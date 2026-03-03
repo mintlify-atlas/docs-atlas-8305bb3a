@@ -1,0 +1,347 @@
+{
+  "projectType": "general",
+  "projectName": "Go",
+  "projectDescription": "An open source programming language that makes it easy to build simple, reliable, and efficient software.",
+  "theme": "aspen",
+  "primaryColor": "#00ADD8",
+  "lightColor": "#5DC9E2",
+  "darkColor": "#00758D",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart",
+              "tutorial"
+            ]
+          },
+          {
+            "group": "Language Guide",
+            "pages": [
+              "language/specification",
+              "language/effective-go",
+              "language/memory-model",
+              "language/godebug"
+            ]
+          },
+          {
+            "group": "Standard Library",
+            "pages": [
+              "stdlib/overview",
+              "stdlib/builtin",
+              "stdlib/fmt",
+              "stdlib/io",
+              "stdlib/os",
+              "stdlib/strings",
+              "stdlib/time",
+              "stdlib/net-http",
+              "stdlib/encoding-json",
+              "stdlib/testing"
+            ]
+          },
+          {
+            "group": "Core Packages",
+            "pages": [
+              "packages/archive",
+              "packages/bufio",
+              "packages/bytes",
+              "packages/compress",
+              "packages/container",
+              "packages/context",
+              "packages/crypto",
+              "packages/database",
+              "packages/debug",
+              "packages/embed",
+              "packages/encoding",
+              "packages/errors",
+              "packages/flag",
+              "packages/hash",
+              "packages/html",
+              "packages/image",
+              "packages/log",
+              "packages/math",
+              "packages/mime",
+              "packages/net",
+              "packages/path",
+              "packages/reflect",
+              "packages/regexp",
+              "packages/runtime",
+              "packages/sort",
+              "packages/strconv",
+              "packages/sync",
+              "packages/syscall",
+              "packages/text",
+              "packages/unicode"
+            ]
+          },
+          {
+            "group": "Tools & Commands",
+            "pages": [
+              "tools/go-command",
+              "tools/gofmt",
+              "tools/compile",
+              "tools/build",
+              "tools/test",
+              "tools/modules",
+              "tools/workspaces"
+            ]
+          },
+          {
+            "group": "Advanced Topics",
+            "pages": [
+              "advanced/runtime",
+              "advanced/assembly",
+              "advanced/cgo",
+              "advanced/garbage-collection",
+              "advanced/diagnostics",
+              "advanced/security"
+            ]
+          },
+          {
+            "group": "Contributing",
+            "pages": [
+              "contributing/overview",
+              "contributing/code-review",
+              "contributing/security"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Language Constructs",
+            "pages": [
+              "api/builtin/functions",
+              "api/builtin/types",
+              "api/builtin/constants"
+            ]
+          },
+          {
+            "group": "I/O & System",
+            "pages": [
+              "api/fmt",
+              "api/io",
+              "api/os",
+              "api/bufio",
+              "api/bytes",
+              "api/strings"
+            ]
+          },
+          {
+            "group": "Data Structures",
+            "pages": [
+              "api/container",
+              "api/sort",
+              "api/slices",
+              "api/maps"
+            ]
+          },
+          {
+            "group": "Networking",
+            "pages": [
+              "api/net",
+              "api/net-http",
+              "api/net-url",
+              "api/net-rpc"
+            ]
+          },
+          {
+            "group": "Encoding",
+            "pages": [
+              "api/encoding-json",
+              "api/encoding-xml",
+              "api/encoding-csv",
+              "api/encoding-base64"
+            ]
+          },
+          {
+            "group": "Cryptography",
+            "pages": [
+              "api/crypto",
+              "api/crypto-tls",
+              "api/crypto-x509",
+              "api/hash"
+            ]
+          },
+          {
+            "group": "Concurrency",
+            "pages": [
+              "api/sync",
+              "api/context",
+              "api/runtime"
+            ]
+          },
+          {
+            "group": "Testing & Debugging",
+            "pages": [
+              "api/testing",
+              "api/debug",
+              "api/log"
+            ]
+          },
+          {
+            "group": "Reflection & Parsing",
+            "pages": [
+              "api/reflect",
+              "api/go-ast",
+              "api/go-parser",
+              "api/go-types"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Statically typed, compiled programming language",
+    "Built-in concurrency with goroutines and channels",
+    "Fast compilation and execution",
+    "Garbage collection",
+    "Rich standard library",
+    "Cross-platform support",
+    "Simple and clean syntax",
+    "Excellent tooling and package management"
+  ],
+  "publicApiSurface": [
+    "archive/tar",
+    "archive/zip",
+    "bufio",
+    "bytes",
+    "compress/flate",
+    "compress/gzip",
+    "container/heap",
+    "container/list",
+    "container/ring",
+    "context",
+    "crypto",
+    "crypto/aes",
+    "crypto/cipher",
+    "crypto/ecdsa",
+    "crypto/ed25519",
+    "crypto/elliptic",
+    "crypto/hmac",
+    "crypto/md5",
+    "crypto/rand",
+    "crypto/rsa",
+    "crypto/sha1",
+    "crypto/sha256",
+    "crypto/sha512",
+    "crypto/subtle",
+    "crypto/tls",
+    "crypto/x509",
+    "database/sql",
+    "database/sql/driver",
+    "debug/elf",
+    "debug/macho",
+    "debug/pe",
+    "embed",
+    "encoding/ascii85",
+    "encoding/asn1",
+    "encoding/base32",
+    "encoding/base64",
+    "encoding/binary",
+    "encoding/csv",
+    "encoding/gob",
+    "encoding/hex",
+    "encoding/json",
+    "encoding/pem",
+    "encoding/xml",
+    "errors",
+    "expvar",
+    "flag",
+    "fmt",
+    "go/ast",
+    "go/build",
+    "go/constant",
+    "go/doc",
+    "go/format",
+    "go/importer",
+    "go/parser",
+    "go/printer",
+    "go/scanner",
+    "go/token",
+    "go/types",
+    "hash",
+    "hash/crc32",
+    "hash/crc64",
+    "hash/fnv",
+    "html",
+    "html/template",
+    "image",
+    "image/color",
+    "image/draw",
+    "image/gif",
+    "image/jpeg",
+    "image/png",
+    "io",
+    "io/fs",
+    "io/ioutil",
+    "log",
+    "log/slog",
+    "log/syslog",
+    "math",
+    "math/big",
+    "math/bits",
+    "math/cmplx",
+    "math/rand",
+    "mime",
+    "mime/multipart",
+    "mime/quotedprintable",
+    "net",
+    "net/http",
+    "net/http/cgi",
+    "net/http/cookiejar",
+    "net/http/fcgi",
+    "net/http/httptest",
+    "net/http/httptrace",
+    "net/http/httputil",
+    "net/http/pprof",
+    "net/mail",
+    "net/netip",
+    "net/rpc",
+    "net/rpc/jsonrpc",
+    "net/smtp",
+    "net/textproto",
+    "net/url",
+    "os",
+    "os/exec",
+    "os/signal",
+    "os/user",
+    "path",
+    "path/filepath",
+    "reflect",
+    "regexp",
+    "regexp/syntax",
+    "runtime",
+    "runtime/debug",
+    "runtime/metrics",
+    "runtime/pprof",
+    "runtime/trace",
+    "slices",
+    "sort",
+    "strconv",
+    "strings",
+    "sync",
+    "sync/atomic",
+    "syscall",
+    "testing",
+    "testing/fstest",
+    "testing/iotest",
+    "testing/quick",
+    "text/scanner",
+    "text/tabwriter",
+    "text/template",
+    "text/template/parse",
+    "time",
+    "unicode",
+    "unicode/utf16",
+    "unicode/utf8"
+  ]
+}
