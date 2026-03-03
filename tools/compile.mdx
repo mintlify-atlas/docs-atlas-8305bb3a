@@ -1,0 +1,477 @@
+---
+title: 'Go Compiler'
+description: 'The Go compiler (go tool compile) compiles Go source files into object files'
+---
+
+The Go compiler, invoked as `go tool compile`, compiles a single Go package comprising the files named on the command line. It writes object files that can be combined into packages or passed to the linker.
+
+## Overview
+
+The compiler is typically invoked indirectly through the `go build` command, but can be used directly for specialized build processes or when debugging compilation issues.
+
+<Note>
+Most users should use `go build` instead of calling the compiler directly. Direct compiler invocation is primarily for advanced use cases and build system integration.
+</Note>
+
+## Usage
+
+```bash
+go tool compile [flags] file...
+```
+
+The specified files must be Go source files and all part of the same package. The same compiler is used for all target operating systems and architectures.
+
+## Basic Flags
+
+### Output Control
+
+<ParamField path="-o" type="file">
+  Write object to file (default: `file.o` or with `-pack`, `file.a`)
+  
+  ```bash
+  go tool compile -o output.o main.go
+  ```
+</ParamField>
+
+<ParamField path="-pack" type="flag">
+  Write a package (archive) file rather than an object file
+  
+  ```bash
+  go tool compile -pack -o lib.a *.go
+  ```
+</ParamField>
+
+<ParamField path="-S" type="flag">
+  Print assembly listing to standard output. Use `-S -S` to include data sections.
+  
+  ```bash
+  go tool compile -S main.go
+  ```
+</ParamField>
+
+### Path and Import Flags
+
+<ParamField path="-D" type="path">
+  Set relative path for local imports
+</ParamField>
+
+<ParamField path="-I" type="directory">
+  Search for imported packages in specified directories (can be repeated)
+  
+  ```bash
+  go tool compile -I /path/to/packages main.go
+  ```
+</ParamField>
+
+<ParamField path="-p" type="path">
+  Set expected package import path for the code being compiled
+  
+  ```bash
+  go tool compile -p example.com/myapp main.go
+  ```
+</ParamField>
+
+## Optimization Flags
+
+<ParamField path="-N" type="flag">
+  Disable optimizations. Useful for debugging.
+  
+  ```bash
+  go tool compile -N -l main.go  # -l disables inlining
+  ```
+</ParamField>
+
+<ParamField path="-l" type="flag">
+  Disable inlining. Combining with `-N` provides better debugging experience.
+</ParamField>
+
+<ParamField path="-m" type="flag">
+  Print optimization decisions. Use multiple times for more detail.
+  
+  ```bash
+  go tool compile -m -m main.go  # More verbose output
+  ```
+</ParamField>
+
+## Common Workflows
+
+### Viewing Assembly Output
+
+<Steps>
+  <Step title="Generate Assembly Listing">
+    Compile and view assembly code:
+    
+    ```bash
+    go tool compile -S main.go > main.s
+    ```
+  </Step>
+  
+  <Step title="View Specific Function">
+    Filter assembly for a specific function:
+    
+    ```bash
+    go tool compile -S main.go | grep -A 20 "TEXT.*myFunction"
+    ```
+  </Step>
+  
+  <Step title="Include Data Sections">
+    View both code and data sections:
+    
+    ```bash
+    go tool compile -S -S main.go
+    ```
+  </Step>
+</Steps>
+
+### Analyzing Optimizations
+
+<CodeGroup>
+```bash Inlining Decisions
+# See what functions are inlined
+go tool compile -m main.go
+
+# More detailed inlining info
+go tool compile -m -m main.go
+```
+
+```bash Escape Analysis
+# See which variables escape to heap
+go tool compile -m main.go 2>&1 | grep escape
+
+# Detailed escape analysis
+go build -gcflags='-m -m' .
+```
+
+```bash Bounds Check Elimination
+# See bounds check decisions
+go tool compile -d=ssa/check_bce/debug=1 main.go
+```
+</CodeGroup>
+
+## Advanced Flags
+
+### Debug and Analysis
+
+<ParamField path="-race" type="flag">
+  Compile with race detector enabled
+  
+  ```bash
+  go tool compile -race main.go
+  ```
+</ParamField>
+
+<ParamField path="-asan" type="flag">
+  Insert calls to C/C++ address sanitizer (Linux only)
+</ParamField>
+
+<ParamField path="-msan" type="flag">
+  Insert calls to C/C++ memory sanitizer (Linux only)
+</ParamField>
+
+### Build Configuration
+
+<ParamField path="-buildid" type="id">
+  Record id as the build id in the export metadata
+  
+  ```bash
+  go tool compile -buildid=myBuildId main.go
+  ```
+</ParamField>
+
+<ParamField path="-importcfg" type="file">
+  Read import configuration from file. Used to specify import resolution.
+</ParamField>
+
+<ParamField path="-embedcfg" type="file">
+  Read go:embed configuration from file. Required if any `//go:embed` directives are used.
+</ParamField>
+
+### Language Version
+
+<ParamField path="-lang" type="version">
+  Set language version to compile, as in `-lang=go1.21`
+  
+  ```bash
+  go tool compile -lang=go1.20 main.go
+  ```
+</ParamField>
+
+<ParamField path="-goversion" type="string">
+  Specify required go tool version of the runtime
+</ParamField>
+
+## DWARF Debug Information
+
+<ParamField path="-dwarf" type="flag">
+  Generate DWARF symbols for debugging
+</ParamField>
+
+<ParamField path="-dwarflocationlists" type="flag">
+  Add location lists to DWARF in optimized mode
+</ParamField>
+
+<ParamField path="-gendwarfinl" type="int">
+  Generate DWARF inline info records (default: 2)
+</ParamField>
+
+## Profiling Flags
+
+```bash
+# CPU profiling during compilation
+go tool compile -cpuprofile cpu.prof main.go
+
+# Memory profiling
+go tool compile -memprofile mem.prof main.go
+
+# Block profiling
+go tool compile -blockprofile block.prof main.go
+
+# Mutex profiling
+go tool compile -mutexprofile mutex.prof main.go
+```
+
+## Compiler Debugging Flags
+
+<Warning>
+These flags are for debugging the compiler itself and are rarely needed by regular users.
+</Warning>
+
+<ParamField path="-d" type="list">
+  Print debug information about items in list
+  
+  ```bash
+  go tool compile -d=ssa/check_bce/debug=1 main.go
+  go tool compile -d=help  # List available debug options
+  ```
+</ParamField>
+
+<ParamField path="-live" type="flag">
+  Debug liveness analysis
+</ParamField>
+
+<ParamField path="-v" type="flag">
+  Increase debug verbosity
+</ParamField>
+
+<ParamField path="-h" type="flag">
+  Halt with a stack trace at the first error detected
+</ParamField>
+
+<ParamField path="-e" type="flag">
+  Remove the limit on the number of errors reported (default limit is 10)
+</ParamField>
+
+## Examples
+
+### Basic Compilation
+
+<CodeGroup>
+```bash Compile Single File
+# Compile to object file
+go tool compile main.go
+# Creates main.o
+
+# Compile with custom output
+go tool compile -o myapp.o main.go
+```
+
+```bash Compile Package
+# Compile all files in package
+go tool compile -p example.com/myapp *.go
+
+# Create archive file
+go tool compile -pack -o myapp.a *.go
+```
+</CodeGroup>
+
+### Cross-Compilation
+
+```bash
+# Set target architecture
+GOOS=linux GOARCH=amd64 go tool compile main.go
+
+# Compile for different platforms
+GOOS=windows GOARCH=amd64 go tool compile -o main.obj main.go
+GOOS=darwin GOARCH=arm64 go tool compile main.go
+```
+
+### Debugging Compilation
+
+<CodeGroup>
+```bash Disable Optimizations
+# Better debugging experience
+go tool compile -N -l main.go
+
+# With DWARF symbols
+go tool compile -N -l -dwarf main.go
+```
+
+```bash View Optimization Decisions
+# See inlining decisions
+go tool compile -m main.go
+
+# Detailed optimization info
+go tool compile -m -m -m main.go
+```
+
+```bash Check Assembly
+# View generated assembly
+go tool compile -S main.go | less
+
+# Save assembly to file
+go tool compile -S main.go > output.s
+```
+</CodeGroup>
+
+### Using with go build
+
+Pass compiler flags through `go build` using `-gcflags`:
+
+```bash
+# View optimization decisions
+go build -gcflags='-m' .
+
+# Disable optimizations for debugging
+go build -gcflags='-N -l' .
+
+# View assembly for specific package
+go build -gcflags='-S' example.com/myapp
+
+# Multiple flags
+go build -gcflags='-m -m -l' .
+```
+
+## Compiler Directives
+
+The compiler accepts directives in the form of comments:
+
+### Function Directives
+
+```go
+//go:noinline
+func myFunction() {
+    // This function will not be inlined
+}
+
+//go:nosplit
+func criticalFunction() {
+    // Omits stack overflow check
+}
+
+//go:noescape
+func externalFunc(p *int)
+
+//go:linkname localname importpath.name
+```
+
+### Line Directives
+
+```go
+//line filename:line
+//line filename:line:col
+/*line filename:line*/
+```
+
+### WebAssembly Directives
+
+```go
+//go:wasmimport module_name function_name
+func importedWasmFunc()
+
+//go:wasmexport export_name
+func exportedWasmFunc() {
+    // Function body
+}
+```
+
+## Compiler Internals
+
+### Compilation Phases
+
+<Steps>
+  <Step title="Parsing">
+    Source code is parsed into an Abstract Syntax Tree (AST)
+  </Step>
+  
+  <Step title="Type Checking">
+    The AST is type-checked and decorated with type information
+  </Step>
+  
+  <Step title="IR Generation">
+    The AST is converted to intermediate representation (IR)
+  </Step>
+  
+  <Step title="Optimizations">
+    Various optimizations are applied (inlining, escape analysis, etc.)
+  </Step>
+  
+  <Step title="SSA Generation">
+    IR is lowered to Static Single Assignment (SSA) form
+  </Step>
+  
+  <Step title="Code Generation">
+    Machine code is generated from SSA
+  </Step>
+  
+  <Step title="Object File Writing">
+    Final object file is written with export data
+  </Step>
+</Steps>
+
+## Performance Tuning
+
+### Compilation Speed
+
+```bash
+# Increase concurrency
+go tool compile -c 8 *.go
+
+# Profile compilation time
+go tool compile -cpuprofile cpu.prof main.go
+```
+
+### Binary Size
+
+```bash
+# Remove debug information
+go build -ldflags='-s -w' .
+
+# Use -trimpath to remove paths
+go build -trimpath .
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Compilation errors with type checking">
+    Use `-e` flag to see all errors at once:
+    ```bash
+    go tool compile -e main.go
+    ```
+  </Accordion>
+  
+  <Accordion title="Debugging optimization issues">
+    Disable optimizations and check if issue persists:
+    ```bash
+    go build -gcflags='-N -l' .
+    ```
+  </Accordion>
+  
+  <Accordion title="Understanding why code doesn't inline">
+    Check inlining decisions:
+    ```bash
+    go build -gcflags='-m -m' . 2>&1 | grep -i inline
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="Building Programs" href="/tools/build">
+    Using go build command
+  </Card>
+  <Card title="go Command" href="/tools/go-command">
+    Overview of go command
+  </Card>
+</CardGroup>

@@ -1,0 +1,293 @@
+---
+title: math
+description: Mathematical functions and constants
+---
+
+The `math` package provides basic constants and mathematical functions.
+
+## Constants
+
+```go
+const (
+    E   = 2.71828182845904523536028747135266249775724709369995957496696763
+    Pi  = 3.14159265358979323846264338327950288419716939937510582097494459
+    Phi = 1.61803398874989484820458683436563811772030917980576286213544862
+    
+    Sqrt2   = 1.41421356237309504880168872420969807856967187537694807317667974
+    SqrtE   = 1.64872127070012814684865078781416357165377610071014801157507931
+    SqrtPi  = 1.77245385090551602729816748334114518279754945612238712821380779
+    SqrtPhi = 1.27201964951406896425242246173749149171560804184009624861664038
+    
+    Ln2    = 0.693147180559945309417232121458176568075500134360255254120680009
+    Log2E  = 1 / Ln2
+    Ln10   = 2.30258509299404568401799145468436420760110148862877297603332790
+    Log10E = 1 / Ln10
+)
+
+const (
+    MaxFloat32             = 3.40282346638528859811704183484516925440e+38
+    SmallestNonzeroFloat32 = 1.401298464324817070923729583289916131280e-45
+    MaxFloat64             = 1.797693134862315708145274237317043567981e+308
+    SmallestNonzeroFloat64 = 4.940656458412465441765687928682213723651e-324
+    
+    MaxInt   = 1<<(bits.UintSize-1) - 1
+    MinInt   = -1 << (bits.UintSize - 1)
+    MaxInt8  = 1<<7 - 1
+    MinInt8  = -1 << 7
+    MaxInt16 = 1<<15 - 1
+    MinInt16 = -1 << 15
+    MaxInt32 = 1<<31 - 1
+    MinInt32 = -1 << 31
+    MaxInt64 = 1<<63 - 1
+    MinInt64 = -1 << 63
+    MaxUint  = 1<<bits.UintSize - 1
+    MaxUint8 = 1<<8 - 1
+    MaxUint16 = 1<<16 - 1
+    MaxUint32 = 1<<32 - 1
+    MaxUint64 = 1<<64 - 1
+)
+```
+
+## Basic Functions
+
+```go
+import "math"
+
+// Absolute value
+abs := math.Abs(-5.5) // 5.5
+
+// Min and Max
+min := math.Min(3.14, 2.71) // 2.71
+max := math.Max(3.14, 2.71) // 3.14
+
+// Power and roots
+pow := math.Pow(2, 3)      // 8
+sqrt := math.Sqrt(16)      // 4
+cbrt := math.Cbrt(27)      // 3
+
+// Rounding
+ceil := math.Ceil(4.2)     // 5
+floor := math.Floor(4.8)   // 4
+round := math.Round(4.5)   // 5
+trunc := math.Trunc(4.9)   // 4
+
+// Remainder
+mod := math.Mod(7, 3)      // 1
+```
+
+## Trigonometric Functions
+
+```go
+// Basic trig (radians)
+sin := math.Sin(math.Pi / 2)  // 1
+cos := math.Cos(0)            // 1
+tan := math.Tan(math.Pi / 4)  // 1
+
+// Inverse trig
+asin := math.Asin(1)          // π/2
+acos := math.Acos(0)          // π/2
+atan := math.Atan(1)          // π/4
+atan2 := math.Atan2(1, 1)    // π/4
+
+// Hyperbolic
+sinh := math.Sinh(0)          // 0
+cosh := math.Cosh(0)          // 1
+tanh := math.Tanh(0)          // 0
+```
+
+## Exponential and Logarithmic
+
+```go
+// Exponential
+exp := math.Exp(1)            // e
+exp2 := math.Exp2(3)          // 8
+
+// Logarithms
+log := math.Log(math.E)       // 1
+log10 := math.Log10(100)      // 2
+log2 := math.Log2(8)          // 3
+log1p := math.Log1p(0)        // 0 (more accurate for small x)
+```
+
+## Special Functions
+
+```go
+// Sign functions
+signbit := math.Signbit(-5)   // true
+copysign := math.Copysign(3.2, -1.0) // -3.2
+
+// Decomposition
+frac, int := math.Modf(3.14)  // 0.14, 3.0
+
+// NaN and Inf
+nan := math.NaN()
+inf := math.Inf(1)            // +Inf
+isNaN := math.IsNaN(nan)      // true
+isInf := math.IsInf(inf, 1)   // true
+
+// Dimension functions
+hypot := math.Hypot(3, 4)     // 5 (√(3² + 4²))
+```
+
+## Practical Examples
+
+### Distance Calculation
+
+```go
+type Point struct {
+    X, Y float64
+}
+
+func distance(p1, p2 Point) float64 {
+    dx := p2.X - p1.X
+    dy := p2.Y - p1.Y
+    return math.Hypot(dx, dy)
+}
+
+// 3D distance
+func distance3D(x1, y1, z1, x2, y2, z2 float64) float64 {
+    return math.Sqrt(
+        math.Pow(x2-x1, 2) +
+        math.Pow(y2-y1, 2) +
+        math.Pow(z2-z1, 2),
+    )
+}
+```
+
+### Angle Conversion
+
+```go
+func degreesToRadians(degrees float64) float64 {
+    return degrees * math.Pi / 180
+}
+
+func radiansToDegrees(radians float64) float64 {
+    return radians * 180 / math.Pi
+}
+```
+
+### Circle Calculations
+
+```go
+func circleArea(radius float64) float64 {
+    return math.Pi * math.Pow(radius, 2)
+}
+
+func circleCircumference(radius float64) float64 {
+    return 2 * math.Pi * radius
+}
+```
+
+### Percentage Calculations
+
+```go
+func percentage(value, total float64) float64 {
+    return (value / total) * 100
+}
+
+func percentageChange(old, new float64) float64 {
+    return ((new - old) / old) * 100
+}
+```
+
+## math/big Package
+
+Arbitrary precision arithmetic.
+
+```go
+import "math/big"
+
+func bigIntExample() {
+    // Big integers
+    a := big.NewInt(12345)
+    b := big.NewInt(67890)
+    
+    sum := new(big.Int).Add(a, b)
+    product := new(big.Int).Mul(a, b)
+    
+    fmt.Println(sum)     // 80235
+    fmt.Println(product) // 838102050
+}
+
+func bigFloatExample() {
+    // Big floats
+    a := big.NewFloat(1.5)
+    b := big.NewFloat(2.3)
+    
+    sum := new(big.Float).Add(a, b)
+    fmt.Println(sum) // 3.8
+}
+
+func bigRatExample() {
+    // Rational numbers
+    a := big.NewRat(1, 3)  // 1/3
+    b := big.NewRat(1, 6)  // 1/6
+    
+    sum := new(big.Rat).Add(a, b)
+    fmt.Println(sum) // 1/2
+}
+```
+
+## math/rand Package
+
+Pseudo-random number generation.
+
+```go
+import (
+    "math/rand"
+    "time"
+)
+
+func randomExample() {
+    rand.Seed(time.Now().UnixNano())
+    
+    // Random integer
+    n := rand.Int()
+    
+    // Random in range [0, 100)
+    n = rand.Intn(100)
+    
+    // Random float [0.0, 1.0)
+    f := rand.Float64()
+    
+    // Random in range [min, max]
+    min, max := 10, 50
+    n = rand.Intn(max-min+1) + min
+}
+
+// Shuffle slice
+func shuffle(slice []int) {
+    rand.Shuffle(len(slice), func(i, j int) {
+        slice[i], slice[j] = slice[j], slice[i]
+    })
+}
+```
+
+## math/cmplx Package
+
+Complex number operations.
+
+```go
+import "math/cmplx"
+
+func complexExample() {
+    z := complex(3, 4) // 3+4i
+    
+    abs := cmplx.Abs(z)       // 5
+    phase := cmplx.Phase(z)   // Angle
+    conj := cmplx.Conj(z)     // 3-4i
+    
+    sqrt := cmplx.Sqrt(z)
+    exp := cmplx.Exp(z)
+    log := cmplx.Log(z)
+}
+```
+
+## Best Practices
+
+1. **Use appropriate types** - float64 for most calculations
+2. **Check for NaN/Inf** - Validate results of divisions
+3. **Use math/big for precision** - When exact arithmetic needed
+4. **Seed random properly** - Use crypto/rand for security
+5. **Watch for overflow** - Check bounds for integer operations
+6. **Use built-in functions** - More accurate than manual implementations

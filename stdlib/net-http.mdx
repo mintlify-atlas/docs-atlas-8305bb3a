@@ -1,0 +1,555 @@
+---
+title: net/http
+description: HTTP client and server implementations
+---
+
+Package http provides HTTP client and server implementations. Get, Head, Post, and PostForm make HTTP requests. The Client type supports custom configurations. The Server type provides an HTTP server.
+
+## HTTP Client
+
+### Making Requests
+
+<ParamField path="Get" type="func Get(url string) (resp *Response, err error)">
+  Issues a GET request to the specified URL. Returns the response and any error encountered.
+  
+  ```go
+  resp, err := http.Get("https://api.example.com/data")
+  if err != nil {
+      log.Fatal(err)
+  }
+  defer resp.Body.Close()
+  
+  body, _ := io.ReadAll(resp.Body)
+  fmt.Println(string(body))
+  ```
+</ParamField>
+
+<ParamField path="Post" type="func Post(url, contentType string, body io.Reader) (resp *Response, err error)">
+  Issues a POST request to the specified URL.
+  
+  ```go
+  data := strings.NewReader(`{"name":"John"}`)
+  resp, err := http.Post("https://api.example.com/users",
+      "application/json", data)
+  if err != nil {
+      log.Fatal(err)
+  }
+  defer resp.Body.Close()
+  ```
+</ParamField>
+
+<ParamField path="PostForm" type="func PostForm(url string, data url.Values) (resp *Response, err error)">
+  Issues a POST request with form data.
+  
+  ```go
+  data := url.Values{}
+  data.Set("username", "john")
+  data.Set("password", "secret")
+  
+  resp, err := http.PostForm("https://example.com/login", data)
+  ```
+</ParamField>
+
+<ParamField path="Head" type="func Head(url string) (resp *Response, err error)">
+  Issues a HEAD request to the specified URL.
+  
+  ```go
+  resp, err := http.Head("https://example.com")
+  if err != nil {
+      log.Fatal(err)
+  }
+  fmt.Println("Status:", resp.Status)
+  fmt.Println("Content-Length:", resp.ContentLength)
+  ```
+</ParamField>
+
+### Client Type
+
+<ParamField path="Client" type="type">
+  An HTTP client. The zero value (DefaultClient) is a usable client that uses DefaultTransport. Clients are safe for concurrent use by multiple goroutines.
+  
+  ```go
+  type Client struct {
+      Transport     RoundTripper
+      CheckRedirect func(req *Request, via []*Request) error
+      Jar           CookieJar
+      Timeout       time.Duration
+  }
+  ```
+  
+  Custom client with timeout:
+  ```go
+  client := &http.Client{
+      Timeout: 10 * time.Second,
+  }
+  
+  resp, err := client.Get("https://api.example.com")
+  ```
+</ParamField>
+
+<ParamField path="Client.Do" type="func (c *Client) Do(req *Request) (*Response, error)">
+  Sends an HTTP request and returns an HTTP response.
+  
+  ```go
+  req, _ := http.NewRequest("GET", "https://api.example.com", nil)
+  req.Header.Add("Authorization", "Bearer token123")
+  
+  client := &http.Client{}
+  resp, err := client.Do(req)
+  ```
+</ParamField>
+
+### Request Type
+
+<ParamField path="NewRequest" type="func NewRequest(method, url string, body io.Reader) (*Request, error)">
+  Returns a new Request given a method, URL, and optional body.
+  
+  ```go
+  // GET request
+  req, err := http.NewRequest("GET", "https://api.example.com/users", nil)
+  
+  // POST request with body
+  data := strings.NewReader(`{"name":"Alice"}`)
+  req, err := http.NewRequest("POST", "https://api.example.com/users", data)
+  req.Header.Set("Content-Type", "application/json")
+  ```
+</ParamField>
+
+<ParamField path="NewRequestWithContext" type="func NewRequestWithContext(ctx context.Context, method, url string, body io.Reader) (*Request, error)">
+  Like NewRequest but includes a context for cancellation and timeouts.
+  
+  ```go
+  ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+  defer cancel()
+  
+  req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+  ```
+</ParamField>
+
+<ParamField path="Request" type="type">
+  Represents an HTTP request received by a server or to be sent by a client.
+  
+  ```go
+  type Request struct {
+      Method string
+      URL    *url.URL
+      Header Header
+      Body   io.ReadCloser
+      // ... more fields
+  }
+  ```
+</ParamField>
+
+### Response Type
+
+<ParamField path="Response" type="type">
+  Represents the response from an HTTP request.
+  
+  ```go
+  type Response struct {
+      Status     string // e.g. "200 OK"
+      StatusCode int    // e.g. 200
+      Header     Header
+      Body       io.ReadCloser
+      // ... more fields
+  }
+  ```
+  
+  Always close the response body:
+  ```go
+  resp, err := http.Get(url)
+  if err != nil {
+      return err
+  }
+  defer resp.Body.Close()
+  
+  body, err := io.ReadAll(resp.Body)
+  ```
+</ParamField>
+
+## HTTP Server
+
+### Creating a Server
+
+<ParamField path="ListenAndServe" type="func ListenAndServe(addr string, handler Handler) error">
+  Listens on the TCP network address and serves HTTP requests.
+  
+  ```go
+  http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+      fmt.Fprintf(w, "Hello, World!")
+  })
+  
+  log.Fatal(http.ListenAndServe(":8080", nil))
+  ```
+</ParamField>
+
+<ParamField path="ListenAndServeTLS" type="func ListenAndServeTLS(addr, certFile, keyFile string, handler Handler) error">
+  Like ListenAndServe but for HTTPS.
+  
+  ```go
+  log.Fatal(http.ListenAndServeTLS(":443", "cert.pem", "key.pem", nil))
+  ```
+</ParamField>
+
+<ParamField path="Server" type="type">
+  Defines parameters for running an HTTP server.
+  
+  ```go
+  type Server struct {
+      Addr         string
+      Handler      Handler
+      ReadTimeout  time.Duration
+      WriteTimeout time.Duration
+      // ... more fields
+  }
+  ```
+  
+  Custom server:
+  ```go
+  server := &http.Server{
+      Addr:           ":8080",
+      ReadTimeout:    10 * time.Second,
+      WriteTimeout:   10 * time.Second,
+      MaxHeaderBytes: 1 << 20,
+  }
+  
+  log.Fatal(server.ListenAndServe())
+  ```
+</ParamField>
+
+### Handler Interface
+
+<ParamField path="Handler" type="interface">
+  Objects that can serve HTTP requests.
+  
+  ```go
+  type Handler interface {
+      ServeHTTP(ResponseWriter, *Request)
+  }
+  ```
+  
+  Custom handler:
+  ```go
+  type MyHandler struct{}
+  
+  func (h *MyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+      w.Write([]byte("Hello from custom handler"))
+  }
+  
+  http.ListenAndServe(":8080", &MyHandler{})
+  ```
+</ParamField>
+
+<ParamField path="HandlerFunc" type="type">
+  An adapter to allow use of ordinary functions as HTTP handlers.
+  
+  ```go
+  type HandlerFunc func(ResponseWriter, *Request)
+  
+  func (f HandlerFunc) ServeHTTP(w ResponseWriter, r *Request) {
+      f(w, r)
+  }
+  ```
+</ParamField>
+
+<ParamField path="HandleFunc" type="func HandleFunc(pattern string, handler func(ResponseWriter, *Request))">
+  Registers the handler function for the given pattern in the DefaultServeMux.
+  
+  ```go
+  http.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) {
+      fmt.Fprintf(w, "Hello, %s!", r.URL.Query().Get("name"))
+  })
+  
+  http.HandleFunc("/api/users", handleUsers)
+  ```
+</ParamField>
+
+<ParamField path="Handle" type="func Handle(pattern string, handler Handler)">
+  Registers the handler for the given pattern in the DefaultServeMux.
+</ParamField>
+
+### Request Handling
+
+<ParamField path="ResponseWriter" type="interface">
+  Used by an HTTP handler to construct an HTTP response.
+  
+  ```go
+  type ResponseWriter interface {
+      Header() Header
+      Write([]byte) (int, error)
+      WriteHeader(statusCode int)
+  }
+  ```
+  
+  Usage:
+  ```go
+  func handler(w http.ResponseWriter, r *http.Request) {
+      w.Header().Set("Content-Type", "application/json")
+      w.WriteHeader(http.StatusOK)
+      w.Write([]byte(`{"status":"ok"}`))
+  }
+  ```
+</ParamField>
+
+### Status Codes
+
+```go
+const (
+    StatusOK                   = 200
+    StatusCreated              = 201
+    StatusAccepted             = 202
+    StatusNoContent            = 204
+    StatusMovedPermanently     = 301
+    StatusFound                = 302
+    StatusBadRequest           = 400
+    StatusUnauthorized         = 401
+    StatusForbidden            = 403
+    StatusNotFound             = 404
+    StatusMethodNotAllowed     = 405
+    StatusInternalServerError  = 500
+    StatusServiceUnavailable   = 503
+)
+```
+
+### Cookies
+
+<ParamField path="SetCookie" type="func SetCookie(w ResponseWriter, cookie *Cookie)">
+  Adds a Set-Cookie header to the ResponseWriter's headers.
+  
+  ```go
+  cookie := &http.Cookie{
+      Name:     "session",
+      Value:    "abc123",
+      Path:     "/",
+      MaxAge:   3600,
+      HttpOnly: true,
+      Secure:   true,
+  }
+  http.SetCookie(w, cookie)
+  ```
+</ParamField>
+
+<ParamField path="Request.Cookie" type="func (r *Request) Cookie(name string) (*Cookie, error)">
+  Returns the named cookie from the request.
+  
+  ```go
+  cookie, err := r.Cookie("session")
+  if err == nil {
+      fmt.Println("Session:", cookie.Value)
+  }
+  ```
+</ParamField>
+
+### File Server
+
+<ParamField path="FileServer" type="func FileServer(root FileSystem) Handler">
+  Returns a handler that serves HTTP requests with the contents of the file system rooted at root.
+  
+  ```go
+  // Serve static files from ./static directory
+  fs := http.FileServer(http.Dir("./static"))
+  http.Handle("/static/", http.StripPrefix("/static/", fs))
+  ```
+</ParamField>
+
+<ParamField path="ServeFile" type="func ServeFile(w ResponseWriter, r *Request, name string)">
+  Replies to the request with the contents of the named file or directory.
+  
+  ```go
+  http.HandleFunc("/download", func(w http.ResponseWriter, r *http.Request) {
+      http.ServeFile(w, r, "./files/document.pdf")
+  })
+  ```
+</ParamField>
+
+## Examples
+
+### Simple HTTP GET
+
+```go
+package main
+
+import (
+    "fmt"
+    "io"
+    "log"
+    "net/http"
+)
+
+func main() {
+    resp, err := http.Get("https://api.github.com")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer resp.Body.Close()
+    
+    fmt.Println("Status:", resp.Status)
+    body, _ := io.ReadAll(resp.Body)
+    fmt.Println(string(body))
+}
+```
+
+### POST Request with JSON
+
+```go
+package main
+
+import (
+    "bytes"
+    "encoding/json"
+    "fmt"
+    "log"
+    "net/http"
+)
+
+type User struct {
+    Name  string `json:"name"`
+    Email string `json:"email"`
+}
+
+func main() {
+    user := User{Name: "Alice", Email: "alice@example.com"}
+    jsonData, _ := json.Marshal(user)
+    
+    resp, err := http.Post("https://api.example.com/users",
+        "application/json", bytes.NewBuffer(jsonData))
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer resp.Body.Close()
+    
+    fmt.Println("Status:", resp.StatusCode)
+}
+```
+
+### Custom Client with Timeout
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "net/http"
+    "time"
+)
+
+func main() {
+    client := &http.Client{
+        Timeout: 5 * time.Second,
+    }
+    
+    ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+    defer cancel()
+    
+    req, _ := http.NewRequestWithContext(ctx, "GET", 
+        "https://api.example.com/slow", nil)
+    req.Header.Set("Authorization", "Bearer token123")
+    
+    resp, err := client.Do(req)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer resp.Body.Close()
+    
+    fmt.Println("Status:", resp.Status)
+}
+```
+
+### Simple HTTP Server
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    "net/http"
+)
+
+func main() {
+    // Handle root path
+    http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+        fmt.Fprintf(w, "Welcome to the home page!")
+    })
+    
+    // Handle /hello path
+    http.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) {
+        name := r.URL.Query().Get("name")
+        if name == "" {
+            name = "Guest"
+        }
+        fmt.Fprintf(w, "Hello, %s!", name)
+    })
+    
+    // Handle /api/status path
+    http.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusOK)
+        fmt.Fprintf(w, `{"status":"healthy","version":"1.0"}`)
+    })
+    
+    fmt.Println("Server starting on :8080")
+    log.Fatal(http.ListenAndServe(":8080", nil))
+}
+```
+
+### REST API Server
+
+```go
+package main
+
+import (
+    "encoding/json"
+    "fmt"
+    "log"
+    "net/http"
+)
+
+type User struct {
+    ID   int    `json:"id"`
+    Name string `json:"name"`
+}
+
+var users = []User{
+    {ID: 1, Name: "Alice"},
+    {ID: 2, Name: "Bob"},
+}
+
+func getUsers(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(users)
+}
+
+func createUser(w http.ResponseWriter, r *http.Request) {
+    var user User
+    if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
+    
+    user.ID = len(users) + 1
+    users = append(users, user)
+    
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusCreated)
+    json.NewEncoder(w).Encode(user)
+}
+
+func main() {
+    http.HandleFunc("/api/users", func(w http.ResponseWriter, r *http.Request) {
+        switch r.Method {
+        case "GET":
+            getUsers(w, r)
+        case "POST":
+            createUser(w, r)
+        default:
+            http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+        }
+    })
+    
+    fmt.Println("API server running on :8080")
+    log.Fatal(http.ListenAndServe(":8080", nil))
+}
+```

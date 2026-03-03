@@ -1,0 +1,369 @@
+---
+title: container
+description: Container data structures including heap, list, and ring
+---
+
+The `container` package provides implementations of container data structures. It includes three subpackages for different container types.
+
+## Subpackages
+
+### container/heap
+
+Provides heap operations for any type that implements `heap.Interface`.
+
+**Interface:**
+
+```go
+type Interface interface {
+    sort.Interface
+    Push(x interface{}) // add x as element Len()
+    Pop() interface{}   // remove and return element Len() - 1
+}
+```
+
+**Example - Min Heap:**
+
+```go
+import (
+    "container/heap"
+    "fmt"
+)
+
+type IntHeap []int
+
+func (h IntHeap) Len() int           { return len(h) }
+func (h IntHeap) Less(i, j int) bool { return h[i] < h[j] }
+func (h IntHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+
+func (h *IntHeap) Push(x interface{}) {
+    *h = append(*h, x.(int))
+}
+
+func (h *IntHeap) Pop() interface{} {
+    old := *h
+    n := len(old)
+    x := old[n-1]
+    *h = old[0 : n-1]
+    return x
+}
+
+func useHeap() {
+    h := &IntHeap{2, 1, 5, 3, 4}
+    heap.Init(h)
+    
+    heap.Push(h, 0)
+    fmt.Printf("minimum: %d\n", (*h)[0])
+    
+    for h.Len() > 0 {
+        fmt.Printf("%d ", heap.Pop(h))
+    }
+    // Output: 0 1 2 3 4 5
+}
+```
+
+**Example - Priority Queue:**
+
+```go
+type Item struct {
+    value    string
+    priority int
+    index    int
+}
+
+type PriorityQueue []*Item
+
+func (pq PriorityQueue) Len() int { return len(pq) }
+
+func (pq PriorityQueue) Less(i, j int) bool {
+    return pq[i].priority > pq[j].priority // Higher priority first
+}
+
+func (pq PriorityQueue) Swap(i, j int) {
+    pq[i], pq[j] = pq[j], pq[i]
+    pq[i].index = i
+    pq[j].index = j
+}
+
+func (pq *PriorityQueue) Push(x interface{}) {
+    n := len(*pq)
+    item := x.(*Item)
+    item.index = n
+    *pq = append(*pq, item)
+}
+
+func (pq *PriorityQueue) Pop() interface{} {
+    old := *pq
+    n := len(old)
+    item := old[n-1]
+    item.index = -1
+    *pq = old[0 : n-1]
+    return item
+}
+
+func usePriorityQueue() {
+    pq := make(PriorityQueue, 0)
+    heap.Init(&pq)
+    
+    heap.Push(&pq, &Item{value: "task1", priority: 3})
+    heap.Push(&pq, &Item{value: "task2", priority: 1})
+    heap.Push(&pq, &Item{value: "task3", priority: 5})
+    
+    for pq.Len() > 0 {
+        item := heap.Pop(&pq).(*Item)
+        fmt.Printf("%s (priority %d)\n", item.value, item.priority)
+    }
+}
+```
+
+### container/list
+
+Implements a doubly linked list.
+
+**Type:**
+
+```go
+type List struct {
+    // contains filtered or unexported fields
+}
+
+type Element struct {
+    Value interface{}
+    // contains filtered or unexported fields
+}
+```
+
+**Example - Basic Usage:**
+
+```go
+import (
+    "container/list"
+    "fmt"
+)
+
+func useList() {
+    l := list.New()
+    
+    // Add elements
+    e1 := l.PushBack("first")
+    e2 := l.PushBack("second")
+    l.PushFront("zero")
+    
+    // Insert relative to existing element
+    l.InsertBefore("before second", e2)
+    l.InsertAfter("after first", e1)
+    
+    // Iterate
+    for e := l.Front(); e != nil; e = e.Next() {
+        fmt.Println(e.Value)
+    }
+    
+    // Remove element
+    l.Remove(e2)
+    
+    // Get length
+    fmt.Printf("Length: %d\n", l.Len())
+}
+```
+
+**Example - LRU Cache:**
+
+```go
+type LRUCache struct {
+    capacity int
+    cache    map[string]*list.Element
+    list     *list.List
+}
+
+type entry struct {
+    key   string
+    value interface{}
+}
+
+func NewLRUCache(capacity int) *LRUCache {
+    return &LRUCache{
+        capacity: capacity,
+        cache:    make(map[string]*list.Element),
+        list:     list.New(),
+    }
+}
+
+func (c *LRUCache) Get(key string) (interface{}, bool) {
+    if elem, ok := c.cache[key]; ok {
+        c.list.MoveToFront(elem)
+        return elem.Value.(*entry).value, true
+    }
+    return nil, false
+}
+
+func (c *LRUCache) Put(key string, value interface{}) {
+    if elem, ok := c.cache[key]; ok {
+        c.list.MoveToFront(elem)
+        elem.Value.(*entry).value = value
+        return
+    }
+    
+    if c.list.Len() >= c.capacity {
+        oldest := c.list.Back()
+        if oldest != nil {
+            c.list.Remove(oldest)
+            delete(c.cache, oldest.Value.(*entry).key)
+        }
+    }
+    
+    elem := c.list.PushFront(&entry{key, value})
+    c.cache[key] = elem
+}
+```
+
+### container/ring
+
+Implements operations on circular lists.
+
+**Type:**
+
+```go
+type Ring struct {
+    Value interface{}
+    // contains filtered or unexported fields
+}
+```
+
+**Example - Basic Usage:**
+
+```go
+import (
+    "container/ring"
+    "fmt"
+)
+
+func useRing() {
+    // Create a ring of size 5
+    r := ring.New(5)
+    
+    // Initialize with values
+    for i := 0; i < r.Len(); i++ {
+        r.Value = i
+        r = r.Next()
+    }
+    
+    // Iterate through ring
+    r.Do(func(x interface{}) {
+        fmt.Println(x)
+    })
+    
+    // Move forward/backward
+    r = r.Move(2)
+    fmt.Printf("Current value: %d\n", r.Value)
+}
+```
+
+**Example - Round Robin Scheduler:**
+
+```go
+type RoundRobin struct {
+    ring *ring.Ring
+}
+
+func NewRoundRobin(items []string) *RoundRobin {
+    r := ring.New(len(items))
+    for i := 0; i < len(items); i++ {
+        r.Value = items[i]
+        r = r.Next()
+    }
+    return &RoundRobin{ring: r}
+}
+
+func (rr *RoundRobin) Next() string {
+    value := rr.ring.Value.(string)
+    rr.ring = rr.ring.Next()
+    return value
+}
+
+func (rr *RoundRobin) Remove(item string) {
+    rr.ring.Do(func(x interface{}) {
+        if x == item {
+            rr.ring = rr.ring.Prev()
+            rr.ring.Unlink(1)
+        }
+    })
+}
+
+func useRoundRobin() {
+    rr := NewRoundRobin([]string{"server1", "server2", "server3"})
+    
+    for i := 0; i < 5; i++ {
+        fmt.Printf("Request to: %s\n", rr.Next())
+    }
+}
+```
+
+## Key Methods
+
+### heap Functions
+
+- `Init(h Interface)` - Establish heap invariants
+- `Push(h Interface, x interface{})` - Push element onto heap
+- `Pop(h Interface)` - Remove and return minimum element
+- `Remove(h Interface, i int)` - Remove element at index i
+- `Fix(h Interface, i int)` - Re-establish heap after element at i changed
+
+### list Methods
+
+- `PushFront(v interface{})` - Insert at front
+- `PushBack(v interface{})` - Insert at back
+- `InsertBefore(v interface{}, mark *Element)` - Insert before mark
+- `InsertAfter(v interface{}, mark *Element)` - Insert after mark
+- `Remove(e *Element)` - Remove element
+- `MoveToFront(e *Element)` - Move element to front
+- `MoveToBack(e *Element)` - Move element to back
+- `Front()` - Return first element
+- `Back()` - Return last element
+
+### ring Methods
+
+- `New(n int)` - Create ring of n elements
+- `Next()` - Return next ring element
+- `Prev()` - Return previous ring element
+- `Move(n int)` - Move n elements forward (negative n moves backward)
+- `Link(s *Ring)` - Connect r and s
+- `Unlink(n int)` - Remove n elements starting from r.Next()
+- `Do(f func(interface{}))` - Call function for each element
+
+## Performance Characteristics
+
+### Heap
+- Push: O(log n)
+- Pop: O(log n)
+- Peek (access min): O(1)
+- Init: O(n)
+
+### List
+- PushFront/PushBack: O(1)
+- Remove: O(1) with element reference
+- Access by index: O(n)
+- Search: O(n)
+
+### Ring
+- Access: O(1)
+- Insert/Remove: O(1)
+- Traverse: O(n)
+
+## Common Use Cases
+
+### Heap
+- Priority queues
+- Task scheduling
+- Finding k smallest/largest elements
+- Dijkstra's algorithm
+
+### List
+- LRU caches
+- Browser history (back/forward)
+- Undo/redo functionality
+- Music playlists
+
+### Ring
+- Round-robin scheduling
+- Circular buffers
+- Load balancing
+- Token rotation

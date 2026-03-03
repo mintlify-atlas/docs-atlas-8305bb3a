@@ -1,0 +1,379 @@
+---
+title: context
+description: Package context defines the Context type for managing deadlines, cancellation, and request-scoped values
+---
+
+Package context defines the Context type, which carries deadlines, cancellation signals, and other request-scoped values across API boundaries and between processes.
+
+Incoming requests to a server should create a Context, and outgoing calls to servers should accept a Context. The chain of function calls between them must propagate the Context, optionally replacing it with a derived Context.
+
+## Context Interface
+
+The Context interface is the core abstraction for managing goroutine lifecycles.
+
+```go
+type Context interface {
+    Deadline() (deadline time.Time, ok bool)
+    Done() <-chan struct{}
+    Err() error
+    Value(key any) any
+}
+```
+
+<ParamField path="Deadline" type="func() (time.Time, bool)">
+  Returns the time when work done on behalf of this context should be canceled. Returns ok==false when no deadline is set.
+</ParamField>
+
+<ParamField path="Done" type="func() <-chan struct{}">
+  Returns a channel that's closed when work done on behalf of this context should be canceled. May return nil if this context can never be canceled.
+</ParamField>
+
+<ParamField path="Err" type="func() error">
+  Returns nil if Done is not yet closed. If Done is closed, returns a non-nil error explaining why: DeadlineExceeded or Canceled.
+</ParamField>
+
+<ParamField path="Value" type="func(key any) any">
+  Returns the value associated with this context for key, or nil if no value is associated with key.
+</ParamField>
+
+## Creating Contexts
+
+### Background
+
+```go
+ctx := context.Background()
+```
+
+<ParamField path="Background" type="func() Context">
+  Returns a non-nil, empty Context. It is never canceled, has no values, and has no deadline. Typically used by the main function, initialization, and tests, and as the top-level Context for incoming requests.
+</ParamField>
+
+### TODO
+
+```go
+ctx := context.TODO()
+```
+
+<ParamField path="TODO" type="func() Context">
+  Returns a non-nil, empty Context. Use context.TODO when it's unclear which Context to use or it is not yet available.
+</ParamField>
+
+## Cancellation
+
+### WithCancel
+
+Creates a cancellable context.
+
+```go
+ctx, cancel := context.WithCancel(parent)
+defer cancel() // Always call cancel to release resources
+
+go func() {
+    select {
+    case <-ctx.Done():
+        fmt.Println("canceled:", ctx.Err())
+        return
+    case <-time.After(time.Second):
+        fmt.Println("completed")
+    }
+}()
+
+cancel() // Cancel the context
+```
+
+<ParamField path="WithCancel" type="func(parent Context) (Context, CancelFunc)">
+  Returns a derived context with a new Done channel. The returned context's Done channel is closed when the cancel function is called or when the parent context's Done channel is closed, whichever happens first.
+</ParamField>
+
+### WithCancelCause
+
+Creates a cancellable context with a specific cause.
+
+```go
+ctx, cancel := context.WithCancelCause(parent)
+defer cancel(nil)
+
+err := errors.New("operation failed")
+cancel(err)
+
+fmt.Println(context.Cause(ctx)) // prints: operation failed
+```
+
+<ParamField path="WithCancelCause" type="func(parent Context) (Context, CancelCauseFunc)">
+  Behaves like WithCancel but returns a CancelCauseFunc that takes an error. Calling cancel with a non-nil error records that error in ctx.
+</ParamField>
+
+<ParamField path="Cause" type="func(c Context) error">
+  Returns a non-nil error explaining why c was canceled. Returns nil if c has not been canceled yet.
+</ParamField>
+
+### WithTimeout
+
+Creates a context that cancels after a timeout.
+
+```go
+ctx, cancel := context.WithTimeout(parent, 5*time.Second)
+defer cancel()
+
+select {
+case <-ctx.Done():
+    fmt.Println("timeout:", ctx.Err())
+case result := <-doWork():
+    fmt.Println("result:", result)
+}
+```
+
+<ParamField path="WithTimeout" type="func(parent Context, timeout time.Duration) (Context, CancelFunc)">
+  Returns WithDeadline(parent, time.Now().Add(timeout)).
+</ParamField>
+
+<ParamField path="WithTimeoutCause" type="func(parent Context, timeout time.Duration, cause error) (Context, CancelFunc)">
+  Like WithTimeout but sets the cause of cancellation when the timeout expires.
+</ParamField>
+
+### WithDeadline
+
+Creates a context that cancels at a specific time.
+
+```go
+deadline := time.Now().Add(10 * time.Second)
+ctx, cancel := context.WithDeadline(parent, deadline)
+defer cancel()
+
+if d, ok := ctx.Deadline(); ok {
+    fmt.Printf("Context will expire at: %v\n", d)
+}
+```
+
+<ParamField path="WithDeadline" type="func(parent Context, d time.Time) (Context, CancelFunc)">
+  Returns a copy of the parent context with the deadline adjusted to be no later than d. If the parent's deadline is already earlier than d, WithDeadline is semantically equivalent to parent.
+</ParamField>
+
+<ParamField path="WithDeadlineCause" type="func(parent Context, d time.Time, cause error) (Context, CancelFunc)">
+  Like WithDeadline but sets the cause of cancellation when the deadline expires.
+</ParamField>
+
+### AfterFunc
+
+Schedules a function to run after context cancellation.
+
+```go
+ctx, cancel := context.WithCancel(parent)
+stop := context.AfterFunc(ctx, func() {
+    fmt.Println("Context was canceled")
+})
+defer stop()
+
+cancel() // Triggers the AfterFunc callback
+```
+
+<ParamField path="AfterFunc" type="func(ctx Context, f func()) (stop func() bool)">
+  Arranges to call f in its own goroutine after ctx is done. Returns a stop function that prevents the call to f if called before ctx is done.
+</ParamField>
+
+## Values
+
+### WithValue
+
+Attaches a key-value pair to a context.
+
+```go
+type key string
+const userKey key = "user"
+
+ctx := context.WithValue(parent, userKey, "alice")
+
+if user, ok := ctx.Value(userKey).(string); ok {
+    fmt.Println("User:", user)
+}
+```
+
+<ParamField path="WithValue" type="func(parent Context, key, val any) Context">
+  Returns a copy of parent in which the value associated with key is val.
+</ParamField>
+
+<Warning>
+Use context Values only for request-scoped data that transits processes and APIs, not for passing optional parameters to functions. Keys should be comparable and values should be safe for simultaneous use by multiple goroutines.
+</Warning>
+
+## Error Values
+
+<ParamField path="Canceled" type="error">
+  Error returned by Context.Err when the context is canceled for some reason other than its deadline passing.
+</ParamField>
+
+<ParamField path="DeadlineExceeded" type="error">
+  Error returned by Context.Err when the context is canceled due to its deadline passing.
+</ParamField>
+
+## Function Signatures
+
+### CancelFunc
+
+```go
+type CancelFunc func()
+```
+
+Tells an operation to abandon its work. Does not wait for the work to stop. May be called by multiple goroutines simultaneously. After the first call, subsequent calls do nothing.
+
+### CancelCauseFunc
+
+```go
+type CancelCauseFunc func(cause error)
+```
+
+Behaves like a CancelFunc but additionally sets the cancellation cause. If called with nil, sets the cause to Canceled.
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always call cancel functions">
+    Failing to call the CancelFunc leaks the child context and its children until the parent is canceled. Use defer to ensure the cancel function is called.
+    
+    ```go
+    ctx, cancel := context.WithTimeout(parent, 5*time.Second)
+    defer cancel() // Always defer cancel
+    ```
+  </Accordion>
+
+  <Accordion title="Pass Context as first parameter">
+    The Context should be the first parameter, typically named ctx.
+    
+    ```go
+    func DoSomething(ctx context.Context, arg Arg) error {
+        // ... use ctx ...
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Don't store Contexts in structs">
+    Pass a Context explicitly to each function that needs it. Don't store Contexts inside a struct type.
+  </Accordion>
+
+  <Accordion title="Never pass nil Context">
+    Even if a function permits it, pass context.TODO if you are unsure which Context to use.
+  </Accordion>
+
+  <Accordion title="Use type-safe context keys">
+    Define context keys as unexported types to avoid collisions.
+    
+    ```go
+    // Package user defines context keys
+    package user
+    
+    type key int
+    const userKey key = 0
+    
+    func WithUser(ctx context.Context, u *User) context.Context {
+        return context.WithValue(ctx, userKey, u)
+    }
+    
+    func FromContext(ctx context.Context) (*User, bool) {
+        u, ok := ctx.Value(userKey).(*User)
+        return u, ok
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Common Patterns
+
+### HTTP Request with Timeout
+
+```go
+func makeRequest(ctx context.Context, url string) error {
+    ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+    defer cancel()
+    
+    req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+    if err != nil {
+        return err
+    }
+    
+    resp, err := http.DefaultClient.Do(req)
+    if err != nil {
+        return err
+    }
+    defer resp.Body.Close()
+    
+    return nil
+}
+```
+
+### Graceful Shutdown
+
+```go
+func server(ctx context.Context) {
+    srv := &http.Server{Addr: ":8080"}
+    
+    go func() {
+        <-ctx.Done()
+        shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+        defer cancel()
+        srv.Shutdown(shutdownCtx)
+    }()
+    
+    srv.ListenAndServe()
+}
+```
+
+### Pipeline with Cancellation
+
+```go
+func gen(ctx context.Context) <-chan int {
+    dst := make(chan int)
+    n := 1
+    go func() {
+        defer close(dst)
+        for {
+            select {
+            case <-ctx.Done():
+                return // Exit when context is canceled
+            case dst <- n:
+                n++
+            }
+        }
+    }()
+    return dst
+}
+
+func main() {
+    ctx, cancel := context.WithCancel(context.Background())
+    defer cancel()
+    
+    for n := range gen(ctx) {
+        fmt.Println(n)
+        if n == 5 {
+            break
+        }
+    }
+}
+```
+
+### Request-scoped Values
+
+```go
+type ctxKey string
+
+const (
+    requestIDKey ctxKey = "requestID"
+    userIDKey    ctxKey = "userID"
+)
+
+func middleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        ctx := r.Context()
+        
+        // Add request ID to context
+        requestID := generateRequestID()
+        ctx = context.WithValue(ctx, requestIDKey, requestID)
+        
+        // Add user ID to context
+        if userID := extractUserID(r); userID != "" {
+            ctx = context.WithValue(ctx, userIDKey, userID)
+        }
+        
+        next.ServeHTTP(w, r.WithContext(ctx))
+    })
+}
+```

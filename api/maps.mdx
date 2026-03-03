@@ -1,0 +1,344 @@
+---
+title: Maps
+description: API reference for Go maps package - functions for working with maps of any type
+---
+
+Package maps defines various functions useful with maps of any type.
+
+<Note>
+  This package does not have any special handling for non-reflexive keys (keys k where k != k), such as floating-point NaNs.
+</Note>
+
+## Comparison Functions
+
+### Equal
+
+```go
+func Equal[M1, M2 ~map[K]V, K, V comparable](m1 M1, m2 M2) bool
+```
+
+Reports whether two maps contain the same key/value pairs. Values are compared using ==.
+
+<ParamField path="m1" type="M1" required>
+  First map to compare
+</ParamField>
+
+<ParamField path="m2" type="M2" required>
+  Second map to compare
+</ParamField>
+
+<ResponseField name="return" type="bool">
+  true if maps contain the same key/value pairs, false otherwise
+</ResponseField>
+
+### EqualFunc
+
+```go
+func EqualFunc[M1 ~map[K]V1, M2 ~map[K]V2, K comparable, V1, V2 any](m1 M1, m2 M2, eq func(V1, V2) bool) bool
+```
+
+Like Equal, but compares values using eq. Keys are still compared with ==.
+
+<ParamField path="m1" type="M1" required>
+  First map to compare
+</ParamField>
+
+<ParamField path="m2" type="M2" required>
+  Second map to compare
+</ParamField>
+
+<ParamField path="eq" type="func(V1, V2) bool" required>
+  Function to compare values
+</ParamField>
+
+<ResponseField name="return" type="bool">
+  true if maps are equal according to eq, false otherwise
+</ResponseField>
+
+## Manipulation Functions
+
+### Clone
+
+```go
+func Clone[M ~map[K]V, K comparable, V any](m M) M
+```
+
+Returns a copy of m. This is a shallow clone: the new keys and values are set using ordinary assignment.
+
+<ParamField path="m" type="M" required>
+  The map to clone
+</ParamField>
+
+<ResponseField name="return" type="M">
+  A shallow copy of the map, or nil if m is nil
+</ResponseField>
+
+### Copy
+
+```go
+func Copy[M1 ~map[K]V, M2 ~map[K]V, K comparable, V any](dst M1, src M2)
+```
+
+Copies all key/value pairs in src adding them to dst. When a key in src is already present in dst, the value in dst will be overwritten by the value associated with the key in src.
+
+<ParamField path="dst" type="M1" required>
+  Destination map
+</ParamField>
+
+<ParamField path="src" type="M2" required>
+  Source map
+</ParamField>
+
+### DeleteFunc
+
+```go
+func DeleteFunc[M ~map[K]V, K comparable, V any](m M, del func(K, V) bool)
+```
+
+Deletes any key/value pairs from m for which del returns true.
+
+<ParamField path="m" type="M" required>
+  The map to delete from
+</ParamField>
+
+<ParamField path="del" type="func(K, V) bool" required>
+  Predicate function to determine which pairs to delete
+</ParamField>
+
+## Iterator Functions
+
+The following functions work with Go 1.23+ iterators.
+
+### All
+
+```go
+func All[M ~map[K]V, K comparable, V any](m M) iter.Seq2[K, V]
+```
+
+Returns an iterator over key-value pairs from m. The iteration order is not specified and is not guaranteed to be the same from one iteration to the next.
+
+<ParamField path="m" type="M" required>
+  The map to iterate over
+</ParamField>
+
+<ResponseField name="return" type="iter.Seq2[K, V]">
+  An iterator over key-value pairs
+</ResponseField>
+
+### Keys
+
+```go
+func Keys[M ~map[K]V, K comparable, V any](m M) iter.Seq[K]
+```
+
+Returns an iterator over keys in m. The iteration order is not specified and is not guaranteed to be the same from one iteration to the next.
+
+<ParamField path="m" type="M" required>
+  The map to get keys from
+</ParamField>
+
+<ResponseField name="return" type="iter.Seq[K]">
+  An iterator over keys
+</ResponseField>
+
+### Values
+
+```go
+func Values[M ~map[K]V, K comparable, V any](m M) iter.Seq[V]
+```
+
+Returns an iterator over values in m. The iteration order is not specified and is not guaranteed to be the same from one iteration to the next.
+
+<ParamField path="m" type="M" required>
+  The map to get values from
+</ParamField>
+
+<ResponseField name="return" type="iter.Seq[V]">
+  An iterator over values
+</ResponseField>
+
+### Insert
+
+```go
+func Insert[M ~map[K]V, K comparable, V any](m M, seq iter.Seq2[K, V])
+```
+
+Adds the key-value pairs from seq to m. If a key in seq already exists in m, its value will be overwritten.
+
+<ParamField path="m" type="M" required>
+  The map to insert into
+</ParamField>
+
+<ParamField path="seq" type="iter.Seq2[K, V]" required>
+  Iterator over key-value pairs to insert
+</ParamField>
+
+### Collect
+
+```go
+func Collect[K comparable, V any](seq iter.Seq2[K, V]) map[K]V
+```
+
+Collects key-value pairs from seq into a new map and returns it.
+
+<ParamField path="seq" type="iter.Seq2[K, V]" required>
+  Iterator over key-value pairs
+</ParamField>
+
+<ResponseField name="return" type="map[K]V">
+  A new map containing the pairs from seq
+</ResponseField>
+
+## Examples
+
+### Basic Operations
+
+```go
+package main
+
+import (
+    "fmt"
+    "maps"
+)
+
+func main() {
+    m1 := map[string]int{
+        "one": 1,
+        "two": 2,
+    }
+
+    // Clone
+    m2 := maps.Clone(m1)
+    m2["one"] = 100
+    fmt.Println(m1["one"]) // 1
+    fmt.Println(m2["one"]) // 100
+
+    // Equal
+    m3 := map[string]int{"one": 1, "two": 2}
+    fmt.Println(maps.Equal(m1, m3)) // true
+}
+```
+
+### Copy and DeleteFunc
+
+```go
+package main
+
+import (
+    "fmt"
+    "maps"
+)
+
+func main() {
+    m1 := map[string]int{
+        "one": 1,
+        "two": 2,
+    }
+    m2 := map[string]int{
+        "one": 10,
+    }
+
+    // Copy
+    maps.Copy(m2, m1)
+    fmt.Println(m2) // map[one:1 two:2]
+
+    // DeleteFunc - delete odd values
+    m3 := map[string]int{
+        "one":   1,
+        "two":   2,
+        "three": 3,
+        "four":  4,
+    }
+    maps.DeleteFunc(m3, func(k string, v int) bool {
+        return v%2 != 0
+    })
+    fmt.Println(m3) // map[four:4 two:2]
+}
+```
+
+### Working with Iterators
+
+```go
+package main
+
+import (
+    "fmt"
+    "maps"
+    "slices"
+)
+
+func main() {
+    m := map[int]string{
+        1:    "one",
+        10:   "ten",
+        1000: "thousand",
+    }
+
+    // Get sorted keys
+    keys := slices.Sorted(maps.Keys(m))
+    fmt.Println(keys) // [1 10 1000]
+
+    // Get sorted values
+    values := slices.Sorted(maps.Values(m))
+    fmt.Println(values) // [one ten thousand]
+
+    // Collect from iterator
+    s := []string{"zero", "one", "two", "three"}
+    m2 := maps.Collect(slices.All(s))
+    fmt.Println(m2) // map[0:zero 1:one 2:two 3:three]
+}
+```
+
+### EqualFunc with Custom Comparison
+
+```go
+package main
+
+import (
+    "fmt"
+    "maps"
+    "strings"
+)
+
+func main() {
+    m1 := map[int]string{
+        1:    "one",
+        10:   "Ten",
+        1000: "THOUSAND",
+    }
+    m2 := map[int][]byte{
+        1:    []byte("One"),
+        10:   []byte("Ten"),
+        1000: []byte("Thousand"),
+    }
+
+    eq := maps.EqualFunc(m1, m2, func(v1 string, v2 []byte) bool {
+        return strings.EqualFold(v1, string(v2))
+    })
+    fmt.Println(eq) // true
+}
+```
+
+### Insert from Iterator
+
+```go
+package main
+
+import (
+    "fmt"
+    "maps"
+    "slices"
+)
+
+func main() {
+    m1 := map[int]string{
+        1000: "THOUSAND",
+    }
+    s := []string{"zero", "one", "two", "three"}
+
+    // Insert all elements from slice into map
+    maps.Insert(m1, slices.All(s))
+    fmt.Println(m1)
+    // map[0:zero 1:one 2:two 3:three 1000:THOUSAND]
+}
+```

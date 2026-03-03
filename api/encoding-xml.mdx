@@ -1,0 +1,472 @@
+---
+title: encoding/xml
+description: API reference for the encoding/xml package - XML encoding and decoding
+---
+
+# encoding/xml
+
+Package xml implements a simple XML 1.0 parser that understands XML name spaces. It provides functions and types for encoding and decoding XML data.
+
+## Overview
+
+The xml package provides:
+
+1. **Marshal/Unmarshal functions** - For converting between Go values and XML byte slices
+2. **Encoder/Decoder types** - For streaming XML data to/from io.Reader and io.Writer
+3. **Token-based parsing** - For low-level XML processing
+
+## Constants
+
+### Header
+
+```go
+const Header = `<?xml version="1.0" encoding="UTF-8"?>` + "\n"
+```
+
+Header is a generic XML header suitable for use with the output of Marshal. This is not automatically added to any output of this package.
+
+## Functions
+
+### Marshal
+
+```go
+func Marshal(v any) ([]byte, error)
+```
+
+Marshal returns the XML encoding of v.
+
+<ParamField path="v" type="any" required>
+  The Go value to encode as XML. Can be structs, slices, arrays, pointers, or interfaces. Channels, functions, and maps are not supported.
+</ParamField>
+
+<ResponseField name="[]byte" type="[]byte">
+  The XML encoding of the value
+</ResponseField>
+
+<ResponseField name="error" type="error">
+  An error if the value cannot be marshaled. Returns an error if asked to marshal a channel, function, or map.
+</ResponseField>
+
+**Example:**
+
+```go
+type Person struct {
+    XMLName   xml.Name `xml:"person"`
+    Id        int      `xml:"id,attr"`
+    FirstName string   `xml:"name>first"`
+    LastName  string   `xml:"name>last"`
+    Age       int      `xml:"age"`
+}
+
+v := &Person{Id: 13, FirstName: "John", LastName: "Doe", Age: 42}
+output, err := xml.Marshal(v)
+// Output: <person id="13"><name><first>John</first><last>Doe</last></name><age>42</age></person>
+```
+
+### Unmarshal
+
+```go
+func Unmarshal(data []byte, v any) error
+```
+
+Unmarshal parses the XML-encoded data and stores the result in the value pointed to by v, which must be a non-nil pointer.
+
+<ParamField path="data" type="[]byte" required>
+  The XML-encoded data to parse
+</ParamField>
+
+<ParamField path="v" type="any" required>
+  A pointer to the destination value where the decoded data will be stored
+</ParamField>
+
+<ResponseField name="error" type="error">
+  Returns an error if the data cannot be parsed or if v is not a valid destination
+</ResponseField>
+
+### MarshalIndent
+
+```go
+func MarshalIndent(v any, prefix, indent string) ([]byte, error)
+```
+
+MarshalIndent works like Marshal, but each XML element begins on a new indented line that starts with prefix and is followed by one or more copies of indent according to the nesting depth.
+
+<ParamField path="v" type="any" required>
+  The Go value to encode as XML
+</ParamField>
+
+<ParamField path="prefix" type="string" required>
+  String to prefix each line with
+</ParamField>
+
+<ParamField path="indent" type="string" required>
+  String to use for each level of indentation
+</ParamField>
+
+**Example:**
+
+```go
+type Person struct {
+    XMLName   xml.Name `xml:"person"`
+    Id        int      `xml:"id,attr"`
+    FirstName string   `xml:"name>first"`
+    LastName  string   `xml:"name>last"`
+    Age       int      `xml:"age"`
+}
+
+v := &Person{Id: 13, FirstName: "John", LastName: "Doe", Age: 42}
+output, err := xml.MarshalIndent(v, "  ", "    ")
+// Output:
+//   <person id="13">
+//       <name>
+//           <first>John</first>
+//           <last>Doe</last>
+//       </name>
+//       <age>42</age>
+//   </person>
+```
+
+## Types
+
+### Encoder
+
+```go
+type Encoder struct {
+    // contains filtered or unexported fields
+}
+```
+
+An Encoder writes XML data to an output stream.
+
+#### NewEncoder
+
+```go
+func NewEncoder(w io.Writer) *Encoder
+```
+
+NewEncoder returns a new encoder that writes to w.
+
+<ParamField path="w" type="io.Writer" required>
+  The writer to encode XML to
+</ParamField>
+
+<ResponseField name="*Encoder" type="*Encoder">
+  A new Encoder instance
+</ResponseField>
+
+**Example:**
+
+```go
+type Person struct {
+    XMLName   xml.Name `xml:"person"`
+    Id        int      `xml:"id,attr"`
+    FirstName string   `xml:"name>first"`
+    LastName  string   `xml:"name>last"`
+    Age       int      `xml:"age"`
+}
+
+v := &Person{Id: 13, FirstName: "John", LastName: "Doe", Age: 42}
+
+enc := xml.NewEncoder(os.Stdout)
+enc.Indent("  ", "    ")
+if err := enc.Encode(v); err != nil {
+    fmt.Printf("error: %v\n", err)
+}
+```
+
+#### Methods
+
+**Encode**
+
+```go
+func (enc *Encoder) Encode(v any) error
+```
+
+Encode writes the XML encoding of v to the stream.
+
+<ParamField path="v" type="any" required>
+  The value to encode
+</ParamField>
+
+**EncodeElement**
+
+```go
+func (enc *Encoder) EncodeElement(v any, start StartElement) error
+```
+
+EncodeElement writes the XML encoding of v to the stream, using start as the outermost tag in the encoding.
+
+**EncodeToken**
+
+```go
+func (enc *Encoder) EncodeToken(t Token) error
+```
+
+EncodeToken writes the given XML token to the stream.
+
+**Flush**
+
+```go
+func (enc *Encoder) Flush() error
+```
+
+Flush flushes any buffered XML to the underlying writer.
+
+**Indent**
+
+```go
+func (enc *Encoder) Indent(prefix, indent string)
+```
+
+Indent sets the encoder to generate XML in which each element begins on a new indented line.
+
+**Close**
+
+```go
+func (enc *Encoder) Close() error
+```
+
+Close the encoder, indicating no more data will be written.
+
+### Decoder
+
+```go
+type Decoder struct {
+    Strict     bool
+    AutoClose  []string
+    Entity     map[string]string
+    CharsetReader func(charset string, input io.Reader) (io.Reader, error)
+    // contains filtered or unexported fields
+}
+```
+
+A Decoder represents an XML parser reading a particular input stream. The parser assumes that its input is encoded in UTF-8.
+
+#### NewDecoder
+
+```go
+func NewDecoder(r io.Reader) *Decoder
+```
+
+NewDecoder creates a new XML parser reading from r.
+
+<ParamField path="r" type="io.Reader" required>
+  The reader to decode XML from
+</ParamField>
+
+<ResponseField name="*Decoder" type="*Decoder">
+  A new Decoder instance
+</ResponseField>
+
+#### Methods
+
+**Decode**
+
+```go
+func (d *Decoder) Decode(v any) error
+```
+
+Decode works like Unmarshal, except it reads the decoder stream to find the start element.
+
+<ParamField path="v" type="any" required>
+  A pointer to the destination value
+</ParamField>
+
+**DecodeElement**
+
+```go
+func (d *Decoder) DecodeElement(v any, start *StartElement) error
+```
+
+DecodeElement works like Decode but takes a pointer to the start XML element to decode into v.
+
+**Token**
+
+```go
+func (d *Decoder) Token() (Token, error)
+```
+
+Token returns the next XML token in the input stream. At the end of the input stream, Token returns nil, io.EOF.
+
+**Skip**
+
+```go
+func (d *Decoder) Skip() error
+```
+
+Skip reads tokens until it has consumed the end element matching the most recent start element already consumed.
+
+**InputOffset**
+
+```go
+func (d *Decoder) InputOffset() int64
+```
+
+InputOffset returns the input stream byte offset of the current decoder position.
+
+### Token Types
+
+**Name**
+
+```go
+type Name struct {
+    Space, Local string
+}
+```
+
+A Name represents an XML name (Local) annotated with a name space identifier (Space).
+
+**Attr**
+
+```go
+type Attr struct {
+    Name  Name
+    Value string
+}
+```
+
+An Attr represents an attribute in an XML element (Name=Value).
+
+**StartElement**
+
+```go
+type StartElement struct {
+    Name Name
+    Attr []Attr
+}
+```
+
+A StartElement represents an XML start element.
+
+**EndElement**
+
+```go
+type EndElement struct {
+    Name Name
+}
+```
+
+An EndElement represents an XML end element.
+
+**CharData**
+
+```go
+type CharData []byte
+```
+
+A CharData represents XML character data (raw text), in which XML escape sequences have been replaced by the characters they represent.
+
+**Comment**
+
+```go
+type Comment []byte
+```
+
+A Comment represents an XML comment of the form \<!--comment--\>.
+
+**ProcInst**
+
+```go
+type ProcInst struct {
+    Target string
+    Inst   []byte
+}
+```
+
+A ProcInst represents an XML processing instruction of the form \<?target inst?\>.
+
+**Directive**
+
+```go
+type Directive []byte
+```
+
+A Directive represents an XML directive of the form \<!text\>.
+
+## Interfaces
+
+### Marshaler
+
+```go
+type Marshaler interface {
+    MarshalXML(e *Encoder, start StartElement) error
+}
+```
+
+Marshaler is the interface implemented by objects that can marshal themselves into valid XML elements.
+
+### MarshalerAttr
+
+```go
+type MarshalerAttr interface {
+    MarshalXMLAttr(name Name) (Attr, error)
+}
+```
+
+MarshalerAttr is the interface implemented by objects that can marshal themselves into valid XML attributes.
+
+### Unmarshaler
+
+```go
+type Unmarshaler interface {
+    UnmarshalXML(d *Decoder, start StartElement) error
+}
+```
+
+Unmarshaler is the interface implemented by objects that can unmarshal an XML element description of themselves.
+
+### UnmarshalerAttr
+
+```go
+type UnmarshalerAttr interface {
+    UnmarshalXMLAttr(attr Attr) error
+}
+```
+
+UnmarshalerAttr is the interface implemented by objects that can unmarshal an XML attribute description of themselves.
+
+## Struct Tags
+
+The XML encoding can be customized using struct field tags:
+
+```go
+// Field appears as XML element named "myName"
+Field int `xml:"myName"`
+
+// Field appears as attribute
+Field int `xml:"name,attr"`
+
+// Field is nested inside parent elements
+Field int `xml:"parent>child>field"`
+
+// Field contains character data
+Field string `xml:",chardata"`
+
+// Field contains CDATA
+Field string `xml:",cdata"`
+
+// Field is written verbatim
+Field string `xml:",innerxml"`
+
+// Field is a comment
+Field string `xml:",comment"`
+
+// Field is omitted if empty
+Field int `xml:"name,omitempty"`
+
+// Field is ignored
+Field int `xml:"-"`
+```
+
+## Error Types
+
+### SyntaxError
+
+```go
+type SyntaxError struct {
+    Msg  string
+    Line int
+}
+```
+
+A SyntaxError represents a syntax error in the XML input stream.

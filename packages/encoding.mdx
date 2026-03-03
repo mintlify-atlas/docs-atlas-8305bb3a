@@ -1,0 +1,495 @@
+---
+title: encoding
+description: Data encoding and decoding in various formats
+---
+
+The `encoding` package defines interfaces for encoding and decoding. It contains subpackages for specific encoding formats.
+
+## Common Interface
+
+```go
+type BinaryMarshaler interface {
+    MarshalBinary() ([]byte, error)
+}
+
+type BinaryUnmarshaler interface {
+    UnmarshalBinary([]byte) error
+}
+
+type TextMarshaler interface {
+    MarshalText() ([]byte, error)
+}
+
+type TextUnmarshaler interface {
+    UnmarshalText([]byte) error
+}
+```
+
+## Subpackages
+
+### encoding/json
+
+JSON encoding and decoding.
+
+```go
+import "encoding/json"
+
+type Person struct {
+    Name  string `json:"name"`
+    Age   int    `json:"age"`
+    Email string `json:"email,omitempty"`
+}
+
+// Marshal to JSON
+func marshalJSON(p Person) ([]byte, error) {
+    return json.Marshal(p)
+}
+
+// Marshal with indentation
+func marshalJSONPretty(p Person) ([]byte, error) {
+    return json.MarshalIndent(p, "", "  ")
+}
+
+// Unmarshal from JSON
+func unmarshalJSON(data []byte) (*Person, error) {
+    var p Person
+    err := json.Unmarshal(data, &p)
+    return &p, err
+}
+
+// Stream encoding
+func encodeStream(w io.Writer, people []Person) error {
+    encoder := json.NewEncoder(w)
+    encoder.SetIndent("", "  ")
+    
+    for _, p := range people {
+        if err := encoder.Encode(p); err != nil {
+            return err
+        }
+    }
+    return nil
+}
+
+// Stream decoding
+func decodeStream(r io.Reader) ([]Person, error) {
+    var people []Person
+    decoder := json.NewDecoder(r)
+    
+    for decoder.More() {
+        var p Person
+        if err := decoder.Decode(&p); err != nil {
+            return nil, err
+        }
+        people = append(people, p)
+    }
+    return people, nil
+}
+```
+
+### encoding/xml
+
+XML encoding and decoding.
+
+```go
+import "encoding/xml"
+
+type Book struct {
+    XMLName xml.Name `xml:"book"`
+    Title   string   `xml:"title"`
+    Author  string   `xml:"author"`
+    Year    int      `xml:"year,attr"`
+}
+
+func marshalXML(b Book) ([]byte, error) {
+    return xml.MarshalIndent(b, "", "  ")
+}
+
+func unmarshalXML(data []byte) (*Book, error) {
+    var b Book
+    err := xml.Unmarshal(data, &b)
+    return &b, err
+}
+```
+
+### encoding/csv
+
+CSV (Comma-Separated Values) reading and writing.
+
+```go
+import (
+    "encoding/csv"
+    "os"
+)
+
+// Write CSV
+func writeCSV(filename string, records [][]string) error {
+    f, err := os.Create(filename)
+    if err != nil {
+        return err
+    }
+    defer f.Close()
+    
+    w := csv.NewWriter(f)
+    defer w.Flush()
+    
+    return w.WriteAll(records)
+}
+
+// Read CSV
+func readCSV(filename string) ([][]string, error) {
+    f, err := os.Open(filename)
+    if err != nil {
+        return nil, err
+    }
+    defer f.Close()
+    
+    r := csv.NewReader(f)
+    return r.ReadAll()
+}
+
+// Stream read CSV
+func readCSVStream(filename string) error {
+    f, err := os.Open(filename)
+    if err != nil {
+        return err
+    }
+    defer f.Close()
+    
+    r := csv.NewReader(f)
+    for {
+        record, err := r.Read()
+        if err == io.EOF {
+            break
+        }
+        if err != nil {
+            return err
+        }
+        fmt.Println(record)
+    }
+    return nil
+}
+```
+
+### encoding/base64
+
+Base64 encoding and decoding.
+
+```go
+import "encoding/base64"
+
+func encodeBase64(data []byte) string {
+    return base64.StdEncoding.EncodeToString(data)
+}
+
+func decodeBase64(s string) ([]byte, error) {
+    return base64.StdEncoding.DecodeString(s)
+}
+
+// URL-safe encoding
+func encodeBase64URL(data []byte) string {
+    return base64.URLEncoding.EncodeToString(data)
+}
+
+func decodeBase64URL(s string) ([]byte, error) {
+    return base64.URLEncoding.DecodeString(s)
+}
+
+// Raw encoding (no padding)
+func encodeBase64Raw(data []byte) string {
+    return base64.RawStdEncoding.EncodeToString(data)
+}
+```
+
+### encoding/hex
+
+Hexadecimal encoding and decoding.
+
+```go
+import "encoding/hex"
+
+func encodeHex(data []byte) string {
+    return hex.EncodeToString(data)
+}
+
+func decodeHex(s string) ([]byte, error) {
+    return hex.DecodeString(s)
+}
+
+// Dump for debugging
+func hexDump(data []byte) string {
+    return hex.Dump(data)
+}
+```
+
+### encoding/binary
+
+Binary encoding and decoding of numeric values.
+
+```go
+import "encoding/binary"
+
+// Write uint32
+func writeUint32(w io.Writer, v uint32) error {
+    return binary.Write(w, binary.LittleEndian, v)
+}
+
+// Read uint32
+func readUint32(r io.Reader) (uint32, error) {
+    var v uint32
+    err := binary.Read(r, binary.LittleEndian, &v)
+    return v, err
+}
+
+// Encode to bytes
+func uint32ToBytes(v uint32) []byte {
+    b := make([]byte, 4)
+    binary.LittleEndian.PutUint32(b, v)
+    return b
+}
+
+// Decode from bytes
+func bytesToUint32(b []byte) uint32 {
+    return binary.LittleEndian.Uint32(b)
+}
+```
+
+### encoding/gob
+
+Go-specific binary encoding.
+
+```go
+import "encoding/gob"
+
+type Message struct {
+    From    string
+    To      string
+    Content string
+}
+
+// Encode
+func encodeGob(m Message) ([]byte, error) {
+    var buf bytes.Buffer
+    enc := gob.NewEncoder(&buf)
+    err := enc.Encode(m)
+    return buf.Bytes(), err
+}
+
+// Decode
+func decodeGob(data []byte) (*Message, error) {
+    var m Message
+    buf := bytes.NewBuffer(data)
+    dec := gob.NewDecoder(buf)
+    err := dec.Decode(&m)
+    return &m, err
+}
+```
+
+### encoding/pem
+
+PEM (Privacy Enhanced Mail) encoding.
+
+```go
+import "encoding/pem"
+
+func encodePEM(data []byte, blockType string) []byte {
+    block := &pem.Block{
+        Type:  blockType,
+        Bytes: data,
+    }
+    return pem.EncodeToMemory(block)
+}
+
+func decodePEM(data []byte) ([]byte, string, error) {
+    block, _ := pem.Decode(data)
+    if block == nil {
+        return nil, "", errors.New("failed to decode PEM")
+    }
+    return block.Bytes, block.Type, nil
+}
+```
+
+### encoding/asn1
+
+ASN.1 DER encoding and decoding.
+
+```go
+import "encoding/asn1"
+
+type Certificate struct {
+    Version    int
+    SerialNumber int
+    Issuer     string
+}
+
+func encodeASN1(cert Certificate) ([]byte, error) {
+    return asn1.Marshal(cert)
+}
+
+func decodeASN1(data []byte) (*Certificate, error) {
+    var cert Certificate
+    _, err := asn1.Unmarshal(data, &cert)
+    return &cert, err
+}
+```
+
+## Practical Examples
+
+### JSON API Handler
+
+```go
+func handleAPIRequest(w http.ResponseWriter, r *http.Request) {
+    var req struct {
+        Action string `json:"action"`
+        Data   string `json:"data"`
+    }
+    
+    // Decode request
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
+    
+    // Process request
+    result := process(req.Action, req.Data)
+    
+    // Encode response
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]interface{}{
+        "success": true,
+        "result":  result,
+    })
+}
+```
+
+### Configuration File Parsing
+
+```go
+type Config struct {
+    Server struct {
+        Host string `json:"host"`
+        Port int    `json:"port"`
+    } `json:"server"`
+    Database struct {
+        URL      string `json:"url"`
+        MaxConns int    `json:"max_connections"`
+    } `json:"database"`
+}
+
+func loadConfig(filename string) (*Config, error) {
+    data, err := os.ReadFile(filename)
+    if err != nil {
+        return nil, err
+    }
+    
+    var config Config
+    err = json.Unmarshal(data, &config)
+    return &config, err
+}
+```
+
+### CSV to JSON Converter
+
+```go
+func csvToJSON(csvPath, jsonPath string) error {
+    // Read CSV
+    csvData, err := readCSV(csvPath)
+    if err != nil {
+        return err
+    }
+    
+    if len(csvData) < 2 {
+        return errors.New("CSV must have header and data")
+    }
+    
+    headers := csvData[0]
+    rows := csvData[1:]
+    
+    // Convert to maps
+    var result []map[string]string
+    for _, row := range rows {
+        m := make(map[string]string)
+        for i, header := range headers {
+            if i < len(row) {
+                m[header] = row[i]
+            }
+        }
+        result = append(result, m)
+    }
+    
+    // Write JSON
+    data, err := json.MarshalIndent(result, "", "  ")
+    if err != nil {
+        return err
+    }
+    
+    return os.WriteFile(jsonPath, data, 0644)
+}
+```
+
+### Binary Protocol
+
+```go
+type Packet struct {
+    Magic   uint32
+    Version uint16
+    Length  uint32
+    Data    []byte
+}
+
+func encodePacket(p Packet) ([]byte, error) {
+    var buf bytes.Buffer
+    
+    // Write header
+    binary.Write(&buf, binary.BigEndian, p.Magic)
+    binary.Write(&buf, binary.BigEndian, p.Version)
+    binary.Write(&buf, binary.BigEndian, p.Length)
+    
+    // Write data
+    buf.Write(p.Data)
+    
+    return buf.Bytes(), nil
+}
+
+func decodePacket(data []byte) (*Packet, error) {
+    buf := bytes.NewReader(data)
+    
+    var p Packet
+    binary.Read(buf, binary.BigEndian, &p.Magic)
+    binary.Read(buf, binary.BigEndian, &p.Version)
+    binary.Read(buf, binary.BigEndian, &p.Length)
+    
+    p.Data = make([]byte, p.Length)
+    io.ReadFull(buf, p.Data)
+    
+    return &p, nil
+}
+```
+
+## JSON Struct Tags
+
+```go
+type Example struct {
+    Field1 string `json:"field_1"`              // Rename field
+    Field2 string `json:"field_2,omitempty"`    // Omit if empty
+    Field3 string `json:"-"`                    // Never marshal
+    Field4 string `json:"field_4,string"`       // Encode as string
+}
+```
+
+## Best Practices
+
+1. **Use streaming for large data** - Use Encoder/Decoder instead of Marshal/Unmarshal
+2. **Handle errors properly** - Check all encoding/decoding errors
+3. **Validate input** - Don't trust decoded data
+4. **Use appropriate encoding** - JSON for APIs, gob for Go-to-Go, binary for performance
+5. **Set limits** - Use `Decoder.DisallowUnknownFields()` for strict JSON
+6. **Consider memory** - Stream processing for large files
+
+## Common Use Cases
+
+- **Web APIs**: JSON for request/response bodies
+- **Configuration**: JSON, XML, or TOML for config files
+- **Data export**: CSV for spreadsheet compatibility
+- **Binary protocols**: Custom binary formats with encoding/binary
+- **Encryption**: Base64 for encoding encrypted data
+- **Certificates**: PEM encoding for SSL/TLS certificates

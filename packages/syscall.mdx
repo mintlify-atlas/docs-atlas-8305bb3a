@@ -1,0 +1,141 @@
+---
+title: syscall
+description: Low-level operating system primitives
+---
+
+The `syscall` package contains low-level interface to the underlying operating system. Most programs should use the `os` package instead.
+
+## Basic Usage
+
+```go
+import "syscall"
+
+// Get process ID
+pid := syscall.Getpid()
+
+// Get parent process ID
+ppid := syscall.Getppid()
+
+// Get user ID
+uid := syscall.Getuid()
+
+// Get group ID
+gid := syscall.Getgid()
+```
+
+## File Operations
+
+```go
+// Open file
+fd, err := syscall.Open("/path/to/file", syscall.O_RDONLY, 0)
+if err != nil {
+    log.Fatal(err)
+}
+defer syscall.Close(fd)
+
+// Read
+buf := make([]byte, 1024)
+n, err := syscall.Read(fd, buf)
+
+// Write
+n, err = syscall.Write(fd, []byte("data"))
+```
+
+## Signals
+
+```go
+import "os/signal"
+
+func handleSignals() {
+    sigChan := make(chan os.Signal, 1)
+    signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+    
+    sig := <-sigChan
+    fmt.Printf("Received signal: %v\n", sig)
+}
+```
+
+## Environment Variables
+
+```go
+// Get environment
+env := syscall.Environ()
+
+// Get specific variable
+value, found := syscall.Getenv("PATH")
+
+// Set variable
+err := syscall.Setenv("MY_VAR", "value")
+
+// Unset variable
+err = syscall.Unsetenv("MY_VAR")
+```
+
+## Process Control
+
+```go
+// Execute program
+args := []string{"/bin/ls", "-la"}
+env := os.Environ()
+err := syscall.Exec("/bin/ls", args, env)
+
+// Fork process (Unix)
+pid, err := syscall.ForkExec(
+    "/bin/echo",
+    []string{"echo", "hello"},
+    &syscall.ProcAttr{},
+)
+```
+
+## File Stats
+
+```go
+var stat syscall.Stat_t
+err := syscall.Stat("/path/to/file", &stat)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Size: %d\n", stat.Size)
+fmt.Printf("Mode: %o\n", stat.Mode)
+```
+
+## Sockets
+
+```go
+// Create socket
+fd, err := syscall.Socket(
+    syscall.AF_INET,
+    syscall.SOCK_STREAM,
+    0,
+)
+if err != nil {
+    log.Fatal(err)
+}
+defer syscall.Close(fd)
+
+// Bind socket
+addr := syscall.SockaddrInet4{
+    Port: 8080,
+    Addr: [4]byte{127, 0, 0, 1},
+}
+err = syscall.Bind(fd, &addr)
+```
+
+## Best Practices
+
+1. **Use os package** - Higher-level, safer interface
+2. **Platform-specific** - syscall varies by OS
+3. **Check errors** - System calls can fail
+4. **Close resources** - File descriptors, sockets
+5. **Use build tags** - For platform-specific code
+
+## Common Use Cases
+
+- Low-level file operations
+- Signal handling
+- Process management
+- Network programming
+- System information
+
+**Note:** For most applications, use higher-level packages like `os`, `os/exec`, `net`, etc. Use `syscall` only when necessary for low-level operations.

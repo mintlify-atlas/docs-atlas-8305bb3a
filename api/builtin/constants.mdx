@@ -1,0 +1,410 @@
+---
+title: 'Built-in Constants'
+description: 'Complete reference for Go built-in constants including true, false, nil, and iota'
+keywords: ['builtin', 'constants', 'true', 'false', 'nil', 'iota', 'zero value']
+---
+
+Go provides several predeclared constants that are available in all packages without import. These constants are fundamental to Go's type system and control flow.
+
+## Boolean Constants
+
+### true
+
+The boolean true value.
+
+<ResponseField name="true" type="bool" required>
+  Untyped boolean constant with value true.
+</ResponseField>
+
+```go
+var isValid bool = true
+
+if true {
+    fmt.Println("This always executes")
+}
+
+// Used in comparisons
+result := (5 == 5) // true
+```
+
+### false
+
+The boolean false value.
+
+<ResponseField name="false" type="bool" required>
+  Untyped boolean constant with value false.
+</ResponseField>
+
+```go
+var isComplete bool = false
+
+if false {
+    fmt.Println("This never executes")
+}
+
+// Used in comparisons
+result := (3 > 5) // false
+```
+
+<CodeGroup>
+
+```go Conditional logic
+isValid := true
+isComplete := false
+
+if isValid && !isComplete {
+    fmt.Println("Valid but not complete")
+}
+```
+
+```go Loop control
+for true {
+    // Infinite loop
+    // Same as: for { }
+}
+```
+
+</CodeGroup>
+
+## Zero Value Constant
+
+### nil
+
+The zero value for pointers, channels, functions, interfaces, maps, and slices.
+
+<ResponseField name="nil" type="Type" required>
+  Predeclared identifier representing the zero value for reference types.
+  
+  Can only be used with: pointer, channel, func, interface, map, or slice types.
+</ResponseField>
+
+<Tabs>
+  <Tab title="Pointers">
+
+```go
+var p *int = nil
+
+if p == nil {
+    fmt.Println("Pointer is nil")
+}
+
+// Dereferencing nil pointer panics
+// fmt.Println(*p) // panic: runtime error
+
+// Check before dereferencing
+if p != nil {
+    fmt.Println(*p)
+}
+```
+
+  </Tab>
+  <Tab title="Slices">
+
+```go
+var s []int = nil
+
+if s == nil {
+    fmt.Println("Slice is nil")
+}
+
+// Safe operations on nil slices
+fmt.Println(len(s))    // 0
+fmt.Println(cap(s))    // 0
+s = append(s, 1)       // Creates new slice
+
+// Iterating over nil slice is safe
+for _, v := range s {
+    fmt.Println(v) // Never executes
+}
+```
+
+  </Tab>
+  <Tab title="Maps">
+
+```go
+var m map[string]int = nil
+
+if m == nil {
+    fmt.Println("Map is nil")
+}
+
+// Reading from nil map returns zero value
+v := m["key"] // 0
+v, ok := m["key"] // 0, false
+
+// Writing to nil map panics
+// m["key"] = 42 // panic: assignment to nil map
+
+// Must initialize before writing
+m = make(map[string]int)
+m["key"] = 42
+```
+
+  </Tab>
+  <Tab title="Channels">
+
+```go
+var ch chan int = nil
+
+if ch == nil {
+    fmt.Println("Channel is nil")
+}
+
+// Operations on nil channels block forever
+// <-ch        // Blocks forever
+// ch <- 1     // Blocks forever
+// close(ch)   // Panics
+
+// Must initialize before use
+ch = make(chan int)
+```
+
+  </Tab>
+  <Tab title="Interfaces">
+
+```go
+var err error = nil
+
+if err == nil {
+    fmt.Println("No error")
+}
+
+// Nil interface is different from interface holding nil value
+var p *int = nil
+var i interface{} = p
+fmt.Println(i == nil) // false! Interface holds typed nil
+```
+
+  </Tab>
+  <Tab title="Functions">
+
+```go
+var f func() = nil
+
+if f == nil {
+    fmt.Println("Function is nil")
+}
+
+// Calling nil function panics
+// f() // panic: runtime error
+
+// Check before calling
+if f != nil {
+    f()
+}
+```
+
+  </Tab>
+</Tabs>
+
+<Warning>
+  Attempting to use nil values incorrectly can cause runtime panics. Always check for nil before dereferencing pointers, writing to maps, or calling functions.
+</Warning>
+
+<Note>
+  Starting in Go 1.21, calling `panic(nil)` causes a run-time error. The GODEBUG setting `panicnil=1` can disable this check.
+</Note>
+
+## Enumeration Constant
+
+### iota
+
+Predeclared identifier representing the index of the current const specification.
+
+<ResponseField name="iota" type="int" required>
+  Untyped integer constant starting at 0 in each const block.
+  
+  Increments by 1 for each const specification in the same parenthesized group.
+</ResponseField>
+
+<CodeGroup>
+
+```go Basic enumeration
+const (
+    Sunday    = iota // 0
+    Monday           // 1
+    Tuesday          // 2
+    Wednesday        // 3
+    Thursday         // 4
+    Friday           // 5
+    Saturday         // 6
+)
+```
+
+```go Custom values
+const (
+    _  = iota             // 0 (ignored)
+    KB = 1 << (10 * iota) // 1 << 10 = 1024
+    MB                     // 1 << 20 = 1048576
+    GB                     // 1 << 30 = 1073741824
+    TB                     // 1 << 40 = 1099511627776
+)
+```
+
+```go Bit flags
+type Permission uint
+
+const (
+    Read Permission = 1 << iota  // 1 << 0 = 1
+    Write                         // 1 << 1 = 2
+    Execute                       // 1 << 2 = 4
+)
+
+// Combine permissions
+perms := Read | Write  // 3
+```
+
+```go Skipping values
+const (
+    A = iota  // 0
+    B         // 1
+    _         // 2 (skipped)
+    C         // 3
+)
+```
+
+```go Multiple iotas
+const (
+    a, b = iota, iota + 10  // 0, 10
+    c, d                     // 1, 11
+    e, f                     // 2, 12
+)
+```
+
+```go Starting at 1
+const (
+    January = iota + 1  // 1
+    February             // 2
+    March                // 3
+    April                // 4
+    May                  // 5
+    June                 // 6
+    July                 // 7
+    August               // 8
+    September            // 9
+    October              // 10
+    November             // 11
+    December             // 12
+)
+```
+
+</CodeGroup>
+
+<Tip>
+  Use `iota` for defining sequential constants, especially enumerations and bit flags. It makes code more maintainable and less error-prone.
+</Tip>
+
+## How iota Works
+
+`iota` represents the index within a const declaration:
+
+1. Resets to 0 at the start of each `const` block
+2. Increments by 1 for each const specification (line)
+3. Can be used in expressions
+4. Repeats the expression for subsequent lines if not specified
+
+```go
+const (
+    a = iota         // 0
+    b = iota * 2     // 1 * 2 = 2
+    c                 // 2 * 2 = 4 (expression repeated)
+    d                 // 3 * 2 = 6 (expression repeated)
+)
+
+// New const block resets iota
+const (
+    e = iota         // 0 (reset)
+    f                 // 1
+)
+```
+
+<AccordionGroup>
+  <Accordion title="Best practices" icon="lightbulb">
+    - Use `iota` for related constant groups that need sequential values
+    - Start with `_ = iota` if you want the first constant to be 1 instead of 0
+    - Use meaningful type aliases for better type safety with enumerations
+    - Document what each constant represents
+    - Consider using `iota` with bit shifts for flag constants
+  </Accordion>
+  
+  <Accordion title="Common patterns" icon="code">
+    **Enumerations:**
+    ```go
+    type Status int
+    const (
+        Pending Status = iota
+        Approved
+        Rejected
+    )
+    ```
+    
+    **Bit flags:**
+    ```go
+    type Flag uint
+    const (
+        FlagA Flag = 1 << iota
+        FlagB
+        FlagC
+    )
+    ```
+    
+    **Powers of 10:**
+    ```go
+    const (
+        One     = 1
+        Ten     = One * 10
+        Hundred = Ten * 10
+        Thousand = Hundred * 10
+    )
+    ```
+  </Accordion>
+  
+  <Accordion title="Common mistakes" icon="exclamation-triangle">
+    - Forgetting that `iota` resets in each new const block
+    - Assuming `iota` persists across multiple const declarations
+    - Not understanding that blank lines don't affect `iota` increment
+    - Mixing `iota` and explicit values without understanding the behavior
+    
+    ```go
+    const (
+        a = iota  // 0
+        b = 42    // 42 (explicit, iota is 1 but unused)
+        c = iota  // 2 (continues from where it was)
+    )
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Zero Values
+
+While not predeclared constants, Go's zero values are important to understand:
+
+| Type | Zero Value |
+|------|------------|
+| `bool` | `false` |
+| `int`, `int8`, `int16`, `int32`, `int64` | `0` |
+| `uint`, `uint8`, `uint16`, `uint32`, `uint64`, `uintptr` | `0` |
+| `float32`, `float64` | `0.0` |
+| `complex64`, `complex128` | `0+0i` |
+| `string` | `""` (empty string) |
+| `pointer`, `function`, `interface`, `slice`, `channel`, `map` | `nil` |
+| `array`, `struct` | All fields/elements set to their zero values |
+
+```go
+var b bool        // false
+var i int         // 0
+var f float64     // 0.0
+var s string      // ""
+var p *int        // nil
+var slice []int   // nil
+var m map[string]int // nil
+
+type Point struct {
+    X, Y int
+}
+var pt Point      // {0, 0}
+```
+
+<Info>
+  Go automatically initializes all variables to their zero value. This ensures variables are always in a defined state.
+</Info>

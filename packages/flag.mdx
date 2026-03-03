@@ -1,0 +1,466 @@
+---
+title: flag
+description: Command-line flag parsing
+---
+
+The `flag` package implements command-line flag parsing. It provides a simple and flexible way to define and parse command-line arguments.
+
+## Basic Usage
+
+### Defining Flags
+
+```go
+import (
+    "flag"
+    "fmt"
+)
+
+func main() {
+    // Define flags
+    name := flag.String("name", "World", "name to greet")
+    age := flag.Int("age", 0, "age in years")
+    verbose := flag.Bool("verbose", false, "enable verbose output")
+    
+    // Parse command line
+    flag.Parse()
+    
+    // Use flags
+    fmt.Printf("Hello, %s!\n", *name)
+    if *verbose {
+        fmt.Printf("Age: %d\n", *age)
+    }
+}
+```
+
+### Flag Types
+
+```go
+// String flag
+var host = flag.String("host", "localhost", "server host")
+
+// Integer flag
+var port = flag.Int("port", 8080, "server port")
+
+// Boolean flag
+var debug = flag.Bool("debug", false, "enable debug mode")
+
+// Float flag
+var rate = flag.Float64("rate", 1.0, "processing rate")
+
+// Duration flag
+var timeout = flag.Duration("timeout", 30*time.Second, "request timeout")
+
+// Uint flag
+var workers = flag.Uint("workers", 4, "number of workers")
+```
+
+### Binding to Variables
+
+```go
+var (
+    host    string
+    port    int
+    verbose bool
+)
+
+func init() {
+    flag.StringVar(&host, "host", "localhost", "server host")
+    flag.IntVar(&port, "port", 8080, "server port")
+    flag.BoolVar(&verbose, "verbose", false, "verbose output")
+}
+
+func main() {
+    flag.Parse()
+    fmt.Printf("Server: %s:%d\n", host, port)
+}
+```
+
+## Command-Line Syntax
+
+```bash
+# Single dash
+./app -name Alice -age 30
+
+# Double dash (also valid)
+./app --name Alice --age 30
+
+# Equals sign
+./app -name=Alice -age=30
+
+# Boolean flags
+./app -verbose        # Sets to true
+./app -verbose=true   # Sets to true
+./app -verbose=false  # Sets to false
+
+# Non-flag arguments
+./app -name Alice file1 file2
+```
+
+## Accessing Non-Flag Arguments
+
+```go
+func main() {
+    var name = flag.String("name", "", "user name")
+    flag.Parse()
+    
+    // Get non-flag arguments
+    args := flag.Args()
+    fmt.Printf("Non-flag arguments: %v\n", args)
+    
+    // Number of non-flag arguments
+    n := flag.NArg()
+    fmt.Printf("Count: %d\n", n)
+    
+    // Get specific argument
+    if n > 0 {
+        first := flag.Arg(0)
+        fmt.Printf("First: %s\n", first)
+    }
+}
+```
+
+## Custom Flag Types
+
+### Implementing flag.Value
+
+```go
+type URLList []string
+
+func (u *URLList) String() string {
+    return strings.Join(*u, ",")
+}
+
+func (u *URLList) Set(value string) error {
+    *u = append(*u, value)
+    return nil
+}
+
+func main() {
+    var urls URLList
+    flag.Var(&urls, "url", "URL to process (can be repeated)")
+    flag.Parse()
+    
+    for _, url := range urls {
+        fmt.Println(url)
+    }
+}
+
+// Usage:
+// ./app -url http://example.com -url http://google.com
+```
+
+### Custom Enum Flag
+
+```go
+type LogLevel int
+
+const (
+    Debug LogLevel = iota
+    Info
+    Warning
+    Error
+)
+
+func (l *LogLevel) String() string {
+    names := []string{"debug", "info", "warning", "error"}
+    return names[*l]
+}
+
+func (l *LogLevel) Set(value string) error {
+    switch strings.ToLower(value) {
+    case "debug":
+        *l = Debug
+    case "info":
+        *l = Info
+    case "warning":
+        *l = Warning
+    case "error":
+        *l = Error
+    default:
+        return fmt.Errorf("invalid log level: %s", value)
+    }
+    return nil
+}
+
+func main() {
+    var level LogLevel = Info
+    flag.Var(&level, "level", "log level (debug, info, warning, error)")
+    flag.Parse()
+    
+    fmt.Printf("Log level: %s\n", level.String())
+}
+```
+
+## FlagSet for Subcommands
+
+```go
+import "flag"
+
+func main() {
+    // Create subcommand flagsets
+    startCmd := flag.NewFlagSet("start", flag.ExitOnError)
+    startPort := startCmd.Int("port", 8080, "server port")
+    startHost := startCmd.String("host", "localhost", "server host")
+    
+    stopCmd := flag.NewFlagSet("stop", flag.ExitOnError)
+    stopForce := stopCmd.Bool("force", false, "force stop")
+    
+    // Check for subcommand
+    if len(os.Args) < 2 {
+        fmt.Println("expected 'start' or 'stop' subcommand")
+        os.Exit(1)
+    }
+    
+    // Parse subcommand
+    switch os.Args[1] {
+    case "start":
+        startCmd.Parse(os.Args[2:])
+        fmt.Printf("Starting server on %s:%d\n", *startHost, *startPort)
+    case "stop":
+        stopCmd.Parse(os.Args[2:])
+        fmt.Printf("Stopping server (force=%v)\n", *stopForce)
+    default:
+        fmt.Printf("Unknown subcommand: %s\n", os.Args[1])
+        os.Exit(1)
+    }
+}
+```
+
+## Practical Examples
+
+### HTTP Server Configuration
+
+```go
+type ServerConfig struct {
+    Host         string
+    Port         int
+    ReadTimeout  time.Duration
+    WriteTimeout time.Duration
+    Debug        bool
+}
+
+func parseFlags() *ServerConfig {
+    config := &ServerConfig{}
+    
+    flag.StringVar(&config.Host, "host", "0.0.0.0", "server host")
+    flag.IntVar(&config.Port, "port", 8080, "server port")
+    flag.DurationVar(&config.ReadTimeout, "read-timeout", 15*time.Second, "read timeout")
+    flag.DurationVar(&config.WriteTimeout, "write-timeout", 15*time.Second, "write timeout")
+    flag.BoolVar(&config.Debug, "debug", false, "enable debug mode")
+    
+    flag.Parse()
+    return config
+}
+
+func main() {
+    config := parseFlags()
+    
+    addr := fmt.Sprintf("%s:%d", config.Host, config.Port)
+    fmt.Printf("Starting server on %s\n", addr)
+    
+    server := &http.Server{
+        Addr:         addr,
+        ReadTimeout:  config.ReadTimeout,
+        WriteTimeout: config.WriteTimeout,
+    }
+    
+    log.Fatal(server.ListenAndServe())
+}
+```
+
+### File Processing Tool
+
+```go
+func main() {
+    var (
+        input     = flag.String("input", "", "input file (required)")
+        output    = flag.String("output", "", "output file (required)")
+        format    = flag.String("format", "json", "output format (json, xml, csv)")
+        verbose   = flag.Bool("v", false, "verbose output")
+        overwrite = flag.Bool("f", false, "overwrite output file")
+    )
+    
+    flag.Parse()
+    
+    // Validate required flags
+    if *input == "" || *output == "" {
+        fmt.Println("Error: -input and -output are required")
+        flag.Usage()
+        os.Exit(1)
+    }
+    
+    // Check output exists
+    if !*overwrite {
+        if _, err := os.Stat(*output); err == nil {
+            fmt.Printf("Error: output file exists (use -f to overwrite)\n")
+            os.Exit(1)
+        }
+    }
+    
+    if *verbose {
+        fmt.Printf("Processing %s -> %s (format: %s)\n", *input, *output, *format)
+    }
+    
+    // Process file...
+}
+```
+
+### Custom Usage Message
+
+```go
+func main() {
+    flag.Usage = func() {
+        fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS] file1 file2...\n\n", os.Args[0])
+        fmt.Fprintf(os.Stderr, "Process files with various options.\n\n")
+        fmt.Fprintf(os.Stderr, "Options:\n")
+        flag.PrintDefaults()
+        fmt.Fprintf(os.Stderr, "\nExamples:\n")
+        fmt.Fprintf(os.Stderr, "  %s -v -output results.txt input.txt\n", os.Args[0])
+        fmt.Fprintf(os.Stderr, "  %s --format json data1.txt data2.txt\n", os.Args[0])
+    }
+    
+    var verbose = flag.Bool("v", false, "verbose output")
+    var output = flag.String("output", "out.txt", "output file")
+    
+    flag.Parse()
+    
+    if flag.NArg() == 0 {
+        flag.Usage()
+        os.Exit(1)
+    }
+    
+    // Process files...
+}
+```
+
+### Environment Variable Fallback
+
+```go
+func getEnvDefault(key, defaultValue string) string {
+    if value := os.Getenv(key); value != "" {
+        return value
+    }
+    return defaultValue
+}
+
+func main() {
+    var (
+        host = flag.String("host",
+            getEnvDefault("SERVER_HOST", "localhost"),
+            "server host (env: SERVER_HOST)")
+        port = flag.Int("port", 8080, "server port (env: SERVER_PORT)")
+    )
+    
+    flag.Parse()
+    
+    // Override with env if not set via flag
+    if !isFlagSet("port") {
+        if envPort := os.Getenv("SERVER_PORT"); envPort != "" {
+            if p, err := strconv.Atoi(envPort); err == nil {
+                *port = p
+            }
+        }
+    }
+    
+    fmt.Printf("Server: %s:%d\n", *host, *port)
+}
+
+func isFlagSet(name string) bool {
+    found := false
+    flag.Visit(func(f *flag.Flag) {
+        if f.Name == name {
+            found = true
+        }
+    })
+    return found
+}
+```
+
+## Advanced Features
+
+### Visiting All Flags
+
+```go
+func printAllFlags() {
+    fmt.Println("All defined flags:")
+    flag.VisitAll(func(f *flag.Flag) {
+        fmt.Printf("%s: %s (default: %s)\n", f.Name, f.Usage, f.DefValue)
+    })
+    
+    fmt.Println("\nFlags that were set:")
+    flag.Visit(func(f *flag.Flag) {
+        fmt.Printf("%s = %s\n", f.Name, f.Value)
+    })
+}
+```
+
+### Parsing Multiple Times
+
+```go
+func main() {
+    fs := flag.NewFlagSet("myapp", flag.ContinueOnError)
+    var verbose = fs.Bool("v", false, "verbose")
+    
+    // Parse can be called multiple times
+    err := fs.Parse(os.Args[1:])
+    if err != nil {
+        fmt.Println("Parse error:", err)
+        return
+    }
+    
+    if *verbose {
+        fmt.Println("Verbose mode enabled")
+    }
+}
+```
+
+## Error Handling
+
+```go
+const (
+    ContinueOnError ErrorHandling = iota // Return error
+    ExitOnError                          // Call os.Exit(2)
+    PanicOnError                         // Panic
+)
+
+func main() {
+    fs := flag.NewFlagSet("myapp", flag.ContinueOnError)
+    fs.SetOutput(os.Stderr)
+    
+    var count = fs.Int("count", 0, "count value")
+    
+    err := fs.Parse(os.Args[1:])
+    if err != nil {
+        if err == flag.ErrHelp {
+            // User asked for help
+            os.Exit(0)
+        }
+        // Other error
+        fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+        os.Exit(1)
+    }
+    
+    fmt.Printf("Count: %d\n", *count)
+}
+```
+
+## Best Practices
+
+1. **Provide good defaults** - Make flags optional with sensible defaults
+2. **Write clear descriptions** - Help text should explain the purpose
+3. **Use consistent naming** - Follow conventions (kebab-case for multi-word flags)
+4. **Validate flag values** - Check for invalid combinations or values
+5. **Support environment variables** - Allow configuration via env vars
+6. **Print helpful usage** - Customize `flag.Usage` for better UX
+7. **Group related flags** - Use prefixes for related options
+8. **Document examples** - Show common usage patterns in help text
+
+## Common Patterns
+
+- **Config flags**: `-config config.yaml`
+- **Verbosity**: `-v`, `-vv`, `-vvv`
+- **Output**: `-o output.txt`
+- **Force/Override**: `-f`, `--force`
+- **Quiet mode**: `-q`, `--quiet`
+- **Version**: `-version`
+- **Help**: `-h`, `-help`

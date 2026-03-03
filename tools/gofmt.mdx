@@ -1,0 +1,375 @@
+---
+title: 'gofmt'
+description: 'Go code formatting tool for consistent code style'
+---
+
+Gofmt is the official Go code formatter. It formats Go programs with consistent style, using tabs for indentation and blanks for alignment.
+
+## Overview
+
+Gofmt enforces a standard formatting style across all Go code, eliminating debates about code style and ensuring consistency. Most Go code in the wild is formatted with gofmt.
+
+<Note>
+Using gofmt is considered a best practice in the Go community. Most editors can be configured to run gofmt automatically on save.
+</Note>
+
+## Usage
+
+```bash
+gofmt [flags] [path ...]
+```
+
+Without an explicit path, gofmt processes standard input. Given a file, it operates on that file; given a directory, it operates on all `.go` files in that directory, recursively.
+
+## Flags
+
+### Output Flags
+
+<ParamField path="-d" type="flag">
+  Print diffs to standard output instead of reformatted sources. Shows what changes would be made.
+</ParamField>
+
+<ParamField path="-l" type="flag">
+  List files whose formatting differs from gofmt's. Does not print reformatted sources.
+</ParamField>
+
+<ParamField path="-w" type="flag">
+  Write result to source file instead of standard output. Overwrites files in-place with gofmt's version.
+</ParamField>
+
+### Code Transformation Flags
+
+<ParamField path="-r" type="string">
+  Apply the rewrite rule to source before reformatting.
+  
+  Format: `pattern -> replacement`
+  
+  Both pattern and replacement must be valid Go expressions.
+</ParamField>
+
+<ParamField path="-s" type="flag">
+  Simplify code (after applying rewrite rule, if any). Applies various simplifications to the code.
+</ParamField>
+
+### Other Flags
+
+<ParamField path="-e" type="flag">
+  Print all errors (including spurious ones).
+</ParamField>
+
+<ParamField path="-cpuprofile" type="filename">
+  Write CPU profile to the specified file (for debugging gofmt performance).
+</ParamField>
+
+## Common Usage Patterns
+
+<Steps>
+  <Step title="Check Formatting">
+    List all files that need formatting:
+    
+    ```bash
+    gofmt -l .
+    ```
+    
+    This is useful in CI/CD pipelines to verify code is formatted.
+  </Step>
+  
+  <Step title="Format Files">
+    Format all Go files in current directory and subdirectories:
+    
+    ```bash
+    gofmt -w .
+    ```
+    
+    The `-w` flag writes changes directly to files.
+  </Step>
+  
+  <Step title="Preview Changes">
+    See what changes gofmt would make without modifying files:
+    
+    ```bash
+    gofmt -d file.go
+    ```
+    
+    Shows a unified diff of the changes.
+  </Step>
+</Steps>
+
+## Examples
+
+### Basic Formatting
+
+<CodeGroup>
+```bash Format Single File
+# Format and print to stdout
+gofmt file.go
+
+# Format and overwrite file
+gofmt -w file.go
+
+# Show diff without modifying
+gofmt -d file.go
+```
+
+```bash Format Directory
+# Format all Go files in current directory
+gofmt -w .
+
+# Format specific directory
+gofmt -w ./cmd/myapp
+
+# List unformatted files
+gofmt -l ./...
+```
+
+```bash Using go fmt
+# Format using go command (invokes gofmt -l -w)
+go fmt ./...
+
+# Format specific package
+go fmt example.com/myapp
+```
+</CodeGroup>
+
+### Rewrite Rules
+
+The `-r` flag enables powerful code transformations using pattern matching:
+
+<CodeGroup>
+```bash Remove Parentheses
+# Check for unnecessary parentheses
+gofmt -r '(a) -> a' -l *.go
+
+# Remove unnecessary parentheses
+gofmt -r '(a) -> a' -w *.go
+```
+
+```bash Simplify Slices
+# Convert explicit slice bounds to implicit ones
+gofmt -r 'α[β:len(α)] -> α[β:]' -w $GOROOT/src
+```
+
+```bash Custom Transformations
+# Replace specific function calls
+gofmt -r 'strings.Replace(a, b, c, -1) -> strings.ReplaceAll(a, b, c)' -w .
+```
+</CodeGroup>
+
+<Info>
+In rewrite patterns, single-character lowercase identifiers (like `α`, `β`, `a`, `b`) serve as wildcards matching arbitrary sub-expressions.
+</Info>
+
+### Simplification with -s
+
+The `-s` flag applies various simplifications:
+
+<CodeGroup>
+```go Before
+// Composite literals
+[]string{string("foo"), string("bar")}
+
+// Slice expressions
+s[a:len(s)]
+
+// Range loops
+for x, _ = range v {...}
+for _ = range v {...}
+```
+
+```go After
+// Simplified composite literals
+[]string{"foo", "bar"}
+
+// Simplified slice
+s[a:]
+
+// Simplified range
+for x = range v {...}
+for range v {...}
+```
+</CodeGroup>
+
+Apply simplifications:
+
+```bash
+gofmt -s -w .
+```
+
+## Integration with Editors
+
+### VS Code
+
+The Go extension automatically runs gofmt on save. Configuration in `settings.json`:
+
+```json
+{
+  "go.formatTool": "gofmt",
+  "editor.formatOnSave": true
+}
+```
+
+### Vim/Neovim
+
+Using vim-go plugin:
+
+```vim
+" Auto-format on save
+let g:go_fmt_autosave = 1
+let g:go_fmt_command = "gofmt"
+```
+
+### Emacs
+
+```elisp
+;; Auto-format on save
+(add-hook 'before-save-hook 'gofmt-before-save)
+```
+
+## CI/CD Integration
+
+### Checking Formatting in CI
+
+<CodeGroup>
+```bash GitHub Actions
+# .github/workflows/ci.yml
+- name: Check formatting
+  run: |
+    unformatted=$(gofmt -l .)
+    if [ -n "$unformatted" ]; then
+      echo "The following files are not formatted:"
+      echo "$unformatted"
+      exit 1
+    fi
+```
+
+```bash GitLab CI
+# .gitlab-ci.yml
+format-check:
+  script:
+    - test -z "$(gofmt -l .)"
+```
+
+```bash Makefile
+# Makefile
+.PHONY: fmt-check
+fmt-check:
+	@test -z "$(shell gofmt -l .)"
+
+.PHONY: fmt
+fmt:
+	@gofmt -w .
+```
+</CodeGroup>
+
+## go fmt vs gofmt
+
+The `go fmt` command is a wrapper around `gofmt`:
+
+| Command | Description |
+|---------|-------------|
+| `gofmt` | Standalone tool, formats files or directories |
+| `go fmt` | Wrapper that runs `gofmt -l -w` on packages |
+
+```bash
+# These are equivalent:
+go fmt ./...
+gofmt -l -w .
+```
+
+<Tip>
+Use `go fmt` for package-based formatting and `gofmt` when you need more control over flags and output.
+</Tip>
+
+## Formatting Standards
+
+### What gofmt Does
+
+- Uses tabs for indentation
+- Uses blanks for alignment
+- Removes trailing whitespace
+- Ensures consistent spacing around operators
+- Formats comments properly
+- Aligns struct field declarations
+- Formats function parameters consistently
+
+### What gofmt Doesn't Do
+
+- Doesn't enforce line length limits
+- Doesn't reorganize imports (use `goimports` for that)
+- Doesn't add or remove blank lines between functions
+- Doesn't rename variables or functions
+
+## Advanced Usage
+
+### Formatting Fragments
+
+Gofmt can format Go fragments (not just complete programs):
+
+```bash
+# Format a code snippet from stdin
+echo 'func f(){println("hello")}' | gofmt
+```
+
+Output:
+```go
+func f() { println("hello") }
+```
+
+### Processing Multiple Files
+
+```bash
+# Format specific files
+gofmt -w file1.go file2.go file3.go
+
+# Format all Go files in current directory (not recursive)
+gofmt -w *.go
+
+# Format all Go files recursively
+find . -name '*.go' -exec gofmt -w {} \;
+```
+
+## Performance
+
+Gofmt is designed to be fast:
+
+- Typically processes thousands of lines per second
+- Can be parallelized across multiple files
+- Uses efficient parsing and formatting algorithms
+
+<Tip>
+For very large codebases, consider using `gofumpt` (a stricter formatter) or running gofmt in parallel across directories.
+</Tip>
+
+## Troubleshooting
+
+### Common Issues
+
+<AccordionGroup>
+  <Accordion title="Gofmt changes file but editor shows different formatting">
+    Your editor may be using a different formatter (like `goimports` or `gofumpt`). Check your editor's Go extension settings.
+  </Accordion>
+  
+  <Accordion title="Gofmt doesn't fix all style issues">
+    Gofmt only handles formatting, not style issues. Use `go vet` and linters like `golangci-lint` for additional checks.
+  </Accordion>
+  
+  <Accordion title="Files with syntax errors aren't formatted">
+    Gofmt requires valid Go syntax. Fix syntax errors first, then run gofmt.
+  </Accordion>
+</AccordionGroup>
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="go Command" href="/tools/go-command">
+    Overview of the go command
+  </Card>
+  <Card title="Building Programs" href="/tools/build">
+    Building Go applications
+  </Card>
+</CardGroup>
+
+## References
+
+- [Effective Go - Formatting](https://go.dev/doc/effective_go#formatting)
+- [Go Code Review Comments](https://go.dev/wiki/CodeReviewComments)

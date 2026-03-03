@@ -1,0 +1,736 @@
+---
+title: 'Profiling and Diagnostics'
+description: 'Tools and techniques for profiling and debugging Go programs'
+---
+
+## Overview
+
+Go provides powerful built-in tools for profiling and diagnosing performance issues. These tools help you understand CPU usage, memory allocation, concurrency behavior, and more. Effective use of these tools is essential for optimizing Go applications.
+
+<Note>
+Always profile with realistic workloads. Synthetic benchmarks may not reflect production behavior.
+</Note>
+
+## CPU Profiling
+
+### Using pprof
+
+CPU profiling shows where your program spends execution time.
+
+#### In Tests and Benchmarks
+
+```bash
+# Run benchmarks with CPU profile
+go test -bench=. -cpuprofile cpu.prof
+
+# Analyze the profile
+go tool pprof cpu.prof
+```
+
+#### In Production Code
+
+```go
+package main
+
+import (
+    "flag"
+    "log"
+    "os"
+    "runtime/pprof"
+)
+
+var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
+
+func main() {
+    flag.Parse()
+    
+    if *cpuprofile != "" {
+        f, err := os.Create(*cpuprofile)
+        if err != nil {
+            log.Fatal(err)
+        }
+        defer f.Close()
+        
+        if err := pprof.StartCPUProfile(f); err != nil {
+            log.Fatal(err)
+        }
+        defer pprof.StopCPUProfile()
+    }
+    
+    // Your application code...
+}
+```
+
+#### Via HTTP
+
+```go
+import _ "net/http/pprof"
+import "net/http"
+
+func main() {
+    go func() {
+        log.Println(http.ListenAndServe("localhost:6060", nil))
+    }()
+    
+    // Your application...
+}
+```
+
+Access profiles at:
+- CPU: `http://localhost:6060/debug/pprof/profile?seconds=30`
+- Heap: `http://localhost:6060/debug/pprof/heap`
+- Goroutines: `http://localhost:6060/debug/pprof/goroutine`
+
+### Analyzing CPU Profiles
+
+```bash
+# Interactive mode
+go tool pprof cpu.prof
+
+# Top functions by CPU time
+(pprof) top
+
+# Show top 20
+(pprof) top20
+
+# List source code for function
+(pprof) list functionName
+
+# Web view (requires graphviz)
+(pprof) web
+
+# Generate PDF
+(pprof) pdf > profile.pdf
+```
+
+Common pprof commands:
+- `top`: Show hot spots
+- `list <func>`: Show annotated source
+- `web`: Interactive graph in browser
+- `peek <func>`: Callees of a function
+- `disasm <func>`: Show assembly
+
+### CPU Profile Example
+
+```
+Type: cpu
+Time: Jan 1, 2024 at 3:04pm (UTC)
+Duration: 30.13s, Total samples = 28.50s (94.59%)
+
+Showing nodes accounting for 22.30s, 78.25% of 28.50s total
+      flat  flat%   sum%        cum   cum%
+     8.20s 28.77% 28.77%      8.20s 28.77%  runtime.memclrNoHeapPointers
+     4.50s 15.79% 44.56%      4.50s 15.79%  hash/crc32.update
+     3.30s 11.58% 56.14%      5.80s 20.35%  main.processData
+     2.80s  9.82% 65.96%      2.80s  9.82%  syscall.Syscall
+```
+
+- **flat**: Time in function itself
+- **cum**: Time in function + callees
+
+## Memory Profiling
+
+### Heap Profiling
+
+Shows memory allocation sites:
+
+```bash
+# In tests
+go test -bench=. -memprofile mem.prof
+
+# Analyze
+go tool pprof mem.prof
+```
+
+In code:
+```go
+var memprofile = flag.String("memprofile", "", "write memory profile to file")
+
+func main() {
+    flag.Parse()
+    // ... application code ...
+    
+    if *memprofile != "" {
+        f, err := os.Create(*memprofile)
+        if err != nil {
+            log.Fatal(err)
+        }
+        defer f.Close()
+        
+        runtime.GC() // Get up-to-date statistics
+        if err := pprof.WriteHeapProfile(f); err != nil {
+            log.Fatal(err)
+        }
+    }
+}
+```
+
+### Profile Types
+
+```go
+// Allocation profile (all allocations)
+pprof.Lookup("allocs").WriteTo(f, 0)
+
+// Heap profile (live objects)
+pprof.Lookup("heap").WriteTo(f, 0)
+```
+
+Differences:
+- **allocs**: Total allocated (including freed)
+- **heap**: Currently in use (live objects)
+
+### Memory Profile Views
+
+```bash
+go tool pprof -alloc_space mem.prof  # Total allocated
+go tool pprof -alloc_objects mem.prof  # Number of allocations
+go tool pprof -inuse_space mem.prof  # Currently in use (default)
+go tool pprof -inuse_objects mem.prof  # Number of live objects
+```
+
+### Analyzing Memory Usage
+
+```go
+import "runtime"
+
+func printMemStats() {
+    var m runtime.MemStats
+    runtime.ReadMemStats(&m)
+    
+    fmt.Printf("Alloc = %v MiB", bToMb(m.Alloc))
+    fmt.Printf("\tTotalAlloc = %v MiB", bToMb(m.TotalAlloc))
+    fmt.Printf("\tSys = %v MiB", bToMb(m.Sys))
+    fmt.Printf("\tNumGC = %v\n", m.NumGC)
+}
+
+func bToMb(b uint64) uint64 {
+    return b / 1024 / 1024
+}
+```
+
+## Goroutine Profiling
+
+### Stack Traces
+
+```go
+// Get all goroutine stack traces
+pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
+
+// Or via HTTP
+// Visit http://localhost:6060/debug/pprof/goroutine
+```
+
+### Detecting Goroutine Leaks
+
+```go
+import "runtime"
+
+func printGoroutineCount() {
+    fmt.Printf("Number of goroutines: %d\n", runtime.NumGoroutine())
+}
+
+// Monitor over time
+ticker := time.NewTicker(10 * time.Second)
+for range ticker.C {
+    printGoroutineCount()
+}
+```
+
+Finding leaked goroutines:
+```bash
+# Get goroutine profile
+curl http://localhost:6060/debug/pprof/goroutine > goroutines.prof
+
+# Analyze
+go tool pprof goroutines.prof
+```
+
+<Warning>
+Goroutine leaks are a common source of memory leaks. Always ensure goroutines can exit.
+</Warning>
+
+## Block Profiling
+
+Profiles blocking on synchronization primitives:
+
+```go
+import "runtime"
+
+func main() {
+    // Enable block profiling
+    runtime.SetBlockProfileRate(1)
+    
+    // Your code...
+    
+    // Write profile
+    f, _ := os.Create("block.prof")
+    pprof.Lookup("block").WriteTo(f, 0)
+    f.Close()
+}
+```
+
+Shows time spent blocked on:
+- `sync.Mutex`
+- `sync.RWMutex`
+- `sync.WaitGroup`
+- `sync.Cond`
+- Channel operations
+- `select` statements
+
+```bash
+go tool pprof block.prof
+```
+
+## Mutex Profiling
+
+Profiles contention on mutexes:
+
+```go
+import "runtime"
+
+func main() {
+    // Sample 1/5 of mutex contention events
+    runtime.SetMutexProfileFraction(5)
+    
+    // Your code...
+    
+    // Write profile
+    f, _ := os.Create("mutex.prof")
+    pprof.Lookup("mutex").WriteTo(f, 0)
+    f.Close()
+}
+```
+
+Identifies:
+- Contended mutexes
+- Lock hold times
+- Hot paths acquiring locks
+
+```bash
+go tool pprof mutex.prof
+```
+
+## Execution Tracing
+
+### Recording Traces
+
+Execution traces show detailed runtime behavior:
+
+```go
+import "runtime/trace"
+
+func main() {
+    f, err := os.Create("trace.out")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer f.Close()
+    
+    if err := trace.Start(f); err != nil {
+        log.Fatal(err)
+    }
+    defer trace.Stop()
+    
+    // Your code to trace...
+}
+```
+
+Or in tests:
+```bash
+go test -trace trace.out
+```
+
+### Viewing Traces
+
+```bash
+go tool trace trace.out
+```
+
+Opens web UI showing:
+- Goroutine execution timeline
+- Heap allocations
+- GC events
+- Syscalls
+- Network blocking
+- Synchronization events
+
+### Trace Analysis
+
+The trace viewer provides multiple views:
+
+**View trace**: Interactive timeline
+- See what each processor was doing
+- Identify goroutine scheduling issues
+- Find long-running operations
+
+**Goroutine analysis**: Per-goroutine execution
+- Time in running/runnable/blocked states
+- Synchronization wait times
+
+**Network/Syscall blocking**: I/O operations
+- Identify slow syscalls
+- Network latency issues
+
+**Scheduler latency**: Scheduling delays
+- Time goroutines wait to be scheduled
+
+### Flight Recorder
+
+Continuous tracing with circular buffer:
+
+```go
+import "runtime/trace"
+
+func main() {
+    // Start flight recorder with 1MB buffer
+    trace.Start(os.Stderr)
+    defer trace.Stop()
+    
+    // On crash/signal, trace is dumped
+    // Your application...
+}
+```
+
+<Note>
+The flight recorder only keeps recent events. Good for capturing issues that happen during crashes.
+</Note>
+
+## Benchmarking
+
+### Writing Benchmarks
+
+```go
+package mypackage
+
+import "testing"
+
+func BenchmarkMyFunction(b *testing.B) {
+    // Setup code (not timed)
+    data := setupTestData()
+    
+    b.ResetTimer()
+    
+    for i := 0; i < b.N; i++ {
+        MyFunction(data)
+    }
+}
+
+// Benchmark with different inputs
+func BenchmarkProcessSmall(b *testing.B) {
+    data := make([]byte, 100)
+    b.ResetTimer()
+    for i := 0; i < b.N; i++ {
+        Process(data)
+    }
+}
+
+func BenchmarkProcessLarge(b *testing.B) {
+    data := make([]byte, 10000)
+    b.ResetTimer()
+    for i := 0; i < b.N; i++ {
+        Process(data)
+    }
+}
+```
+
+### Running Benchmarks
+
+```bash
+# Run all benchmarks
+go test -bench=.
+
+# Run specific benchmark
+go test -bench=BenchmarkMyFunction
+
+# With memory stats
+go test -bench=. -benchmem
+
+# Longer runs for more accuracy
+go test -bench=. -benchtime=10s
+
+# Multiple iterations
+go test -bench=. -count=5
+```
+
+### Benchmark Output
+
+```
+BenchmarkMyFunction-8   1000000   1234 ns/op   512 B/op   5 allocs/op
+```
+
+- `BenchmarkMyFunction-8`: Name and GOMAXPROCS
+- `1000000`: Iterations run
+- `1234 ns/op`: Nanoseconds per operation
+- `512 B/op`: Bytes allocated per op
+- `5 allocs/op`: Allocations per op
+
+### Comparing Benchmarks
+
+```bash
+# Run baseline
+go test -bench=. -benchmem > old.txt
+
+# Make changes...
+
+# Run new version
+go test -bench=. -benchmem > new.txt
+
+# Compare
+go install golang.org/x/perf/cmd/benchstat@latest
+benchstat old.txt new.txt
+```
+
+Output:
+```
+name        old time/op  new time/op  delta
+MyFunc-8    1.23µs ± 2%  0.89µs ± 1%  -27.64%
+
+name        old alloc/op  new alloc/op  delta
+MyFunc-8     512B ± 0%     256B ± 0%   -50.00%
+```
+
+## Runtime Metrics
+
+### metrics package
+
+```go
+import "runtime/metrics"
+
+func readMetrics() {
+    // List all available metrics
+    descs := metrics.All()
+    for _, desc := range descs {
+        fmt.Printf("%s: %s\n", desc.Name, desc.Description)
+    }
+    
+    // Read specific metrics
+    samples := []metrics.Sample{
+        {Name: "/gc/cycles/total:gc-cycles"},
+        {Name: "/gc/heap/goal:bytes"},
+        {Name: "/memory/classes/total:bytes"},
+    }
+    
+    metrics.Read(samples)
+    
+    for _, sample := range samples {
+        fmt.Printf("%s: ", sample.Name)
+        
+        switch sample.Value.Kind() {
+        case metrics.KindUint64:
+            fmt.Printf("%d\n", sample.Value.Uint64())
+        case metrics.KindFloat64:
+            fmt.Printf("%.2f\n", sample.Value.Float64())
+        }
+    }
+}
+```
+
+### Key Metrics
+
+```
+/gc/cycles/total:gc-cycles              # GC runs
+/gc/heap/goal:bytes                     # Target heap size
+/gc/heap/live:bytes                     # Live data
+/memory/classes/heap/objects:bytes      # Object memory
+/memory/classes/heap/unused:bytes       # Wasted memory
+/sched/goroutines:goroutines            # Goroutine count
+/cpu/classes/gc/total:cpu-seconds       # GC CPU time
+```
+
+## GODEBUG Environment Variable
+
+Control runtime debugging:
+
+```bash
+# GC trace
+GODEBUG=gctrace=1 ./program
+
+# Scheduler trace  
+GODEBUG=schedtrace=1000 ./program  # Every 1000ms
+
+# Detailed scheduler trace
+GODEBUG=schedtrace=1000,scheddetail=1 ./program
+
+# Memory allocator stats
+GODEBUG=allocfreetrace=1 ./program
+
+# Multiple options
+GODEBUG=gctrace=1,schedtrace=1000 ./program
+```
+
+### gctrace Output
+
+```
+gc 3 @0.101s 0%: 0.021+0.72+0.043 ms clock, 0.042+0.47/0.20/0.23+0.086 ms cpu, 4->4->2 MB, 5 MB goal, 2 P
+```
+
+Fields:
+- `gc 3`: GC cycle number
+- `@0.101s`: Time since start
+- `0%`: GC CPU percentage
+- `4->4->2 MB`: Heap before, after, live
+- `5 MB goal`: Target heap
+- `2 P`: Number of processors
+
+### schedtrace Output
+
+```
+SCHED 1000ms: gomaxprocs=2 idleprocs=0 threads=4 spinningthreads=0 idlethreads=1 runqueue=0 [1 0]
+```
+
+- `gomaxprocs`: GOMAXPROCS setting
+- `idleprocs`: Idle P count
+- `threads`: OS thread count
+- `runqueue`: Global runqueue length
+- `[1 0]`: Per-P runqueue lengths
+
+## Best Practices
+
+### 1. Profile Realistic Workloads
+
+```go
+// Bad: Synthetic benchmark
+func BenchmarkFake(b *testing.B) {
+    for i := 0; i < b.N; i++ {
+        compute(100)
+    }
+}
+
+// Good: Representative workload
+func BenchmarkRealistic(b *testing.B) {
+    requests := loadProductionSample()
+    b.ResetTimer()
+    
+    for i := 0; i < b.N; i++ {
+        handleRequest(requests[i%len(requests)])
+    }
+}
+```
+
+### 2. Isolate Profiling Code
+
+```go
+// Use build tags for profiling code
+//go:build profile
+
+package main
+
+import _ "net/http/pprof"
+
+func init() {
+    go http.ListenAndServe(":6060", nil)
+}
+```
+
+Build with: `go build -tags=profile`
+
+### 3. Sample Appropriately
+
+```go
+// Don't profile everything
+if rand.Float64() < 0.01 {  // 1% sampling
+    f, _ := os.Create("cpu.prof")
+    pprof.StartCPUProfile(f)
+    defer func() {
+        pprof.StopCPUProfile()
+        f.Close()
+    }()
+}
+```
+
+### 4. Use Continuous Profiling
+
+In production, collect profiles periodically:
+
+```go
+func startContinuousProfiling() {
+    ticker := time.NewTicker(10 * time.Minute)
+    go func() {
+        for range ticker.C {
+            collectProfile()
+        }
+    }()
+}
+
+func collectProfile() {
+    // CPU profile
+    f, _ := os.Create(fmt.Sprintf("cpu-%d.prof", time.Now().Unix()))
+    pprof.StartCPUProfile(f)
+    time.Sleep(30 * time.Second)
+    pprof.StopCPUProfile()
+    f.Close()
+    
+    // Upload to storage...
+}
+```
+
+### 5. Automate Regression Detection
+
+```bash
+#!/bin/bash
+# benchmark.sh
+
+# Run benchmarks
+go test -bench=. -benchmem -count=10 > new.txt
+
+# Compare with baseline
+if [ -f baseline.txt ]; then
+    benchstat baseline.txt new.txt
+fi
+
+# Update baseline if approved
+cp new.txt baseline.txt
+```
+
+## Troubleshooting Common Issues
+
+### High CPU Usage
+
+1. Run CPU profile
+2. Look for hot functions in `top`
+3. Use `list` to see source
+4. Optimize hot paths
+
+### High Memory Usage
+
+1. Check `runtime.MemStats`
+2. Run heap profile
+3. Look at `-inuse_space` for live memory
+4. Look at `-alloc_space` for churn
+5. Fix leaks or reduce allocations
+
+### Goroutine Leaks
+
+1. Monitor `runtime.NumGoroutine()`
+2. Capture goroutine profile
+3. Look for blocked goroutines
+4. Ensure exit conditions exist
+
+### GC Pauses
+
+1. Enable `gctrace`
+2. Check pause times
+3. Reduce heap size or increase GOGC
+4. Reduce pointer-heavy structures
+
+### Lock Contention
+
+1. Run mutex profile
+2. Identify hot mutexes
+3. Reduce critical section size
+4. Consider sharding locks
+
+## References
+
+- [Profiling Go Programs](https://go.dev/blog/pprof)
+- [Diagnostics Guide](https://go.dev/doc/diagnostics)
+- [runtime/pprof package](/pkg/runtime/pprof/)
+- [runtime/trace package](/pkg/runtime/trace/)
+- [testing package](/pkg/testing/)
+
+## Related Topics
+
+- [Garbage Collection](/advanced/garbage-collection)
+- [Runtime Internals](/advanced/runtime)
+- [Performance Optimization](/guides/performance)
+- [Testing and Benchmarking](/guides/testing)

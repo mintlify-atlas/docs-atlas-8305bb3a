@@ -1,0 +1,503 @@
+---
+title: Sort
+description: API reference for Go sort package - sorting slices and user-defined collections
+---
+
+Package sort provides primitives for sorting slices and user-defined collections.
+
+<Note>
+  In many situations, the newer `slices.SortFunc` function is more ergonomic and runs faster.
+</Note>
+
+## Types
+
+### Interface
+
+```go
+type Interface interface {
+    Len() int
+    Less(i, j int) bool
+    Swap(i, j int)
+}
+```
+
+An implementation of Interface can be sorted by the routines in this package. The methods refer to elements of the underlying collection by integer index.
+
+<ParamField path="Len" type="func() int">
+  Returns the number of elements in the collection
+</ParamField>
+
+<ParamField path="Less" type="func(i, j int) bool">
+  Reports whether the element with index i must sort before the element with index j. Must describe a strict weak ordering.
+</ParamField>
+
+<ParamField path="Swap" type="func(i, j int)">
+  Swaps the elements with indexes i and j
+</ParamField>
+
+### Convenience Types
+
+#### IntSlice
+
+```go
+type IntSlice []int
+```
+
+Attaches the methods of Interface to []int, sorting in increasing order.
+
+**Methods:**
+- `func (x IntSlice) Len() int`
+- `func (x IntSlice) Less(i, j int) bool`
+- `func (x IntSlice) Swap(i, j int)`
+- `func (x IntSlice) Sort()`
+- `func (x IntSlice) Search(x int) int`
+
+#### Float64Slice
+
+```go
+type Float64Slice []float64
+```
+
+Implements Interface for []float64, sorting in increasing order with NaN values ordered before other values.
+
+**Methods:**
+- `func (x Float64Slice) Len() int`
+- `func (x Float64Slice) Less(i, j int) bool`
+- `func (x Float64Slice) Swap(i, j int)`
+- `func (x Float64Slice) Sort()`
+- `func (x Float64Slice) Search(x float64) int`
+
+#### StringSlice
+
+```go
+type StringSlice []string
+```
+
+Attaches the methods of Interface to []string, sorting in increasing order.
+
+**Methods:**
+- `func (x StringSlice) Len() int`
+- `func (x StringSlice) Less(i, j int) bool`
+- `func (x StringSlice) Swap(i, j int)`
+- `func (x StringSlice) Sort()`
+- `func (x StringSlice) Search(x string) int`
+
+## Sorting Functions
+
+### Sort
+
+```go
+func Sort(data Interface)
+```
+
+Sorts data in ascending order as determined by the Less method. It makes one call to data.Len to determine n and O(n*log(n)) calls to data.Less and data.Swap. The sort is not guaranteed to be stable.
+
+<ParamField path="data" type="Interface" required>
+  The collection to sort
+</ParamField>
+
+<ResponseField name="complexity" type="string">
+  O(n*log(n)) comparisons and swaps
+</ResponseField>
+
+### Stable
+
+```go
+func Stable(data Interface)
+```
+
+Sorts data in ascending order as determined by the Less method, while keeping the original order of equal elements.
+
+<ParamField path="data" type="Interface" required>
+  The collection to sort
+</ParamField>
+
+<ResponseField name="complexity" type="string">
+  O(n*log(n)) comparisons, O(n*log(n)*log(n)) swaps
+</ResponseField>
+
+### IsSorted
+
+```go
+func IsSorted(data Interface) bool
+```
+
+Reports whether data is sorted.
+
+<ParamField path="data" type="Interface" required>
+  The collection to check
+</ParamField>
+
+<ResponseField name="return" type="bool">
+  true if data is sorted, false otherwise
+</ResponseField>
+
+### Reverse
+
+```go
+func Reverse(data Interface) Interface
+```
+
+Returns the reverse order for data.
+
+<ParamField path="data" type="Interface" required>
+  The collection to reverse
+</ParamField>
+
+<ResponseField name="return" type="Interface">
+  An Interface wrapper that reverses the ordering
+</ResponseField>
+
+## Slice Functions
+
+### Slice
+
+```go
+func Slice(x any, less func(i, j int) bool)
+```
+
+Sorts the slice x given the provided less function. It panics if x is not a slice. The sort is not guaranteed to be stable.
+
+<ParamField path="x" type="any" required>
+  The slice to sort (must be a slice type)
+</ParamField>
+
+<ParamField path="less" type="func(i, j int) bool" required>
+  Comparison function that reports whether x[i] should sort before x[j]
+</ParamField>
+
+<Note>
+  The newer `slices.SortFunc` function is more ergonomic and runs faster.
+</Note>
+
+### SliceStable
+
+```go
+func SliceStable(x any, less func(i, j int) bool)
+```
+
+Sorts the slice x using the provided less function, keeping equal elements in their original order. It panics if x is not a slice.
+
+<ParamField path="x" type="any" required>
+  The slice to sort (must be a slice type)
+</ParamField>
+
+<ParamField path="less" type="func(i, j int) bool" required>
+  Comparison function that reports whether x[i] should sort before x[j]
+</ParamField>
+
+### SliceIsSorted
+
+```go
+func SliceIsSorted(x any, less func(i, j int) bool) bool
+```
+
+Reports whether the slice x is sorted according to the provided less function. It panics if x is not a slice.
+
+<ParamField path="x" type="any" required>
+  The slice to check (must be a slice type)
+</ParamField>
+
+<ParamField path="less" type="func(i, j int) bool" required>
+  Comparison function
+</ParamField>
+
+<ResponseField name="return" type="bool">
+  true if x is sorted, false otherwise
+</ResponseField>
+
+## Convenience Functions
+
+### Ints
+
+```go
+func Ints(x []int)
+```
+
+Sorts a slice of ints in increasing order.
+
+<ParamField path="x" type="[]int" required>
+  The slice to sort
+</ParamField>
+
+<Note>
+  As of Go 1.22, this function simply calls `slices.Sort`.
+</Note>
+
+### Float64s
+
+```go
+func Float64s(x []float64)
+```
+
+Sorts a slice of float64s in increasing order. NaN values are ordered before other values.
+
+<ParamField path="x" type="[]float64" required>
+  The slice to sort
+</ParamField>
+
+### Strings
+
+```go
+func Strings(x []string)
+```
+
+Sorts a slice of strings in increasing order.
+
+<ParamField path="x" type="[]string" required>
+  The slice to sort
+</ParamField>
+
+### IntsAreSorted
+
+```go
+func IntsAreSorted(x []int) bool
+```
+
+Reports whether the slice x is sorted in increasing order.
+
+<ParamField path="x" type="[]int" required>
+  The slice to check
+</ParamField>
+
+### Float64sAreSorted
+
+```go
+func Float64sAreSorted(x []float64) bool
+```
+
+Reports whether the slice x is sorted in increasing order, with NaN values before any other values.
+
+<ParamField path="x" type="[]float64" required>
+  The slice to check
+</ParamField>
+
+### StringsAreSorted
+
+```go
+func StringsAreSorted(x []string) bool
+```
+
+Reports whether the slice x is sorted in increasing order.
+
+<ParamField path="x" type="[]string" required>
+  The slice to check
+</ParamField>
+
+## Binary Search Functions
+
+### Search
+
+```go
+func Search(n int, f func(int) bool) int
+```
+
+Uses binary search to find and return the smallest index i in [0, n) at which f(i) is true. Search requires that f is false for some (possibly empty) prefix of the input range [0, n) and then true for the remainder. If there is no such index, Search returns n.
+
+<ParamField path="n" type="int" required>
+  The upper bound of the search range
+</ParamField>
+
+<ParamField path="f" type="func(int) bool" required>
+  Predicate function
+</ParamField>
+
+<ResponseField name="return" type="int">
+  The smallest index i where f(i) is true, or n if no such index exists
+</ResponseField>
+
+### Find
+
+```go
+func Find(n int, cmp func(int) int) (i int, found bool)
+```
+
+Uses binary search to find and return the smallest index i in the range from 0 to n at which the comparison function returns a value less than or equal to 0. The found result is true if i is less than n and the comparison returns exactly 0.
+
+<ParamField path="n" type="int" required>
+  The upper bound of the search range
+</ParamField>
+
+<ParamField path="cmp" type="func(int) int" required>
+  Comparison function returning negative, zero, or positive
+</ParamField>
+
+<ResponseField name="i" type="int">
+  The index where the target is found or should be inserted
+</ResponseField>
+
+<ResponseField name="found" type="bool">
+  true if the target was found, false otherwise
+</ResponseField>
+
+### SearchInts
+
+```go
+func SearchInts(a []int, x int) int
+```
+
+Searches for x in a sorted slice of ints and returns the index as specified by Search. The slice must be sorted in ascending order.
+
+<ParamField path="a" type="[]int" required>
+  The sorted slice to search
+</ParamField>
+
+<ParamField path="x" type="int" required>
+  The value to search for
+</ParamField>
+
+<ResponseField name="return" type="int">
+  The index where x is found or should be inserted
+</ResponseField>
+
+### SearchFloat64s
+
+```go
+func SearchFloat64s(a []float64, x float64) int
+```
+
+Searches for x in a sorted slice of float64s and returns the index as specified by Search. The slice must be sorted in ascending order.
+
+<ParamField path="a" type="[]float64" required>
+  The sorted slice to search
+</ParamField>
+
+<ParamField path="x" type="float64" required>
+  The value to search for
+</ParamField>
+
+### SearchStrings
+
+```go
+func SearchStrings(a []string, x string) int
+```
+
+Searches for x in a sorted slice of strings and returns the index as specified by Search. The slice must be sorted in ascending order.
+
+<ParamField path="a" type="[]string" required>
+  The sorted slice to search
+</ParamField>
+
+<ParamField path="x" type="string" required>
+  The value to search for
+</ParamField>
+
+## Examples
+
+### Basic Sorting
+
+```go
+package main
+
+import (
+    "fmt"
+    "sort"
+)
+
+func main() {
+    // Sort integers
+    ints := []int{5, 2, 6, 3, 1, 4}
+    sort.Ints(ints)
+    fmt.Println(ints) // [1 2 3 4 5 6]
+
+    // Sort strings
+    strs := []string{"c", "a", "b"}
+    sort.Strings(strs)
+    fmt.Println(strs) // [a b c]
+
+    // Check if sorted
+    fmt.Println(sort.IntsAreSorted(ints)) // true
+}
+```
+
+### Custom Sort with Interface
+
+```go
+package main
+
+import (
+    "fmt"
+    "sort"
+)
+
+type Person struct {
+    Name string
+    Age  int
+}
+
+type ByAge []Person
+
+func (a ByAge) Len() int           { return len(a) }
+func (a ByAge) Less(i, j int) bool { return a[i].Age < a[j].Age }
+func (a ByAge) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+
+func main() {
+    people := []Person{
+        {"Bob", 31},
+        {"John", 42},
+        {"Michael", 17},
+        {"Jenny", 26},
+    }
+
+    sort.Sort(ByAge(people))
+    fmt.Println(people)
+    // [{Michael 17} {Jenny 26} {Bob 31} {John 42}]
+}
+```
+
+### Sort with Slice Function
+
+```go
+package main
+
+import (
+    "fmt"
+    "sort"
+)
+
+type Person struct {
+    Name string
+    Age  int
+}
+
+func main() {
+    people := []Person{
+        {"Bob", 31},
+        {"John", 42},
+        {"Michael", 17},
+        {"Jenny", 26},
+    }
+
+    // Sort by age
+    sort.Slice(people, func(i, j int) bool {
+        return people[i].Age < people[j].Age
+    })
+
+    fmt.Println(people)
+    // [{Michael 17} {Jenny 26} {Bob 31} {John 42}]
+}
+```
+
+### Binary Search
+
+```go
+package main
+
+import (
+    "fmt"
+    "sort"
+)
+
+func main() {
+    data := []int{1, 2, 3, 5, 8, 13, 21}
+    x := 8
+
+    i := sort.Search(len(data), func(i int) bool { return data[i] >= x })
+    if i < len(data) && data[i] == x {
+        fmt.Printf("found %d at index %d\n", x, i)
+    } else {
+        fmt.Printf("%d not found, would insert at %d\n", x, i)
+    }
+    // Output: found 8 at index 4
+}
+```

@@ -1,0 +1,442 @@
+---
+title: embed
+description: Embedding files into Go binaries at compile time
+---
+
+The `embed` package provides access to files embedded in the running Go program at compile time using the `//go:embed` directive.
+
+## Basic Usage
+
+### Embedding a Single File
+
+```go
+import (
+    _ "embed"
+)
+
+//go:embed hello.txt
+var message string
+
+func main() {
+    fmt.Println(message)
+}
+```
+
+### Embedding as Bytes
+
+```go
+import (
+    _ "embed"
+)
+
+//go:embed image.png
+var logo []byte
+
+func serveLogo(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "image/png")
+    w.Write(logo)
+}
+```
+
+### Embedding Multiple Files
+
+```go
+import (
+    "embed"
+)
+
+//go:embed templates/*.html
+var templates embed.FS
+
+func loadTemplate(name string) ([]byte, error) {
+    return templates.ReadFile("templates/" + name)
+}
+```
+
+## The embed.FS Type
+
+The `embed.FS` type implements `fs.FS` and provides a read-only file system.
+
+```go
+type FS struct {
+    // contains filtered or unexported fields
+}
+```
+
+### Methods
+
+- `Open(name string)` - Open a file for reading
+- `ReadDir(name string)` - Read directory contents
+- `ReadFile(name string)` - Read entire file
+
+## Practical Examples
+
+### Embedding Static Web Assets
+
+```go
+import (
+    "embed"
+    "io/fs"
+    "net/http"
+)
+
+//go:embed static
+var staticFiles embed.FS
+
+func main() {
+    // Serve embedded files
+    staticFS, err := fs.Sub(staticFiles, "static")
+    if err != nil {
+        panic(err)
+    }
+    
+    http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
+    http.ListenAndServe(":8080", nil)
+}
+```
+
+### Embedding HTML Templates
+
+```go
+import (
+    "embed"
+    "html/template"
+    "net/http"
+)
+
+//go:embed templates/*.html
+var templateFiles embed.FS
+
+var templates *template.Template
+
+func init() {
+    templates = template.Must(template.ParseFS(templateFiles, "templates/*.html"))
+}
+
+func handleIndex(w http.ResponseWriter, r *http.Request) {
+    data := map[string]string{
+        "Title": "My Page",
+    }
+    templates.ExecuteTemplate(w, "index.html", data)
+}
+```
+
+### Embedding Configuration Files
+
+```go
+import (
+    _ "embed"
+    "encoding/json"
+)
+
+//go:embed config.json
+var configData []byte
+
+type Config struct {
+    Host string `json:"host"`
+    Port int    `json:"port"`
+}
+
+func loadConfig() (*Config, error) {
+    var config Config
+    err := json.Unmarshal(configData, &config)
+    return &config, err
+}
+```
+
+### Embedding SQL Migration Files
+
+```go
+import (
+    "embed"
+    "fmt"
+    "sort"
+    "strings"
+)
+
+//go:embed migrations/*.sql
+var migrations embed.FS
+
+func runMigrations(db *sql.DB) error {
+    files, err := migrations.ReadDir("migrations")
+    if err != nil {
+        return err
+    }
+    
+    // Sort files to ensure order
+    var fileNames []string
+    for _, file := range files {
+        if !file.IsDir() && strings.HasSuffix(file.Name(), ".sql") {
+            fileNames = append(fileNames, file.Name())
+        }
+    }
+    sort.Strings(fileNames)
+    
+    for _, name := range fileNames {
+        content, err := migrations.ReadFile("migrations/" + name)
+        if err != nil {
+            return err
+        }
+        
+        fmt.Printf("Running migration: %s\n", name)
+        _, err = db.Exec(string(content))
+        if err != nil {
+            return fmt.Errorf("migration %s failed: %w", name, err)
+        }
+    }
+    
+    return nil
+}
+```
+
+### Embedding Frontend Build
+
+```go
+import (
+    "embed"
+    "io/fs"
+    "net/http"
+)
+
+//go:embed dist
+var dist embed.FS
+
+func serveFrontend() {
+    distFS, _ := fs.Sub(dist, "dist")
+    
+    http.Handle("/", http.FileServer(http.FS(distFS)))
+    http.ListenAndServe(":8080", nil)
+}
+```
+
+### Embedding Test Fixtures
+
+```go
+import (
+    "embed"
+    "testing"
+)
+
+//go:embed testdata/*.json
+var testData embed.FS
+
+func TestParser(t *testing.T) {
+    data, err := testData.ReadFile("testdata/valid.json")
+    if err != nil {
+        t.Fatal(err)
+    }
+    
+    // Test with embedded data
+    result, err := Parse(data)
+    if err != nil {
+        t.Errorf("Parse failed: %v", err)
+    }
+}
+```
+
+### Walking Embedded Directory
+
+```go
+import (
+    "embed"
+    "io/fs"
+    "path/filepath"
+)
+
+//go:embed assets
+var assets embed.FS
+
+func listAllFiles() error {
+    return fs.WalkDir(assets, "assets", func(path string, d fs.DirEntry, err error) error {
+        if err != nil {
+            return err
+        }
+        
+        if !d.IsDir() {
+            fmt.Printf("File: %s\n", path)
+        }
+        
+        return nil
+    })
+}
+```
+
+## Directive Patterns
+
+### Single File
+
+```go
+//go:embed file.txt
+var content string
+```
+
+### Multiple Files
+
+```go
+//go:embed file1.txt file2.txt file3.txt
+var files embed.FS
+```
+
+### Wildcard Patterns
+
+```go
+//go:embed templates/*.html
+var templates embed.FS
+
+//go:embed static/**/*
+var static embed.FS
+```
+
+### Multiple Directives
+
+```go
+//go:embed templates
+//go:embed static
+var content embed.FS
+```
+
+## Rules and Limitations
+
+### What Can Be Embedded
+
+- Files in the same directory or subdirectories
+- Files in the module containing the package
+- Files must be readable at build time
+
+### What Cannot Be Embedded
+
+- Files outside the module
+- Symbolic links
+- Hidden files (starting with `.` or `_`)
+- Files in `testdata` directories (unless explicitly specified)
+
+### Syntax Rules
+
+```go
+// Valid
+//go:embed file.txt
+var f string
+
+//go:embed file.txt
+var f []byte
+
+//go:embed file.txt
+//go:embed another.txt
+var files embed.FS
+
+// Invalid - cannot embed into non-string/[]byte/embed.FS
+//go:embed file.txt
+var f int // Compile error
+
+// Invalid - directive must be directly above variable
+//go:embed file.txt
+// comment
+var f string // Compile error
+```
+
+## Working with text/template
+
+```go
+import (
+    "embed"
+    "text/template"
+)
+
+//go:embed templates/*.tmpl
+var templateFS embed.FS
+
+func loadTemplates() (*template.Template, error) {
+    return template.ParseFS(templateFS, "templates/*.tmpl")
+}
+
+func useTemplate() error {
+    tmpl, err := loadTemplates()
+    if err != nil {
+        return err
+    }
+    
+    data := struct {
+        Name string
+    }{"World"}
+    
+    return tmpl.ExecuteTemplate(os.Stdout, "greeting.tmpl", data)
+}
+```
+
+## Checking for Embedded Files
+
+```go
+import (
+    "embed"
+    "io/fs"
+)
+
+//go:embed data
+var dataFS embed.FS
+
+func fileExists(name string) bool {
+    _, err := dataFS.Open(name)
+    return err == nil
+}
+
+func listFiles(dir string) ([]string, error) {
+    entries, err := dataFS.ReadDir(dir)
+    if err != nil {
+        return nil, err
+    }
+    
+    var files []string
+    for _, entry := range entries {
+        if !entry.IsDir() {
+            files = append(files, entry.Name())
+        }
+    }
+    
+    return files, nil
+}
+```
+
+## Best Practices
+
+1. **Organize embedded files** - Keep them in dedicated directories
+2. **Use embed.FS for multiple files** - More flexible than string or []byte
+3. **Document embedded files** - Comment what files are embedded and why
+4. **Consider binary size** - Embedded files increase binary size
+5. **Use for truly static content** - Don't embed files that change frequently
+6. **Validate at startup** - Check that required embedded files are present
+7. **Version control embedded files** - Include them in your repository
+
+## Common Use Cases
+
+- **Web applications**: HTML, CSS, JavaScript files
+- **Configuration**: Default configuration files
+- **Templates**: Email, report, or document templates
+- **Assets**: Images, fonts, icons
+- **Database migrations**: SQL schema and migration files
+- **Documentation**: Help text and user guides
+- **Test fixtures**: Sample data for testing
+- **Certificates**: TLS certificates and keys
+
+## Build Tags and Conditional Embedding
+
+```go
+//go:build !prod
+
+//go:embed dev-config.json
+var config []byte
+```
+
+```go
+//go:build prod
+
+//go:embed prod-config.json
+var config []byte
+```
+
+## Performance Considerations
+
+- Embedded files are included in the binary at compile time
+- Reading is fast - no disk I/O needed
+- Files are decompressed on demand
+- Multiple reads of the same file are efficient
+- Binary size increases by the total size of embedded files

@@ -1,0 +1,584 @@
+---
+title: testing
+description: Support for automated testing of Go packages
+---
+
+Package testing provides support for automated testing of Go packages. It is intended to be used with the "go test" command, which automates execution of test functions.
+
+## Writing Tests
+
+### Test Functions
+
+<ParamField path="Test" type="func TestXxx(*testing.T)">
+  Test functions must be named TestXxx where Xxx does not start with a lowercase letter. The function takes a single argument of type *testing.T.
+  
+  ```go
+  func TestAdd(t *testing.T) {
+      result := Add(2, 3)
+      if result != 5 {
+          t.Errorf("Add(2, 3) = %d; want 5", result)
+      }
+  }
+  ```
+</ParamField>
+
+### T Type Methods
+
+<ParamField path="T.Error" type="func (t *T) Error(args ...any)">
+  Marks the test as failed and logs the arguments. The test continues execution.
+  
+  ```go
+  if got != want {
+      t.Error("values do not match")
+  }
+  ```
+</ParamField>
+
+<ParamField path="T.Errorf" type="func (t *T) Errorf(format string, args ...any)">
+  Like Error but formats the message according to a format specifier.
+  
+  ```go
+  if got != want {
+      t.Errorf("got %v, want %v", got, want)
+  }
+  ```
+</ParamField>
+
+<ParamField path="T.Fail" type="func (t *T) Fail()">
+  Marks the test as failed but continues execution.
+  
+  ```go
+  if err != nil {
+      t.Fail()
+  }
+  ```
+</ParamField>
+
+<ParamField path="T.FailNow" type="func (t *T) FailNow()">
+  Marks the test as failed and stops execution immediately.
+  
+  ```go
+  if db == nil {
+      t.FailNow()
+  }
+  ```
+</ParamField>
+
+<ParamField path="T.Fatal" type="func (t *T) Fatal(args ...any)">
+  Equivalent to Error followed by FailNow.
+  
+  ```go
+  db, err := OpenDB()
+  if err != nil {
+      t.Fatal("Failed to open database:", err)
+  }
+  ```
+</ParamField>
+
+<ParamField path="T.Fatalf" type="func (t *T) Fatalf(format string, args ...any)">
+  Equivalent to Errorf followed by FailNow.
+  
+  ```go
+  if err != nil {
+      t.Fatalf("setup failed: %v", err)
+  }
+  ```
+</ParamField>
+
+<ParamField path="T.Log" type="func (t *T) Log(args ...any)">
+  Logs the arguments. Output is only printed if the test fails or -v flag is set.
+  
+  ```go
+  t.Log("Starting database connection")
+  ```
+</ParamField>
+
+<ParamField path="T.Logf" type="func (t *T) Logf(format string, args ...any)">
+  Like Log but formats according to a format specifier.
+  
+  ```go
+  t.Logf("Processing item %d of %d", i, total)
+  ```
+</ParamField>
+
+<ParamField path="T.Skip" type="func (t *T) Skip(args ...any)">
+  Marks the test as skipped and stops execution.
+  
+  ```go
+  if runtime.GOOS != "linux" {
+      t.Skip("Skipping Linux-specific test")
+  }
+  ```
+</ParamField>
+
+<ParamField path="T.Skipf" type="func (t *T) Skipf(format string, args ...any)">
+  Like Skip but formats the message.
+  
+  ```go
+  if !hasFeature {
+      t.Skipf("Feature %s not available", featureName)
+  }
+  ```
+</ParamField>
+
+### Subtests
+
+<ParamField path="T.Run" type="func (t *T) Run(name string, f func(*T)) bool">
+  Runs a subtest with the given name. Useful for table-driven tests.
+  
+  ```go
+  func TestSum(t *testing.T) {
+      tests := []struct {
+          name string
+          a, b int
+          want int
+      }{
+          {"positive", 2, 3, 5},
+          {"negative", -1, -2, -3},
+          {"zero", 0, 0, 0},
+      }
+      
+      for _, tt := range tests {
+          t.Run(tt.name, func(t *testing.T) {
+              got := Sum(tt.a, tt.b)
+              if got != tt.want {
+                  t.Errorf("Sum(%d, %d) = %d; want %d", 
+                      tt.a, tt.b, got, tt.want)
+              }
+          })
+      }
+  }
+  ```
+</ParamField>
+
+## Benchmarks
+
+<ParamField path="Benchmark" type="func BenchmarkXxx(*testing.B)">
+  Benchmark functions must be named BenchmarkXxx and take a single argument of type *testing.B. Run with: go test -bench=.
+  
+  ```go
+  func BenchmarkFibonacci(b *testing.B) {
+      for b.Loop() {
+          Fibonacci(20)
+      }
+  }
+  ```
+</ParamField>
+
+### B Type Methods
+
+<ParamField path="B.Loop" type="func (b *B) Loop() bool">
+  Reports whether the benchmark should continue running iterations. Modern way to write benchmarks.
+  
+  ```go
+  func BenchmarkAppend(b *testing.B) {
+      data := make([]int, 0)
+      for b.Loop() {
+          data = append(data, 1)
+      }
+  }
+  ```
+</ParamField>
+
+<ParamField path="B.ResetTimer" type="func (b *B) ResetTimer()">
+  Resets the benchmark timer. Useful for excluding setup time from measurements.
+  
+  ```go
+  func BenchmarkExpensiveSetup(b *testing.B) {
+      // Expensive setup
+      data := generateLargeDataset()
+      
+      b.ResetTimer() // Don't count setup time
+      for b.Loop() {
+          processData(data)
+      }
+  }
+  ```
+</ParamField>
+
+<ParamField path="B.StartTimer" type="func (b *B) StartTimer()">
+  Starts the benchmark timer. The timer is initially running.
+</ParamField>
+
+<ParamField path="B.StopTimer" type="func (b *B) StopTimer()">
+  Stops the benchmark timer.
+  
+  ```go
+  for b.Loop() {
+      b.StopTimer()
+      // Setup for this iteration (not measured)
+      data := prepareData()
+      b.StartTimer()
+      
+      processData(data) // Measured
+  }
+  ```
+</ParamField>
+
+<ParamField path="B.RunParallel" type="func (b *B) RunParallel(body func(*PB))">
+  Runs the benchmark in parallel.
+  
+  ```go
+  func BenchmarkParallel(b *testing.B) {
+      b.RunParallel(func(pb *testing.PB) {
+          for pb.Next() {
+              // Code to benchmark
+              ExpensiveOperation()
+          }
+      })
+  }
+  ```
+</ParamField>
+
+### Memory Benchmarks
+
+<ParamField path="B.ReportAllocs" type="func (b *B) ReportAllocs()">
+  Enables allocation statistics for the benchmark.
+  
+  ```go
+  func BenchmarkAllocations(b *testing.B) {
+      b.ReportAllocs()
+      for b.Loop() {
+          _ = make([]byte, 1024)
+      }
+  }
+  ```
+</ParamField>
+
+<ParamField path="B.SetBytes" type="func (b *B) SetBytes(n int64)">
+  Records the number of bytes processed in a single operation.
+  
+  ```go
+  func BenchmarkRead(b *testing.B) {
+      data := make([]byte, 1024)
+      b.SetBytes(int64(len(data)))
+      for b.Loop() {
+          reader.Read(data)
+      }
+  }
+  ```
+</ParamField>
+
+## Examples
+
+<ParamField path="Example" type="func ExampleXxx()">
+  Example functions demonstrate how to use a function or feature. The output comment verifies the example.
+  
+  ```go
+  func ExampleSum() {
+      fmt.Println(Sum(2, 3))
+      // Output: 5
+  }
+  
+  func ExampleReverse() {
+      s := []int{1, 2, 3, 4, 5}
+      fmt.Println(Reverse(s))
+      // Output: [5 4 3 2 1]
+  }
+  ```
+</ParamField>
+
+## Helper Functions
+
+<ParamField path="T.Helper" type="func (t *T) Helper()">
+  Marks the calling function as a test helper. When printing file and line information, that function will be skipped.
+  
+  ```go
+  func assertPositive(t *testing.T, n int) {
+      t.Helper()
+      if n <= 0 {
+          t.Errorf("expected positive number, got %d", n)
+      }
+  }
+  
+  func TestValue(t *testing.T) {
+      assertPositive(t, 5) // Error will point to this line
+  }
+  ```
+</ParamField>
+
+<ParamField path="T.Cleanup" type="func (t *T) Cleanup(f func())">
+  Registers a function to be called when the test completes. Cleanup functions are called in LIFO order.
+  
+  ```go
+  func TestWithCleanup(t *testing.T) {
+      tmpDir, err := os.MkdirTemp("", "test")
+      if err != nil {
+          t.Fatal(err)
+      }
+      t.Cleanup(func() {
+          os.RemoveAll(tmpDir)
+      })
+      
+      // Use tmpDir in test
+  }
+  ```
+</ParamField>
+
+<ParamField path="T.TempDir" type="func (t *T) TempDir() string">
+  Creates a temporary directory for the test and arranges for it to be removed when the test completes.
+  
+  ```go
+  func TestFileOperations(t *testing.T) {
+      dir := t.TempDir()
+      
+      // Use dir for test files
+      // Automatically cleaned up after test
+  }
+  ```
+</ParamField>
+
+## Main
+
+<ParamField path="TestMain" type="func TestMain(m *M)">
+  Can be used to set up and tear down before and after all tests. If TestMain is present, it will be called instead of running tests directly.
+  
+  ```go
+  func TestMain(m *testing.M) {
+      // Setup
+      fmt.Println("Setting up tests")
+      db := setupDatabase()
+      
+      // Run tests
+      code := m.Run()
+      
+      // Teardown
+      db.Close()
+      fmt.Println("Cleaning up")
+      
+      os.Exit(code)
+  }
+  ```
+</ParamField>
+
+## Test Examples
+
+### Basic Test
+
+```go
+package math
+
+import "testing"
+
+func Add(a, b int) int {
+    return a + b
+}
+
+func TestAdd(t *testing.T) {
+    result := Add(2, 3)
+    if result != 5 {
+        t.Errorf("Add(2, 3) = %d; want 5", result)
+    }
+}
+
+func TestAddNegative(t *testing.T) {
+    result := Add(-1, -2)
+    if result != -3 {
+        t.Errorf("Add(-1, -2) = %d; want -3", result)
+    }
+}
+```
+
+### Table-Driven Tests
+
+```go
+package math
+
+import "testing"
+
+func TestMultiply(t *testing.T) {
+    tests := []struct {
+        name     string
+        a, b     int
+        expected int
+    }{
+        {"positive numbers", 2, 3, 6},
+        {"negative numbers", -2, -3, 6},
+        {"mixed signs", -2, 3, -6},
+        {"with zero", 5, 0, 0},
+        {"one", 7, 1, 7},
+    }
+    
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            result := Multiply(tt.a, tt.b)
+            if result != tt.expected {
+                t.Errorf("Multiply(%d, %d) = %d; want %d",
+                    tt.a, tt.b, result, tt.expected)
+            }
+        })
+    }
+}
+```
+
+### Benchmarks
+
+```go
+package strings
+
+import (
+    "strings"
+    "testing"
+)
+
+// Modern benchmark using Loop()
+func BenchmarkConcatLoop(b *testing.B) {
+    for b.Loop() {
+        var s string
+        for i := 0; i < 100; i++ {
+            s += "x"
+        }
+    }
+}
+
+func BenchmarkConcatBuilder(b *testing.B) {
+    for b.Loop() {
+        var builder strings.Builder
+        for i := 0; i < 100; i++ {
+            builder.WriteString("x")
+        }
+        _ = builder.String()
+    }
+}
+
+// With memory reporting
+func BenchmarkMakeSlice(b *testing.B) {
+    b.ReportAllocs()
+    for b.Loop() {
+        _ = make([]int, 1000)
+    }
+}
+
+// Parallel benchmark
+func BenchmarkParallelWork(b *testing.B) {
+    b.RunParallel(func(pb *testing.PB) {
+        for pb.Next() {
+            doExpensiveWork()
+        }
+    })
+}
+```
+
+### Test Helpers
+
+```go
+package mypackage
+
+import "testing"
+
+func assertEqual(t *testing.T, got, want interface{}) {
+    t.Helper()
+    if got != want {
+        t.Errorf("got %v, want %v", got, want)
+    }
+}
+
+func assertNoError(t *testing.T, err error) {
+    t.Helper()
+    if err != nil {
+        t.Fatalf("unexpected error: %v", err)
+    }
+}
+
+func TestWithHelpers(t *testing.T) {
+    result, err := DoSomething()
+    assertNoError(t, err)
+    assertEqual(t, result, "expected")
+}
+```
+
+### Using TempDir and Cleanup
+
+```go
+package files
+
+import (
+    "os"
+    "path/filepath"
+    "testing"
+)
+
+func TestFileOperations(t *testing.T) {
+    // Create temporary directory
+    dir := t.TempDir()
+    
+    // Create a test file
+    filename := filepath.Join(dir, "test.txt")
+    err := os.WriteFile(filename, []byte("test data"), 0644)
+    if err != nil {
+        t.Fatal(err)
+    }
+    
+    // Test reading the file
+    data, err := os.ReadFile(filename)
+    if err != nil {
+        t.Fatal(err)
+    }
+    
+    if string(data) != "test data" {
+        t.Errorf("got %q, want %q", string(data), "test data")
+    }
+    
+    // No cleanup needed - TempDir handles it
+}
+```
+
+### Example Functions
+
+```go
+package greet
+
+import "fmt"
+
+func Greet(name string) string {
+    return fmt.Sprintf("Hello, %s!", name)
+}
+
+func ExampleGreet() {
+    fmt.Println(Greet("Alice"))
+    // Output: Hello, Alice!
+}
+
+func ExampleGreet_empty() {
+    fmt.Println(Greet(""))
+    // Output: Hello, !
+}
+```
+
+## Running Tests
+
+```bash
+# Run all tests
+go test
+
+# Run tests with verbose output
+go test -v
+
+# Run specific test
+go test -run TestAdd
+
+# Run tests matching pattern
+go test -run "TestAdd.*"
+
+# Run benchmarks
+go test -bench=.
+
+# Run specific benchmark
+go test -bench=BenchmarkConcat
+
+# Show memory allocations
+go test -bench=. -benchmem
+
+# Run with coverage
+go test -cover
+
+# Generate coverage report
+go test -coverprofile=coverage.out
+go tool cover -html=coverage.out
+
+# Run with race detector
+go test -race
+
+# Run tests in parallel
+go test -parallel 4
+```

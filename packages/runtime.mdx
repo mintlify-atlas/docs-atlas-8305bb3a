@@ -1,0 +1,182 @@
+---
+title: runtime
+description: Go runtime interaction including goroutines, memory, and GC
+---
+
+The `runtime` package contains operations that interact with Go's runtime system, such as controlling goroutines, memory management, and garbage collection.
+
+## Goroutine Control
+
+```go
+import "runtime"
+
+// Get number of goroutines
+num := runtime.NumGoroutine()
+
+// Force garbage collection
+runtime.GC()
+
+// Get/Set max processors
+runtime.GOMAXPROCS(runtime.NumCPU())
+
+// Yield processor
+runtime.Gosched()
+
+// Keep variable alive
+runtime.KeepAlive(obj)
+```
+
+## Memory Statistics
+
+```go
+func printMemStats() {
+    var m runtime.MemStats
+    runtime.ReadMemStats(&m)
+    
+    fmt.Printf("Alloc = %v MB", m.Alloc / 1024 / 1024)
+    fmt.Printf("TotalAlloc = %v MB", m.TotalAlloc / 1024 / 1024)
+    fmt.Printf("Sys = %v MB", m.Sys / 1024 / 1024)
+    fmt.Printf("NumGC = %v\n", m.NumGC)
+}
+```
+
+## Stack Traces
+
+```go
+func printStack() {
+    buf := make([]byte, 1024)
+    n := runtime.Stack(buf, false)
+    fmt.Printf("Stack trace:\n%s\n", buf[:n])
+}
+
+// Get caller info
+func caller() {
+    pc, file, line, ok := runtime.Caller(0)
+    if ok {
+        fmt.Printf("Called from %s:%d\n", file, line)
+        fn := runtime.FuncForPC(pc)
+        fmt.Printf("Function: %s\n", fn.Name())
+    }
+}
+```
+
+## Version and Environment
+
+```go
+func systemInfo() {
+    fmt.Println("Go Version:", runtime.Version())
+    fmt.Println("OS:", runtime.GOOS)
+    fmt.Println("Arch:", runtime.GOARCH)
+    fmt.Println("CPUs:", runtime.NumCPU())
+    fmt.Println("Goroutines:", runtime.NumGoroutine())
+}
+```
+
+## Finalizers
+
+```go
+type Resource struct {
+    name string
+}
+
+func cleanup(r *Resource) {
+    fmt.Printf("Cleaning up %s\n", r.name)
+}
+
+func useResource() {
+    r := &Resource{name: "file.txt"}
+    runtime.SetFinalizer(r, cleanup)
+    // r will be cleaned up when garbage collected
+}
+```
+
+## Practical Examples
+
+### Memory Monitoring
+
+```go
+func monitorMemory(interval time.Duration) {
+    ticker := time.NewTicker(interval)
+    defer ticker.Stop()
+    
+    for range ticker.C {
+        var m runtime.MemStats
+        runtime.ReadMemStats(&m)
+        
+        log.Printf("Memory: Alloc=%dMB, Sys=%dMB, NumGC=%d",
+            m.Alloc/1024/1024,
+            m.Sys/1024/1024,
+            m.NumGC)
+    }
+}
+```
+
+### Goroutine Leak Detection
+
+```go
+func detectLeaks() {
+    before := runtime.NumGoroutine()
+    
+    // Run test code
+    testFunction()
+    
+    time.Sleep(time.Second)
+    after := runtime.NumGoroutine()
+    
+    if after > before {
+        log.Printf("Possible leak: %d goroutines", after-before)
+    }
+}
+```
+
+### CPU Profiling
+
+```go
+import "runtime/pprof"
+
+func profileCPU() error {
+    f, err := os.Create("cpu.prof")
+    if err != nil {
+        return err
+    }
+    defer f.Close()
+    
+    if err := pprof.StartCPUProfile(f); err != nil {
+        return err
+    }
+    defer pprof.StopCPUProfile()
+    
+    // Run code to profile
+    doWork()
+    
+    return nil
+}
+```
+
+### Memory Profiling
+
+```go
+func profileMemory() error {
+    f, err := os.Create("mem.prof")
+    if err != nil {
+        return err
+    }
+    defer f.Close()
+    
+    runtime.GC() // Get up-to-date statistics
+    if err := pprof.WriteHeapProfile(f); err != nil {
+        return err
+    }
+    
+    return nil
+}
+```
+
+## Best Practices
+
+1. **Don't force GC** - Let runtime handle it
+2. **Monitor in production** - Track goroutines and memory
+3. **Use profiling tools** - pprof for optimization
+4. **Set GOMAXPROCS wisely** - Usually NumCPU() is good
+5. **Avoid finalizers** - Prefer explicit cleanup
+6. **Check for leaks** - Monitor goroutine count

@@ -1,0 +1,246 @@
+---
+title: unicode
+description: Unicode character properties and transformations
+---
+
+The `unicode` package provides data and functions to test Unicode code point properties.
+
+## Character Classification
+
+```go
+import "unicode"
+
+// Check character type
+isLetter := unicode.IsLetter('A')  // true
+isDigit := unicode.IsDigit('5')    // true
+isSpace := unicode.IsSpace(' ')    // true
+isPunct := unicode.IsPunct('.')    // true
+isUpper := unicode.IsUpper('A')    // true
+isLower := unicode.IsLower('a')    // true
+```
+
+## Case Conversion
+
+```go
+// Convert case
+upper := unicode.ToUpper('a')  // 'A'
+lower := unicode.ToLower('A')  // 'a'
+title := unicode.ToTitle('a')  // 'A'
+```
+
+## Character Categories
+
+```go
+// Test categories
+isControl := unicode.IsControl('\n')  // true
+isGraphic := unicode.IsGraphic('A')   // true
+isMark := unicode.IsMark('́')     // true (combining acute)
+isNumber := unicode.IsNumber('5')     // true
+isPrint := unicode.IsPrint('A')       // true
+isSymbol := unicode.IsSymbol('$')     // true
+```
+
+## Ranges and Scripts
+
+```go
+// Check if in range
+inLatin := unicode.In('A', unicode.Latin)           // true
+inCyrillic := unicode.In('А', unicode.Cyrillic) // true
+inHan := unicode.In('一', unicode.Han)           // true (Chinese)
+```
+
+## unicode/utf8
+
+UTF-8 encoding/decoding.
+
+```go
+import "unicode/utf8"
+
+// Encode rune to bytes
+buf := make([]byte, 4)
+n := utf8.EncodeRune(buf, '中') // Chinese character
+
+// Decode rune from bytes
+r, size := utf8.DecodeRune(buf[:n])
+
+// Count runes in string
+count := utf8.RuneCountInString("Hello 👋") // 7
+
+// Validate UTF-8
+valid := utf8.ValidString("Hello") // true
+```
+
+## unicode/utf16
+
+UTF-16 encoding/decoding.
+
+```go
+import "unicode/utf16"
+
+// Encode rune to UTF-16
+r := '😀' // Emoji
+u16 := utf16.Encode([]rune{r})
+
+// Decode UTF-16 to runes
+runes := utf16.Decode(u16)
+```
+
+## Practical Examples
+
+### Count Character Types
+
+```go
+func countCharTypes(s string) map[string]int {
+    counts := map[string]int{
+        "letters": 0,
+        "digits":  0,
+        "spaces":  0,
+        "other":   0,
+    }
+    
+    for _, r := range s {
+        switch {
+        case unicode.IsLetter(r):
+            counts["letters"]++
+        case unicode.IsDigit(r):
+            counts["digits"]++
+        case unicode.IsSpace(r):
+            counts["spaces"]++
+        default:
+            counts["other"]++
+        }
+    }
+    
+    return counts
+}
+```
+
+### Title Case
+
+```go
+func toTitleCase(s string) string {
+    var result []rune
+    prevSpace := true
+    
+    for _, r := range s {
+        if prevSpace {
+            result = append(result, unicode.ToUpper(r))
+        } else {
+            result = append(result, unicode.ToLower(r))
+        }
+        prevSpace = unicode.IsSpace(r)
+    }
+    
+    return string(result)
+}
+```
+
+### Strip Non-Letters
+
+```go
+func stripNonLetters(s string) string {
+    var result []rune
+    
+    for _, r := range s {
+        if unicode.IsLetter(r) {
+            result = append(result, r)
+        }
+    }
+    
+    return string(result)
+}
+```
+
+### Validate Identifier
+
+```go
+func isValidIdentifier(s string) bool {
+    if len(s) == 0 {
+        return false
+    }
+    
+    for i, r := range s {
+        if i == 0 {
+            if !unicode.IsLetter(r) && r != '_' {
+                return false
+            }
+        } else {
+            if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_' {
+                return false
+            }
+        }
+    }
+    
+    return true
+}
+```
+
+### Count Bytes vs Runes
+
+```go
+func compareCount(s string) {
+    bytes := len(s)
+    runes := utf8.RuneCountInString(s)
+    
+    fmt.Printf("String: %s\n", s)
+    fmt.Printf("Bytes: %d\n", bytes)
+    fmt.Printf("Runes: %d\n", runes)
+}
+
+// Example:
+// compareCount("Hello 👋")
+// Bytes: 10
+// Runes: 7
+```
+
+## Common Character Sets
+
+```go
+var (
+    // Scripts
+    Latin      *RangeTable
+    Greek      *RangeTable
+    Cyrillic   *RangeTable
+    Arabic     *RangeTable
+    Hebrew     *RangeTable
+    Han        *RangeTable
+    Hiragana   *RangeTable
+    Katakana   *RangeTable
+    
+    // Categories
+    Letter     *RangeTable
+    Digit      *RangeTable
+    Number     *RangeTable
+    Punct      *RangeTable
+    Symbol     *RangeTable
+    Space      *RangeTable
+)
+```
+
+## Best Practices
+
+1. **Use utf8.RuneCountInString** - Not len() for character count
+2. **Range over runes** - Use `for _, r := range str`
+3. **Validate UTF-8** - Check with ValidString before processing
+4. **Handle multi-byte** - Be aware of bytes vs runes
+5. **Use unicode functions** - For proper case conversion
+6. **Consider normalization** - Use golang.org/x/text/unicode/norm
+
+## Common Pitfalls
+
+```go
+// Wrong: Counts bytes, not characters
+len("👋") // 4
+
+// Correct: Counts runes (characters)
+utf8.RuneCountInString("👋") // 1
+
+// Wrong: Byte indexing
+s := "Hello👋"
+s[5] // Part of emoji bytes
+
+// Correct: Rune iteration
+for i, r := range s {
+    // i is byte index, r is rune
+}
+```

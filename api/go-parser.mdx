@@ -1,0 +1,507 @@
+---
+title: "go/parser"
+description: "Parse Go source code into abstract syntax trees"
+---
+
+## Overview
+
+The `go/parser` package implements a parser for Go source code. It converts Go source text into an abstract syntax tree (AST) representation using the types defined in the `go/ast` package.
+
+**Main functions:**
+- Parse individual expressions, statements, or complete files
+- Handle comments and associate them with declarations
+- Report syntax errors with precise location information
+- Support incremental parsing (imports only, package clause only)
+
+## Parse Mode
+
+### Mode Type
+
+Controls parser behavior and what gets parsed.
+
+```go
+type Mode uint
+
+const (
+    PackageClauseOnly    Mode = 1 << iota // stop after package clause
+    ImportsOnly                            // stop after import declarations
+    ParseComments                          // parse and add comments to AST
+    Trace                                  // print parse trace
+    DeclarationErrors                      // report declaration errors
+    SpuriousErrors                         // report all errors
+    SkipObjectResolution                   // skip deprecated identifier resolution
+    AllErrors = SpuriousErrors             // report all errors
+)
+```
+
+**Common modes:**
+- `0` - Parse entire file, no comments
+- `ParseComments` - Parse file with comments
+- `ImportsOnly | ParseComments` - Parse only imports (fast)
+- `ParseComments | SkipObjectResolution` - Recommended for most use cases
+
+<Tip>
+Use `SkipObjectResolution` mode as the deprecated object resolution phase is slow and not useful. Use `go/types` instead for proper name resolution.
+</Tip>
+
+## Core Functions
+
+### ParseFile
+
+Parses a single Go source file and returns an AST.
+
+```go
+func ParseFile(
+    fset *token.FileSet,
+    filename string,
+    src any,
+    mode Mode,
+) (f *ast.File, err error)
+```
+
+**Parameters:**
+- `fset` - FileSet for recording position information (must not be nil)
+- `filename` - Filename for position information and error messages
+- `src` - Source code (string, []byte, io.Reader, or nil to read from filename)
+- `mode` - Parser mode flags
+
+**Returns:**
+- `*ast.File` - Parsed AST (may be partial if errors occurred)
+- `error` - Parse errors (may be scanner.ErrorList with multiple errors)
+
+**Example - Parse from string:**
+```go
+fset := token.NewFileSet()
+src := `package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Hello, World!")
+}`
+
+file, err := parser.ParseFile(fset, "hello.go", src, parser.ParseComments)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Package: %s\n", file.Name.Name)
+// Output: Package: main
+```
+
+**Example - Parse from file:**
+```go
+fset := token.NewFileSet()
+file, err := parser.ParseFile(fset, "myfile.go", nil, parser.ParseComments)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+**Example - Parse only imports:**
+```go
+fset := token.NewFileSet()
+file, err := parser.ParseFile(
+    fset,
+    "example.go",
+    src,
+    parser.ImportsOnly | parser.ParseComments,
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, imp := range file.Imports {
+    fmt.Println(imp.Path.Value)
+}
+// Output:
+// "fmt"
+// "time"
+```
+
+### ParseDir
+
+Parses all Go files in a directory.
+
+```go
+func ParseDir(
+    fset *token.FileSet,
+    path string,
+    filter func(fs.FileInfo) bool,
+    mode Mode,
+) (pkgs map[string]*ast.Package, first error)
+```
+
+**Parameters:**
+- `fset` - FileSet for recording positions
+- `path` - Directory path to parse
+- `filter` - Optional filter function for files (can be nil)
+- `mode` - Parser mode flags
+
+**Returns:**
+- Map of package name to Package AST
+- First error encountered (if any)
+
+<Warning>
+`ParseDir` is deprecated for production use as it doesn't handle build tags correctly. Use `golang.org/x/tools/go/packages` instead for accurate package loading.
+</Warning>
+
+**Example:**
+```go
+fset := token.NewFileSet()
+pkgs, err := parser.ParseDir(fset, "./mypackage", nil, parser.ParseComments)
+if err != nil {
+    log.Fatal(err)
+}
+
+for pkgName, pkg := range pkgs {
+    fmt.Printf("Package: %s\n", pkgName)
+    for filename := range pkg.Files {
+        fmt.Printf("  File: %s\n", filename)
+    }
+}
+```
+
+**Example with filter:**
+```go
+// Only parse test files
+filter := func(info fs.FileInfo) bool {
+    return strings.HasSuffix(info.Name(), "_test.go")
+}
+
+pkgs, err := parser.ParseDir(fset, "./mypackage", filter, parser.ParseComments)
+```
+
+### ParseExpr
+
+Parses a standalone expression.
+
+```go
+func ParseExpr(x string) (ast.Expr, error)
+```
+
+**Example:**
+```go
+expr, err := parser.ParseExpr("x + y * 2")
+if err != nil {
+    log.Fatal(err)
+}
+
+// expr is a *ast.BinaryExpr
+ast.Print(nil, expr)
+```
+
+**More examples:**
+```go
+// Parse type expression
+expr, _ := parser.ParseExpr("map[string]int")
+
+// Parse function call
+expr, _ := parser.ParseExpr("fmt.Println(42)")
+
+// Parse composite literal
+expr, _ := parser.ParseExpr(`Person{Name: "Alice", Age: 30}`)
+```
+
+### ParseExprFrom
+
+Parses an expression with full control over source and error handling.
+
+```go
+func ParseExprFrom(
+    fset *token.FileSet,
+    filename string,
+    src any,
+    mode Mode,
+) (ast.Expr, error)
+```
+
+**Example:**
+```go
+fset := token.NewFileSet()
+expr, err := parser.ParseExprFrom(
+    fset,
+    "expr.go",
+    "a + b * c",
+    0,
+)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+## Error Handling
+
+Parse errors are returned as `scanner.ErrorList` which contains multiple errors sorted by position.
+
+```go
+file, err := parser.ParseFile(fset, filename, src, mode)
+if err != nil {
+    // Type assert to get error list
+    if errList, ok := err.(scanner.ErrorList); ok {
+        for _, e := range errList {
+            fmt.Printf("%s: %s\n", e.Pos, e.Msg)
+        }
+    }
+}
+```
+
+**Example with partial AST:**
+```go
+src := `package main
+
+func broken( {  // syntax error
+    return
+}
+
+func good() {
+    return
+}`
+
+file, err := parser.ParseFile(fset, "", src, 0)
+if err != nil {
+    fmt.Println("Parse errors:", err)
+}
+
+// file is still usable - contains partial AST
+// Can analyze the 'good' function even though 'broken' has errors
+ast.Inspect(file, func(n ast.Node) bool {
+    if fn, ok := n.(*ast.FuncDecl); ok {
+        fmt.Printf("Found function: %s\n", fn.Name.Name)
+    }
+    return true
+})
+```
+
+## Source Input Types
+
+The `src` parameter accepts multiple types:
+
+**String:**
+```go
+parser.ParseFile(fset, "file.go", "package main", 0)
+```
+
+**Byte slice:**
+```go
+data := []byte("package main")
+parser.ParseFile(fset, "file.go", data, 0)
+```
+
+**io.Reader:**
+```go
+file, _ := os.Open("example.go")
+defer file.Close()
+parser.ParseFile(fset, "example.go", file, 0)
+```
+
+**nil (read from filename):**
+```go
+parser.ParseFile(fset, "example.go", nil, 0)
+```
+
+## Complete Example
+
+### Analyzing Function Calls
+
+```go
+package main
+
+import (
+    "fmt"
+    "go/ast"
+    "go/parser"
+    "go/token"
+)
+
+func main() {
+    src := `package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Hello")
+    fmt.Printf("Number: %d\n", 42)
+    myFunc(1, 2, 3)
+}`
+
+    fset := token.NewFileSet()
+    file, err := parser.ParseFile(fset, "", src, 0)
+    if err != nil {
+        panic(err)
+    }
+
+    // Find all function calls
+    ast.Inspect(file, func(n ast.Node) bool {
+        call, ok := n.(*ast.CallExpr)
+        if !ok {
+            return true
+        }
+
+        // Get function name
+        var name string
+        switch fun := call.Fun.(type) {
+        case *ast.Ident:
+            name = fun.Name
+        case *ast.SelectorExpr:
+            name = fun.Sel.Name
+        }
+
+        fmt.Printf("Call to %s with %d args\n",
+            name, len(call.Args))
+
+        return true
+    })
+}
+
+// Output:
+// Call to Println with 1 args
+// Call to Printf with 2 args
+// Call to myFunc with 3 args
+```
+
+### Extracting Imports
+
+```go
+package main
+
+import (
+    "fmt"
+    "go/parser"
+    "go/token"
+)
+
+func main() {
+    src := `package main
+
+import (
+    "fmt"
+    "os"
+    db "database/sql"
+    _ "github.com/lib/pq"
+)`
+
+    fset := token.NewFileSet()
+    file, err := parser.ParseFile(
+        fset,
+        "",
+        src,
+        parser.ImportsOnly,
+    )
+    if err != nil {
+        panic(err)
+    }
+
+    for _, imp := range file.Imports {
+        path := imp.Path.Value
+        name := ""
+        if imp.Name != nil {
+            name = imp.Name.Name
+        }
+
+        if name == "" {
+            fmt.Printf("import %s\n", path)
+        } else {
+            fmt.Printf("import %s as %s\n", path, name)
+        }
+    }
+}
+
+// Output:
+// import "fmt"
+// import "os"
+// import "database/sql" as db
+// import "github.com/lib/pq" as _
+```
+
+### Finding Struct Definitions
+
+```go
+package main
+
+import (
+    "fmt"
+    "go/ast"
+    "go/parser"
+    "go/token"
+)
+
+func main() {
+    src := `package models
+
+type User struct {
+    ID   int
+    Name string
+}
+
+type Product struct {
+    SKU   string
+    Price float64
+}`
+
+    fset := token.NewFileSet()
+    file, err := parser.ParseFile(fset, "", src, 0)
+    if err != nil {
+        panic(err)
+    }
+
+    // Find all type declarations
+    for _, decl := range file.Decls {
+        genDecl, ok := decl.(*ast.GenDecl)
+        if !ok || genDecl.Tok != token.TYPE {
+            continue
+        }
+
+        for _, spec := range genDecl.Specs {
+            typeSpec := spec.(*ast.TypeSpec)
+            structType, ok := typeSpec.Type.(*ast.StructType)
+            if !ok {
+                continue
+            }
+
+            fmt.Printf("struct %s {\n", typeSpec.Name.Name)
+            for _, field := range structType.Fields.List {
+                for _, name := range field.Names {
+                    fmt.Printf("  %s\n", name.Name)
+                }
+            }
+            fmt.Println("}")
+        }
+    }
+}
+
+// Output:
+// struct User {
+//   ID
+//   Name
+// }
+// struct Product {
+//   SKU
+//   Price
+// }
+```
+
+## Performance Tips
+
+<Tip>
+**For better performance:**
+- Use `ImportsOnly` mode when you only need import information
+- Use `PackageClauseOnly` to quickly determine package name
+- Always use `SkipObjectResolution` mode
+- Cache the FileSet across multiple parse operations
+- Parse files in parallel when processing multiple files
+</Tip>
+
+**Parsing speed:**
+- Full parse: ~1-2 MB/s per core
+- ImportsOnly: ~5-10 MB/s per core
+- PackageClauseOnly: ~20-50 MB/s per core
+
+## Related Packages
+
+- `go/ast` - AST node types and traversal functions
+- `go/token` - Token definitions and file position tracking
+- `go/scanner` - Lexical scanner for Go source code
+- `go/printer` - Pretty-print AST nodes back to Go source
+- `go/types` - Type checking and semantic analysis
+- `golang.org/x/tools/go/packages` - High-level package loading

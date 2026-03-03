@@ -1,0 +1,466 @@
+---
+title: "hash"
+description: "Common interfaces for hash functions"
+icon: "hashtag"
+---
+
+The hash package provides interfaces for hash functions used throughout the Go standard library.
+
+## Overview
+
+This package defines common interfaces that all hash functions implement. The actual hash implementations are in separate packages like:
+- `crypto/md5`
+- `crypto/sha1`
+- `crypto/sha256`
+- `crypto/sha512`
+- `hash/crc32`
+- `hash/crc64`
+
+## Hash Interface
+
+The common interface implemented by all hash functions.
+
+```go
+type Hash interface {
+    io.Writer
+    Sum(b []byte) []byte
+    Reset()
+    Size() int
+    BlockSize() int
+}
+```
+
+### Methods
+
+#### Write()
+
+Adds more data to the running hash. Inherited from `io.Writer`.
+
+```go
+Write(p []byte) (n int, err error)
+```
+
+This method never returns an error.
+
+#### Sum()
+
+Appends the current hash to the provided byte slice and returns the result.
+
+```go
+Sum(b []byte) []byte
+```
+
+Does not change the underlying hash state.
+
+#### Reset()
+
+Resets the hash to its initial state.
+
+```go
+Reset()
+```
+
+#### Size()
+
+Returns the number of bytes Sum will return.
+
+```go
+Size() int
+```
+
+#### BlockSize()
+
+Returns the hash's underlying block size.
+
+```go
+BlockSize() int
+```
+
+The Write method operates more efficiently if all writes are a multiple of the block size.
+
+### Example Usage
+
+```go
+import (
+    "crypto/sha256"
+    "fmt"
+    "hash"
+)
+
+func computeHash(data []byte, h hash.Hash) []byte {
+    h.Reset()
+    h.Write(data)
+    return h.Sum(nil)
+}
+
+func main() {
+    data := []byte("hello world")
+    h := sha256.New()
+    
+    checksum := computeHash(data, h)
+    fmt.Printf("%x\n", checksum)
+    // Output: b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9
+}
+```
+
+## Hash32 Interface
+
+The common interface for 32-bit hash functions.
+
+```go
+type Hash32 interface {
+    Hash
+    Sum32() uint32
+}
+```
+
+### Sum32()
+
+Returns the current hash as a uint32.
+
+```go
+Sum32() uint32
+```
+
+**Example:**
+```go
+import (
+    "hash/crc32"
+    "fmt"
+)
+
+h := crc32.NewIEEE()
+h.Write([]byte("hello world"))
+checksum := h.Sum32()
+fmt.Printf("CRC32: 0x%08x\n", checksum)
+```
+
+## Hash64 Interface
+
+The common interface for 64-bit hash functions.
+
+```go
+type Hash64 interface {
+    Hash
+    Sum64() uint64
+}
+```
+
+### Sum64()
+
+Returns the current hash as a uint64.
+
+```go
+Sum64() uint64
+```
+
+**Example:**
+```go
+import (
+    "hash/crc64"
+    "fmt"
+)
+
+table := crc64.MakeTable(crc64.ISO)
+h := crc64.New(table)
+h.Write([]byte("hello world"))
+checksum := h.Sum64()
+fmt.Printf("CRC64: 0x%016x\n", checksum)
+```
+
+## Cloner Interface
+
+Interface for hash functions whose state can be cloned.
+
+```go
+type Cloner interface {
+    Hash
+    Clone() (Cloner, error)
+}
+```
+
+All Hash implementations in the standard library implement this interface unless `GOFIPS140=v1.0.0` is set.
+
+### Clone()
+
+Returns a copy of the hash with equivalent and independent state.
+
+```go
+Clone() (Cloner, error)
+```
+
+If cloning is not supported at runtime, returns an error wrapping `errors.ErrUnsupported`.
+
+**Example:**
+```go
+import (
+    "crypto/sha256"
+    "fmt"
+)
+
+h1 := sha256.New()
+h1.Write([]byte("hello "))
+
+// Clone the hash state
+h2, err := h1.(hash.Cloner).Clone()
+if err != nil {
+    log.Fatal(err)
+}
+
+// Both hashes can continue independently
+h1.Write([]byte("world"))
+h2.Write([]byte("Go"))
+
+fmt.Printf("h1: %x\n", h1.Sum(nil))
+fmt.Printf("h2: %x\n", h2.(hash.Hash).Sum(nil))
+```
+
+## XOF Interface
+
+Extendable Output Function (XOF) - a hash with arbitrary or unlimited output length.
+
+```go
+type XOF interface {
+    io.Writer
+    io.Reader
+    Reset()
+    BlockSize() int
+}
+```
+
+### Write()
+
+Absorbs more data into the XOF's state. Panics if called after Read.
+
+### Read()
+
+Reads more output from the XOF. May return `io.EOF` if there's a limit to the output length.
+
+**Example with SHAKE256:**
+```go
+import (
+    "crypto/sha3"
+    "fmt"
+)
+
+xof := sha3.NewShake256()
+
+// Absorb input
+xof.Write([]byte("hello world"))
+
+// Read arbitrary length output
+output := make([]byte, 64) // Can be any length
+xof.Read(output)
+fmt.Printf("%x\n", output)
+```
+
+<Warning>
+**Important**: For XOF functions, you must not call `Write()` after calling `Read()`. Doing so will cause a panic.
+</Warning>
+
+## State Marshaling
+
+<Note>
+Hash implementations in the standard library (e.g., `hash/crc32`, `crypto/sha256`) implement `encoding.BinaryMarshaler`, `encoding.BinaryAppender`, and `encoding.BinaryUnmarshaler` interfaces.
+
+This allows saving and restoring hash state for continuing computation later.
+</Note>
+
+**Example:**
+```go
+import (
+    "crypto/sha256"
+    "encoding"
+    "fmt"
+)
+
+h1 := sha256.New()
+h1.Write([]byte("hello "))
+
+// Save state
+marshaler := h1.(encoding.BinaryMarshaler)
+state, err := marshaler.MarshalBinary()
+if err != nil {
+    log.Fatal(err)
+}
+
+// Continue hashing
+h1.Write([]byte("world"))
+sum1 := h1.Sum(nil)
+
+// Restore state in new hash
+h2 := sha256.New()
+unmarshaler := h2.(encoding.BinaryUnmarshaler)
+err = unmarshaler.UnmarshalBinary(state)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Continue from saved point
+h2.Write([]byte("world"))
+sum2 := h2.Sum(nil)
+
+fmt.Printf("Equal: %v\n", bytes.Equal(sum1, sum2)) // true
+```
+
+<Warning>
+**Security Note**: Hash state may contain portions of the input in its original form. Handle marshaled state carefully if it contains sensitive data.
+</Warning>
+
+## Common Hash Functions
+
+### Cryptographic Hashes
+
+```go
+import "crypto/sha256"
+
+h := sha256.New()        // SHA-256
+h := sha256.New224()     // SHA-224
+```
+
+```go
+import "crypto/sha512"
+
+h := sha512.New()        // SHA-512
+h := sha512.New384()     // SHA-384
+h := sha512.New512_224() // SHA-512/224
+h := sha512.New512_256() // SHA-512/256
+```
+
+```go
+import "crypto/sha1"
+
+h := sha1.New()          // SHA-1 (deprecated for security)
+```
+
+```go
+import "crypto/md5"
+
+h := md5.New()           // MD5 (deprecated for security)
+```
+
+```go
+import "crypto/sha3"
+
+h := sha3.New224()       // SHA3-224
+h := sha3.New256()       // SHA3-256
+h := sha3.New384()       // SHA3-384
+h := sha3.New512()       // SHA3-512
+
+// Extendable-output functions
+xof := sha3.NewShake128() // SHAKE128
+xof := sha3.NewShake256() // SHAKE256
+```
+
+### Non-cryptographic Hashes
+
+```go
+import "hash/crc32"
+
+h := crc32.NewIEEE()     // CRC-32 IEEE polynomial
+```
+
+```go
+import "hash/crc64"
+
+table := crc64.MakeTable(crc64.ISO)
+h := crc64.New(table)    // CRC-64
+```
+
+## Compatibility
+
+<Note>
+The Go project maintains compatibility with encoded hash states across versions. Any released version should be able to decode state data written by any previously released version, subject to security fixes.
+
+See the [Go 1 compatibility document](https://golang.org/doc/go1compat) for more information.
+</Note>
+
+## Usage Patterns
+
+### Single Pass Hashing
+
+```go
+import "crypto/sha256"
+
+data := []byte("data to hash")
+h := sha256.New()
+h.Write(data)
+sum := h.Sum(nil)
+```
+
+### Streaming Hashing
+
+```go
+import (
+    "crypto/sha256"
+    "io"
+    "os"
+)
+
+file, _ := os.Open("large-file.dat")
+defer file.Close()
+
+h := sha256.New()
+io.Copy(h, file)
+sum := h.Sum(nil)
+```
+
+### Appending to Existing Slice
+
+```go
+import "crypto/sha256"
+
+h := sha256.New()
+h.Write([]byte("data"))
+
+// Append hash to existing data
+prefix := []byte("HASH:")
+result := h.Sum(prefix) // result = "HASH:" + hash bytes
+```
+
+### Reusing Hash Object
+
+```go
+import "crypto/sha256"
+
+h := sha256.New()
+
+for _, data := range datasets {
+    h.Reset()
+    h.Write(data)
+    sum := h.Sum(nil)
+    // Process sum...
+}
+```
+
+## Performance Considerations
+
+<Note>
+**Optimization Tips:**
+
+1. **Block Alignment**: Write data in multiples of `BlockSize()` for better performance
+2. **Reuse Hash Objects**: Call `Reset()` instead of creating new hash objects
+3. **Avoid Small Writes**: Buffer small writes when possible
+4. **Choose Appropriate Hash**: Use CRC32/CRC64 for checksums, SHA-256+ for security
+</Note>
+
+## Security Considerations
+
+<Warning>
+**Hash Function Security:**
+
+1. **Deprecated for Security**: MD5 and SHA-1 are cryptographically broken - use SHA-256 or better
+2. **Not for Passwords**: Never use hash functions directly for passwords - use bcrypt, scrypt, or argon2
+3. **Collision Resistance**: Modern applications should use SHA-256 or SHA-3 family
+4. **Length Extension Attacks**: SHA-256 is vulnerable; use HMAC or SHA-3 when this matters
+5. **State Security**: Marshaled hash state may contain input data - handle carefully
+</Warning>
+
+## See Also
+
+- [crypto](/api/crypto) - Common cryptographic constants and hash identifiers
+- `crypto/sha256` - SHA-224 and SHA-256 hash functions
+- `crypto/sha512` - SHA-384, SHA-512, SHA-512/224, and SHA-512/256
+- `crypto/sha3` - SHA-3 family and SHAKE XOF functions
+- `hash/crc32` - 32-bit cyclic redundancy check
+- `hash/crc64` - 64-bit cyclic redundancy check

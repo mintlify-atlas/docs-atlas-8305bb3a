@@ -1,0 +1,494 @@
+---
+title: "log"
+description: "API reference for log package - simple logging with structured logging support"
+---
+
+## Overview
+
+The `log` package implements simple logging functionality. It defines the `Logger` type with methods for formatting output. The package also has a predefined 'standard' Logger accessible through helper functions that write to standard error.
+
+## Types
+
+### Logger
+
+A Logger represents an active logging object that generates lines of output to an io.Writer.
+
+```go
+type Logger struct {
+    // contains filtered or unexported fields
+}
+```
+
+#### Constructor
+
+<ResponseField name="New" type="func(out io.Writer, prefix string, flag int) *Logger">
+  Creates a new Logger. The out variable sets the destination to which log data will be written. The prefix appears at the beginning of each generated log line. The flag argument defines the logging properties.
+  
+  ```go
+  logger := log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime)
+  ```
+</ResponseField>
+
+#### Methods
+
+<ResponseField name="Print" type="func(v ...any)">
+  Calls Output to print to the logger. Arguments are handled in the manner of fmt.Print.
+</ResponseField>
+
+<ResponseField name="Printf" type="func(format string, v ...any)">
+  Calls Output to print to the logger. Arguments are handled in the manner of fmt.Printf.
+</ResponseField>
+
+<ResponseField name="Println" type="func(v ...any)">
+  Calls Output to print to the logger. Arguments are handled in the manner of fmt.Println.
+</ResponseField>
+
+<ResponseField name="Fatal" type="func(v ...any)">
+  Equivalent to Print() followed by a call to os.Exit(1).
+</ResponseField>
+
+<ResponseField name="Fatalf" type="func(format string, v ...any)">
+  Equivalent to Printf() followed by a call to os.Exit(1).
+</ResponseField>
+
+<ResponseField name="Fatalln" type="func(v ...any)">
+  Equivalent to Println() followed by a call to os.Exit(1).
+</ResponseField>
+
+<ResponseField name="Panic" type="func(v ...any)">
+  Equivalent to Print() followed by a call to panic().
+</ResponseField>
+
+<ResponseField name="Panicf" type="func(format string, v ...any)">
+  Equivalent to Printf() followed by a call to panic().
+</ResponseField>
+
+<ResponseField name="Panicln" type="func(v ...any)">
+  Equivalent to Println() followed by a call to panic().
+</ResponseField>
+
+<ResponseField name="SetOutput" type="func(w io.Writer)">
+  Sets the output destination for the logger.
+</ResponseField>
+
+<ResponseField name="SetFlags" type="func(flag int)">
+  Sets the output flags for the logger.
+</ResponseField>
+
+<ResponseField name="SetPrefix" type="func(prefix string)">
+  Sets the output prefix for the logger.
+</ResponseField>
+
+<ResponseField name="Flags" type="func() int">
+  Returns the output flags for the logger.
+</ResponseField>
+
+<ResponseField name="Prefix" type="func() string">
+  Returns the output prefix for the logger.
+</ResponseField>
+
+<ResponseField name="Writer" type="func() io.Writer">
+  Returns the output destination for the logger.
+</ResponseField>
+
+## Constants
+
+These flags define which text to prefix to each log entry.
+
+<ResponseField name="Ldate" type="int">
+  The date in the local time zone: 2009/01/23
+</ResponseField>
+
+<ResponseField name="Ltime" type="int">
+  The time in the local time zone: 01:23:23
+</ResponseField>
+
+<ResponseField name="Lmicroseconds" type="int">
+  Microsecond resolution: 01:23:23.123123 (assumes Ltime)
+</ResponseField>
+
+<ResponseField name="Llongfile" type="int">
+  Full file name and line number: /a/b/c/d.go:23
+</ResponseField>
+
+<ResponseField name="Lshortfile" type="int">
+  Final file name element and line number: d.go:23 (overrides Llongfile)
+</ResponseField>
+
+<ResponseField name="LUTC" type="int">
+  If Ldate or Ltime is set, use UTC rather than the local time zone
+</ResponseField>
+
+<ResponseField name="Lmsgprefix" type="int">
+  Move the "prefix" from the beginning of the line to before the message
+</ResponseField>
+
+<ResponseField name="LstdFlags" type="int">
+  Initial values for the standard logger (Ldate | Ltime)
+</ResponseField>
+
+## Package-Level Functions
+
+These functions write to the standard logger.
+
+<ResponseField name="Print" type="func(v ...any)">
+  Calls Output to print to the standard logger.
+</ResponseField>
+
+<ResponseField name="Printf" type="func(format string, v ...any)">
+  Calls Output to print to the standard logger.
+</ResponseField>
+
+<ResponseField name="Println" type="func(v ...any)">
+  Calls Output to print to the standard logger.
+</ResponseField>
+
+<ResponseField name="Fatal" type="func(v ...any)">
+  Equivalent to Print followed by os.Exit(1).
+</ResponseField>
+
+<ResponseField name="Fatalf" type="func(format string, v ...any)">
+  Equivalent to Printf followed by os.Exit(1).
+</ResponseField>
+
+<ResponseField name="Fatalln" type="func(v ...any)">
+  Equivalent to Println followed by os.Exit(1).
+</ResponseField>
+
+<ResponseField name="Panic" type="func(v ...any)">
+  Equivalent to Print followed by panic().
+</ResponseField>
+
+<ResponseField name="Panicf" type="func(format string, v ...any)">
+  Equivalent to Printf followed by panic().
+</ResponseField>
+
+<ResponseField name="Panicln" type="func(v ...any)">
+  Equivalent to Println followed by panic().
+</ResponseField>
+
+<ResponseField name="SetOutput" type="func(w io.Writer)">
+  Sets the output destination for the standard logger.
+</ResponseField>
+
+<ResponseField name="SetFlags" type="func(flag int)">
+  Sets the output flags for the standard logger.
+</ResponseField>
+
+<ResponseField name="SetPrefix" type="func(prefix string)">
+  Sets the output prefix for the standard logger.
+</ResponseField>
+
+<ResponseField name="Default" type="func() *Logger">
+  Returns the standard logger used by the package-level output functions.
+</ResponseField>
+
+## log/slog - Structured Logging
+
+The `log/slog` package provides structured logging with levels (Debug, Info, Warn, Error) and key-value pairs.
+
+### Types
+
+<ResponseField name="Logger" type="type">
+  A Logger records structured information about each call to its Log, Debug, Info, Warn, and Error methods.
+  
+  ```go
+  type Logger struct {
+      // contains filtered or unexported fields
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="Handler" type="interface">
+  A Handler handles log records produced by a Logger.
+  
+  ```go
+  type Handler interface {
+      Enabled(context.Context, Level) bool
+      Handle(context.Context, Record) error
+      WithAttrs(attrs []Attr) Handler
+      WithGroup(name string) Handler
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="Level" type="type">
+  A Level is the importance or severity of a log event.
+  
+  ```go
+  type Level int
+  ```
+  
+  Standard levels:
+  - `LevelDebug` (-4)
+  - `LevelInfo` (0)
+  - `LevelWarn` (4)
+  - `LevelError` (8)
+</ResponseField>
+
+<ResponseField name="Record" type="type">
+  A Record holds information about a log event.
+  
+  ```go
+  type Record struct {
+      Time    time.Time
+      Message string
+      Level   Level
+      PC      uintptr
+      // contains filtered or unexported fields
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="Attr" type="type">
+  An Attr is a key-value pair.
+  
+  ```go
+  type Attr struct {
+      Key   string
+      Value Value
+  }
+  ```
+</ResponseField>
+
+### Functions
+
+<ResponseField name="New" type="func(h Handler) *Logger">
+  Creates a new Logger with the given non-nil Handler.
+</ResponseField>
+
+<ResponseField name="Default" type="func() *Logger">
+  Returns the default Logger.
+</ResponseField>
+
+<ResponseField name="SetDefault" type="func(l *Logger)">
+  Makes l the default Logger.
+</ResponseField>
+
+<ResponseField name="Debug" type="func(msg string, args ...any)">
+  Calls Logger.Debug on the default logger.
+</ResponseField>
+
+<ResponseField name="Info" type="func(msg string, args ...any)">
+  Calls Logger.Info on the default logger.
+</ResponseField>
+
+<ResponseField name="Warn" type="func(msg string, args ...any)">
+  Calls Logger.Warn on the default logger.
+</ResponseField>
+
+<ResponseField name="Error" type="func(msg string, args ...any)">
+  Calls Logger.Error on the default logger.
+</ResponseField>
+
+### Built-in Handlers
+
+<ResponseField name="NewJSONHandler" type="func(w io.Writer, opts *HandlerOptions) *JSONHandler">
+  Creates a JSONHandler that writes Records to w as line-delimited JSON objects.
+</ResponseField>
+
+<ResponseField name="NewTextHandler" type="func(w io.Writer, opts *HandlerOptions) *TextHandler">
+  Creates a TextHandler that writes Records to w as a sequence of key=value pairs.
+</ResponseField>
+
+## Examples
+
+### Basic Logging
+
+```go
+package main
+
+import "log"
+
+func main() {
+    log.Println("This is a simple log message")
+    log.Printf("User %s logged in", "john")
+}
+```
+
+### Custom Logger
+
+```go
+package main
+
+import (
+    "log"
+    "os"
+)
+
+func main() {
+    file, err := os.OpenFile("app.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer file.Close()
+    
+    logger := log.New(file, "APP: ", log.Ldate|log.Ltime|log.Lshortfile)
+    logger.Println("Application started")
+}
+```
+
+### Custom Flags
+
+```go
+package main
+
+import "log"
+
+func main() {
+    // Set custom flags
+    log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
+    log.SetPrefix("DEBUG: ")
+    
+    log.Println("Detailed log message")
+    // Output: DEBUG: 2009/01/23 01:23:23.123123 main.go:10: Detailed log message
+}
+```
+
+### Structured Logging with slog
+
+```go
+package main
+
+import (
+    "log/slog"
+    "os"
+)
+
+func main() {
+    // JSON handler
+    logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+    
+    logger.Info("user login",
+        "user", "john",
+        "ip", "192.168.1.1",
+        "duration", 123)
+    
+    // Output: {"time":"2024-01-23T01:23:23Z","level":"INFO","msg":"user login","user":"john","ip":"192.168.1.1","duration":123}
+}
+```
+
+### slog with Levels
+
+```go
+package main
+
+import (
+    "log/slog"
+    "os"
+)
+
+func main() {
+    opts := &slog.HandlerOptions{
+        Level: slog.LevelDebug,
+    }
+    logger := slog.New(slog.NewTextHandler(os.Stdout, opts))
+    
+    logger.Debug("debug message", "key", "value")
+    logger.Info("info message", "user", "alice")
+    logger.Warn("warning message", "temp", 95)
+    logger.Error("error message", "err", "connection failed")
+}
+```
+
+### slog with Groups
+
+```go
+package main
+
+import "log/slog"
+
+func main() {
+    logger := slog.Default()
+    
+    // Create a logger with grouped attributes
+    userLogger := logger.WithGroup("user").With(
+        "id", 123,
+        "name", "alice",
+    )
+    
+    userLogger.Info("user action", "action", "login")
+    // Output includes: user.id=123 user.name=alice action=login
+}
+```
+
+### slog with Context
+
+```go
+package main
+
+import (
+    "context"
+    "log/slog"
+)
+
+func main() {
+    logger := slog.Default()
+    
+    // Add request-scoped attributes
+    logger = logger.With("request_id", "abc123")
+    
+    ctx := context.Background()
+    processRequest(ctx, logger)
+}
+
+func processRequest(ctx context.Context, logger *slog.Logger) {
+    logger.Info("processing request")
+    // The request_id will be included in all log messages
+}
+```
+
+### Custom slog Handler
+
+```go
+package main
+
+import (
+    "context"
+    "log/slog"
+    "os"
+)
+
+type CustomHandler struct {
+    handler slog.Handler
+}
+
+func (h *CustomHandler) Enabled(ctx context.Context, level slog.Level) bool {
+    return h.handler.Enabled(ctx, level)
+}
+
+func (h *CustomHandler) Handle(ctx context.Context, r slog.Record) error {
+    // Add custom attributes
+    r.AddAttrs(slog.String("app", "myapp"))
+    return h.handler.Handle(ctx, r)
+}
+
+func (h *CustomHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+    return &CustomHandler{handler: h.handler.WithAttrs(attrs)}
+}
+
+func (h *CustomHandler) WithGroup(name string) slog.Handler {
+    return &CustomHandler{handler: h.handler.WithGroup(name)}
+}
+
+func main() {
+    handler := &CustomHandler{
+        handler: slog.NewJSONHandler(os.Stdout, nil),
+    }
+    logger := slog.New(handler)
+    
+    logger.Info("test message")
+    // Output will include "app":"myapp" in every log
+}
+```
+
+## Comparison: log vs slog
+
+| Feature | log | slog |
+|---------|-----|------|
+| **Output Format** | Unstructured text | Structured (JSON/text) |
+| **Performance** | Fast | Optimized for structured |
+| **Levels** | None (manual) | Built-in (Debug/Info/Warn/Error) |
+| **Context** | No | Yes |
+| **Attributes** | No | Yes (key-value pairs) |
+| **Use Case** | Simple logging | Production apps, observability |

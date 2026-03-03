@@ -1,0 +1,400 @@
+---
+title: debug
+description: Debugging support for Go programs
+---
+
+The `debug` package provides debugging facilities for Go programs. It contains subpackages for examining binaries, reading DWARF debugging information, and runtime debugging.
+
+## Subpackages
+
+### debug/dwarf
+
+Access to DWARF debugging information from executable files.
+
+```go
+import (
+    "debug/dwarf"
+    "debug/elf"
+    "fmt"
+)
+
+func readDWARF(filename string) error {
+    // Open ELF file
+    f, err := elf.Open(filename)
+    if err != nil {
+        return err
+    }
+    defer f.Close()
+    
+    // Get DWARF data
+    dwarfData, err := f.DWARF()
+    if err != nil {
+        return err
+    }
+    
+    // Read entries
+    reader := dwarfData.Reader()
+    for {
+        entry, err := reader.Next()
+        if err != nil {
+            return err
+        }
+        if entry == nil {
+            break
+        }
+        
+        if entry.Tag == dwarf.TagSubprogram {
+            name := entry.Val(dwarf.AttrName)
+            fmt.Printf("Function: %v\n", name)
+        }
+    }
+    
+    return nil
+}
+```
+
+### debug/elf
+
+Access to ELF (Executable and Linkable Format) object files.
+
+```go
+import "debug/elf"
+
+func examineELF(filename string) error {
+    f, err := elf.Open(filename)
+    if err != nil {
+        return err
+    }
+    defer f.Close()
+    
+    fmt.Printf("Class: %v\n", f.Class)
+    fmt.Printf("Data: %v\n", f.Data)
+    fmt.Printf("Machine: %v\n", f.Machine)
+    fmt.Printf("Type: %v\n", f.Type)
+    
+    // List sections
+    for _, section := range f.Sections {
+        fmt.Printf("Section: %s (type %v)\n", section.Name, section.Type)
+    }
+    
+    // List symbols
+    symbols, err := f.Symbols()
+    if err != nil {
+        return err
+    }
+    
+    for _, sym := range symbols {
+        fmt.Printf("Symbol: %s\n", sym.Name)
+    }
+    
+    return nil
+}
+```
+
+### debug/macho
+
+Access to Mach-O object files (macOS and iOS).
+
+```go
+import "debug/macho"
+
+func examineMachO(filename string) error {
+    f, err := macho.Open(filename)
+    if err != nil {
+        return err
+    }
+    defer f.Close()
+    
+    fmt.Printf("CPU: %v\n", f.Cpu)
+    fmt.Printf("Type: %v\n", f.Type)
+    
+    // List sections
+    for _, section := range f.Sections {
+        fmt.Printf("Section: %s\n", section.Name)
+    }
+    
+    return nil
+}
+```
+
+### debug/pe
+
+Access to PE (Portable Executable) files (Windows).
+
+```go
+import "debug/pe"
+
+func examinePE(filename string) error {
+    f, err := pe.Open(filename)
+    if err != nil {
+        return err
+    }
+    defer f.Close()
+    
+    fmt.Printf("Machine: %v\n", f.Machine)
+    
+    // List sections
+    for _, section := range f.Sections {
+        fmt.Printf("Section: %s\n", section.Name)
+    }
+    
+    // List imported DLLs
+    imports, err := f.ImportedLibraries()
+    if err != nil {
+        return err
+    }
+    
+    for _, dll := range imports {
+        fmt.Printf("Import: %s\n", dll)
+    }
+    
+    return nil
+}
+```
+
+### debug/plan9obj
+
+Access to Plan 9 a.out object files.
+
+```go
+import "debug/plan9obj"
+
+func examinePlan9(filename string) error {
+    f, err := plan9obj.Open(filename)
+    if err != nil {
+        return err
+    }
+    defer f.Close()
+    
+    fmt.Printf("Magic: %v\n", f.Magic)
+    
+    // List sections
+    for _, section := range f.Sections {
+        fmt.Printf("Section: %s\n", section.Name)
+    }
+    
+    return nil
+}
+```
+
+### debug/buildinfo
+
+Read build information embedded in Go binaries.
+
+```go
+import (
+    "debug/buildinfo"
+    "fmt"
+)
+
+func readBuildInfo(filename string) error {
+    info, err := buildinfo.ReadFile(filename)
+    if err != nil {
+        return err
+    }
+    
+    fmt.Printf("Go version: %s\n", info.GoVersion)
+    fmt.Printf("Path: %s\n", info.Path)
+    fmt.Printf("Main module: %s %s\n", info.Main.Path, info.Main.Version)
+    
+    // List dependencies
+    for _, dep := range info.Deps {
+        fmt.Printf("Dependency: %s %s\n", dep.Path, dep.Version)
+    }
+    
+    // Build settings
+    for _, setting := range info.Settings {
+        fmt.Printf("%s=%s\n", setting.Key, setting.Value)
+    }
+    
+    return nil
+}
+```
+
+## Runtime Debugging
+
+### runtime/debug Package
+
+```go
+import (
+    "fmt"
+    "runtime/debug"
+)
+
+// Print stack trace
+func printStack() {
+    debug.PrintStack()
+}
+
+// Get stack trace as string
+func getStack() string {
+    return string(debug.Stack())
+}
+
+// Control garbage collector
+func controlGC() {
+    // Disable GC
+    debug.SetGCPercent(-1)
+    
+    // Re-enable with 100% target
+    debug.SetGCPercent(100)
+    
+    // Force GC
+    debug.FreeOSMemory()
+}
+
+// Read GC stats
+func readGCStats() {
+    var stats debug.GCStats
+    debug.ReadGCStats(&stats)
+    
+    fmt.Printf("Last GC: %v\n", stats.LastGC)
+    fmt.Printf("Num GC: %d\n", stats.NumGC)
+    fmt.Printf("Pause total: %v\n", stats.PauseTotal)
+}
+
+// Read memory stats
+func readMemStats() {
+    var m runtime.MemStats
+    runtime.ReadMemStats(&m)
+    
+    fmt.Printf("Alloc: %d MB\n", m.Alloc/1024/1024)
+    fmt.Printf("TotalAlloc: %d MB\n", m.TotalAlloc/1024/1024)
+    fmt.Printf("Sys: %d MB\n", m.Sys/1024/1024)
+    fmt.Printf("NumGC: %d\n", m.NumGC)
+}
+```
+
+### Build Info at Runtime
+
+```go
+import "runtime/debug"
+
+func printRuntimeBuildInfo() {
+    info, ok := debug.ReadBuildInfo()
+    if !ok {
+        fmt.Println("Build info not available")
+        return
+    }
+    
+    fmt.Printf("Go version: %s\n", info.GoVersion)
+    fmt.Printf("Main module: %s\n", info.Main.Path)
+    
+    for _, dep := range info.Deps {
+        fmt.Printf("%s@%s\n", dep.Path, dep.Version)
+    }
+}
+```
+
+## Practical Examples
+
+### Crash Recovery with Stack Trace
+
+```go
+import "runtime/debug"
+
+func recoverFromPanic() {
+    if r := recover(); r != nil {
+        fmt.Printf("Panic: %v\n", r)
+        fmt.Printf("Stack trace:\n%s\n", debug.Stack())
+    }
+}
+
+func riskyOperation() {
+    defer recoverFromPanic()
+    
+    // Code that might panic
+    panic("something went wrong")
+}
+```
+
+### Memory Profiling
+
+```go
+import (
+    "os"
+    "runtime/pprof"
+)
+
+func profileMemory(filename string) error {
+    f, err := os.Create(filename)
+    if err != nil {
+        return err
+    }
+    defer f.Close()
+    
+    runtime.GC() // Run GC before profiling
+    if err := pprof.WriteHeapProfile(f); err != nil {
+        return err
+    }
+    
+    return nil
+}
+```
+
+### Extract Version Information
+
+```go
+import "debug/buildinfo"
+
+func getVersion(binaryPath string) (string, error) {
+    info, err := buildinfo.ReadFile(binaryPath)
+    if err != nil {
+        return "", err
+    }
+    
+    // Look for version in build settings
+    for _, setting := range info.Settings {
+        if setting.Key == "vcs.revision" {
+            return setting.Value[:7], nil // Short commit hash
+        }
+    }
+    
+    return "unknown", nil
+}
+```
+
+### Binary Analysis
+
+```go
+func analyzeBinary(filename string) error {
+    // Try to open as different formats
+    if f, err := elf.Open(filename); err == nil {
+        defer f.Close()
+        fmt.Println("Format: ELF")
+        return examineELF(filename)
+    }
+    
+    if f, err := pe.Open(filename); err == nil {
+        defer f.Close()
+        fmt.Println("Format: PE")
+        return examinePE(filename)
+    }
+    
+    if f, err := macho.Open(filename); err == nil {
+        defer f.Close()
+        fmt.Println("Format: Mach-O")
+        return examineMachO(filename)
+    }
+    
+    return fmt.Errorf("unknown binary format")
+}
+```
+
+## Common Use Cases
+
+- **Binary inspection**: Examine compiled binaries and their structure
+- **Debugging information**: Extract debug symbols and line information
+- **Dependency analysis**: List dependencies of a compiled binary
+- **Version tracking**: Embed and extract version information
+- **Memory debugging**: Track memory usage and garbage collection
+- **Crash analysis**: Capture and analyze stack traces
+- **Build validation**: Verify build settings and dependencies
+
+## Best Practices
+
+1. **Always close file handles** - Use `defer f.Close()` when opening binaries
+2. **Handle format variations** - Different platforms use different executable formats
+3. **Check error returns** - Binary parsing can fail in various ways
+4. **Use runtime/debug for production** - Safer than debug/elf etc. at runtime
+5. **Embed build info** - Use `-ldflags` to embed version information during build

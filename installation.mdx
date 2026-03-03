@@ -1,0 +1,460 @@
+---
+title: "Installation"
+description: "Download and install Go on Linux, macOS, Windows, and other platforms"
+---
+
+## System Requirements
+
+Go supports the following operating systems and architectures:
+
+- **Linux**: AMD64, 386, ARM, ARM64, PPC64, S390X
+- **macOS**: AMD64 (Intel), ARM64 (Apple Silicon)
+- **Windows**: AMD64, 386, ARM, ARM64
+- **FreeBSD**: AMD64, 386, ARM
+- **OpenBSD**: AMD64, 386, ARM
+
+<Note>
+Go requires a 64-bit operating system for most platforms. 32-bit support is available but limited.
+</Note>
+
+## Installation Methods
+
+<Tabs>
+  <Tab title="Linux">
+    ### Download the Archive
+
+    <Steps>
+      <Step title="Download Go">
+        Download the latest Go release for Linux:
+
+        ```bash
+        wget https://go.dev/dl/go1.23.0.linux-amd64.tar.gz
+        ```
+
+        <Note>
+        Check [go.dev/dl](https://go.dev/dl) for the latest version number.
+        </Note>
+      </Step>
+
+      <Step title="Remove Previous Installation">
+        If you have a previous installation, remove it first:
+
+        ```bash
+        sudo rm -rf /usr/local/go
+        ```
+      </Step>
+
+      <Step title="Extract the Archive">
+        Extract the archive to `/usr/local`:
+
+        ```bash
+        sudo tar -C /usr/local -xzf go1.23.0.linux-amd64.tar.gz
+        ```
+      </Step>
+
+      <Step title="Update Your PATH">
+        Add Go to your PATH by adding this to your `~/.profile` or `~/.bashrc`:
+
+        ```bash
+        export PATH=$PATH:/usr/local/go/bin
+        ```
+
+        Apply the changes:
+
+        ```bash
+        source ~/.profile
+        ```
+      </Step>
+
+      <Step title="Verify Installation">
+        Check that Go is installed correctly:
+
+        ```bash
+        go version
+        ```
+
+        You should see output like: `go version go1.23.0 linux/amd64`
+      </Step>
+    </Steps>
+
+    ### Using a Package Manager
+
+    <CodeGroup>
+      ```bash Ubuntu/Debian
+      sudo apt update
+      sudo apt install golang-go
+      ```
+
+      ```bash Fedora
+      sudo dnf install golang
+      ```
+
+      ```bash Arch Linux
+      sudo pacman -S go
+      ```
+
+      ```bash Snap
+      sudo snap install go --classic
+      ```
+    </CodeGroup>
+
+    <Warning>
+    Package manager versions may lag behind the official releases. For the latest version, use the official tarball.
+    </Warning>
+  </Tab>
+
+  <Tab title="macOS">
+    ### Using the Installer
+
+    <Steps>
+      <Step title="Download the Package">
+        Download the macOS installer from [go.dev/dl](https://go.dev/dl):
+
+        - **Apple Silicon (M1/M2/M3)**: `go1.23.0.darwin-arm64.pkg`
+        - **Intel**: `go1.23.0.darwin-amd64.pkg`
+      </Step>
+
+      <Step title="Run the Installer">
+        Open the downloaded `.pkg` file and follow the prompts. The installer will:
+        - Install Go to `/usr/local/go`
+        - Add `/usr/local/go/bin` to your PATH
+      </Step>
+
+      <Step title="Verify Installation">
+        Open a new terminal and verify:
+
+        ```bash
+        go version
+        ```
+      </Step>
+    </Steps>
+
+    ### Using Homebrew
+
+    If you use Homebrew, you can install Go with:
+
+    ```bash
+    brew install go
+    ```
+
+    Then verify the installation:
+
+    ```bash
+    go version
+    ```
+
+    <Note>
+    Homebrew installs Go to `/opt/homebrew/bin/go` (Apple Silicon) or `/usr/local/bin/go` (Intel) and automatically updates your PATH.
+    </Note>
+  </Tab>
+
+  <Tab title="Windows">
+    ### Using the MSI Installer
+
+    <Steps>
+      <Step title="Download the Installer">
+        Download the Windows installer from [go.dev/dl](https://go.dev/dl):
+
+        - **64-bit**: `go1.23.0.windows-amd64.msi`
+        - **32-bit**: `go1.23.0.windows-386.msi`
+        - **ARM64**: `go1.23.0.windows-arm64.msi`
+      </Step>
+
+      <Step title="Run the Installer">
+        Open the MSI file and follow the installation wizard. By default, Go installs to:
+
+        ```
+        C:\Program Files\Go
+        ```
+
+        The installer automatically adds `C:\Program Files\Go\bin` to your PATH.
+      </Step>
+
+      <Step title="Verify Installation">
+        Open a new Command Prompt or PowerShell window and run:
+
+        ```powershell
+        go version
+        ```
+      </Step>
+    </Steps>
+
+    ### Using Chocolatey
+
+    If you use Chocolatey package manager:
+
+    ```powershell
+    choco install golang
+    ```
+
+    ### Using Scoop
+
+    If you use Scoop package manager:
+
+    ```powershell
+    scoop install go
+    ```
+  </Tab>
+
+  <Tab title="Docker">
+    ### Official Go Images
+
+    Use the official Go Docker images for development or building applications:
+
+    ```bash
+    # Pull the latest Go image
+    docker pull golang:latest
+
+    # Run Go in a container
+    docker run -it golang:latest
+    ```
+
+    ### Version-Specific Images
+
+    ```bash
+    # Use a specific Go version
+    docker pull golang:1.23.0
+
+    # Alpine-based image (smaller)
+    docker pull golang:1.23.0-alpine
+    ```
+
+    ### Build Your Application
+
+    Example Dockerfile for a Go application:
+
+    ```dockerfile
+    FROM golang:1.23.0 AS builder
+    WORKDIR /app
+    COPY go.mod go.sum ./
+    RUN go mod download
+    COPY . .
+    RUN CGO_ENABLED=0 GOOS=linux go build -o myapp
+
+    FROM alpine:latest
+    WORKDIR /root/
+    COPY --from=builder /app/myapp .
+    CMD ["./myapp"]
+    ```
+  </Tab>
+</Tabs>
+
+## Environment Setup
+
+After installing Go, configure your development environment:
+
+### GOPATH and Workspace
+
+Go uses a workspace directory for your projects. By default:
+
+- **Linux/macOS**: `~/go`
+- **Windows**: `%USERPROFILE%\go`
+
+The workspace contains:
+
+```
+$GOPATH/
+├── bin/     # Compiled executables
+├── pkg/     # Package objects
+└── src/     # Source files (deprecated with modules)
+```
+
+<Note>
+With Go modules (the modern approach), you can work anywhere. You don't need to use GOPATH for your projects.
+</Note>
+
+### Set GOPATH (Optional)
+
+To customize your workspace location:
+
+<CodeGroup>
+  ```bash Linux/macOS
+  export GOPATH=$HOME/my-go-workspace
+  export PATH=$PATH:$GOPATH/bin
+  ```
+
+  ```powershell Windows
+  setx GOPATH "%USERPROFILE%\my-go-workspace"
+  setx PATH "%PATH%;%GOPATH%\bin"
+  ```
+</CodeGroup>
+
+### Go Environment Variables
+
+View all Go environment variables:
+
+```bash
+go env
+```
+
+Key environment variables:
+
+| Variable | Description |
+|----------|-------------|
+| `GOROOT` | Location of Go installation |
+| `GOPATH` | Workspace directory |
+| `GOBIN` | Where `go install` puts binaries |
+| `GOOS` | Target operating system |
+| `GOARCH` | Target architecture |
+| `GO111MODULE` | Module support (on by default) |
+
+## Verify Your Installation
+
+Create a simple program to test your setup:
+
+<Steps>
+  <Step title="Create a Directory">
+    ```bash
+    mkdir -p ~/hello
+    cd ~/hello
+    ```
+  </Step>
+
+  <Step title="Initialize a Module">
+    ```bash
+    go mod init example/hello
+    ```
+  </Step>
+
+  <Step title="Create hello.go">
+    Create a file named `hello.go`:
+
+    ```go
+    package main
+
+    import "fmt"
+
+    func main() {
+        fmt.Println("hello, world")
+    }
+    ```
+  </Step>
+
+  <Step title="Run the Program">
+    ```bash
+    go run hello.go
+    ```
+
+    You should see:
+    ```
+    hello, world
+    ```
+  </Step>
+</Steps>
+
+<Check>
+Congratulations! Go is installed and working correctly.
+</Check>
+
+## Update Go
+
+To update to a newer version of Go:
+
+<Steps>
+  <Step title="Download New Version">
+    Download the latest version from [go.dev/dl](https://go.dev/dl)
+  </Step>
+
+  <Step title="Remove Old Version">
+    <CodeGroup>
+      ```bash Linux/macOS
+      sudo rm -rf /usr/local/go
+      ```
+
+      ```powershell Windows
+      # Uninstall via Add/Remove Programs
+      # Or delete C:\Program Files\Go
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Install New Version">
+    Follow the same installation steps as above for your platform
+  </Step>
+</Steps>
+
+## Uninstall Go
+
+To completely remove Go:
+
+<Tabs>
+  <Tab title="Linux/macOS">
+    ```bash
+    # Remove Go installation
+    sudo rm -rf /usr/local/go
+
+    # Remove from PATH (edit ~/.profile or ~/.bashrc)
+    # Remove this line: export PATH=$PATH:/usr/local/go/bin
+
+    # Optionally remove workspace
+    rm -rf ~/go
+    ```
+  </Tab>
+
+  <Tab title="Windows">
+    1. Use **Add or Remove Programs** to uninstall Go
+    2. Or manually delete `C:\Program Files\Go`
+    3. Remove `C:\Program Files\Go\bin` from your PATH
+    4. Optionally delete `%USERPROFILE%\go`
+  </Tab>
+</Tabs>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Quick Start Guide"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Write your first Go program
+  </Card>
+  <Card
+    title="Tutorial"
+    icon="book-open"
+    href="/tutorial"
+  >
+    Learn Go fundamentals with a hands-on tutorial
+  </Card>
+  <Card
+    title="Editor Setup"
+    icon="code"
+    href="/tools/go-command"
+  >
+    Configure your IDE or editor for Go development
+  </Card>
+  <Card
+    title="Standard Library"
+    icon="box"
+    href="/stdlib/overview"
+  >
+    Explore the standard library packages
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+### Command Not Found
+
+If you get "go: command not found":
+
+1. Verify Go is in your PATH: `echo $PATH` (Linux/macOS) or `echo %PATH%` (Windows)
+2. Restart your terminal
+3. Check the installation directory exists
+
+### Permission Denied
+
+On Linux/macOS, ensure `/usr/local/go` is accessible:
+
+```bash
+sudo chown -R $USER /usr/local/go
+```
+
+### Import Errors
+
+If you get package import errors, ensure you're using Go modules:
+
+```bash
+go mod init your-module-name
+go mod tidy
+```

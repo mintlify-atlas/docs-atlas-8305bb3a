@@ -1,0 +1,440 @@
+---
+title: encoding/base64
+description: API reference for the encoding/base64 package - Base64 encoding and decoding
+---
+
+# encoding/base64
+
+Package base64 implements base64 encoding as specified by RFC 4648. It provides functions for encoding and decoding data using base64 encoding schemes.
+
+## Overview
+
+The base64 package provides:
+
+1. **Standard base64 encoding** - Using + and / for characters 62 and 63
+2. **URL-safe base64 encoding** - Using - and _ for characters 62 and 63
+3. **Raw (unpadded) variants** - Without padding characters
+4. **Streaming encoding/decoding** - For processing large amounts of data
+
+## Constants
+
+### Padding
+
+```go
+const StdPadding rune = '=' // Standard padding character
+const NoPadding rune = -1   // No padding
+```
+
+## Variables
+
+### Standard Encodings
+
+```go
+var StdEncoding = NewEncoding("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
+```
+
+StdEncoding is the standard base64 encoding, as defined in RFC 4648.
+
+```go
+var URLEncoding = NewEncoding("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
+```
+
+URLEncoding is the alternate base64 encoding defined in RFC 4648. It is typically used in URLs and file names.
+
+```go
+var RawStdEncoding = StdEncoding.WithPadding(NoPadding)
+```
+
+RawStdEncoding is the standard raw, unpadded base64 encoding, as defined in RFC 4648 section 3.2.
+
+```go
+var RawURLEncoding = URLEncoding.WithPadding(NoPadding)
+```
+
+RawURLEncoding is the unpadded alternate base64 encoding defined in RFC 4648. It is typically used in URLs and file names.
+
+## Types
+
+### Encoding
+
+```go
+type Encoding struct {
+    // contains filtered or unexported fields
+}
+```
+
+An Encoding is a radix 64 encoding/decoding scheme, defined by a 64-character alphabet. The most common encoding is the "base64" encoding defined in RFC 4648.
+
+#### NewEncoding
+
+```go
+func NewEncoding(encoder string) *Encoding
+```
+
+NewEncoding returns a new padded Encoding defined by the given alphabet, which must be a 64-byte string that contains unique byte values.
+
+<ParamField path="encoder" type="string" required>
+  A 64-character string defining the encoding alphabet
+</ParamField>
+
+<ResponseField name="*Encoding" type="*Encoding">
+  A new Encoding instance using the default padding character ('=')
+</ResponseField>
+
+#### Methods
+
+**Encode**
+
+```go
+func (enc *Encoding) Encode(dst, src []byte)
+```
+
+Encode encodes src using the encoding enc, writing EncodedLen(len(src)) bytes to dst.
+
+<ParamField path="dst" type="[]byte" required>
+  Destination buffer to write encoded data to. Must have length at least EncodedLen(len(src)).
+</ParamField>
+
+<ParamField path="src" type="[]byte" required>
+  Source data to encode
+</ParamField>
+
+**Example:**
+
+```go
+data := []byte("Hello, world!")
+dst := make([]byte, base64.StdEncoding.EncodedLen(len(data)))
+base64.StdEncoding.Encode(dst, data)
+fmt.Println(string(dst))
+// Output: SGVsbG8sIHdvcmxkIQ==
+```
+
+**EncodeToString**
+
+```go
+func (enc *Encoding) EncodeToString(src []byte) string
+```
+
+EncodeToString returns the base64 encoding of src.
+
+<ParamField path="src" type="[]byte" required>
+  The data to encode
+</ParamField>
+
+<ResponseField name="string" type="string">
+  The base64-encoded string
+</ResponseField>
+
+**Example:**
+
+```go
+msg := "Hello, 世界"
+encoded := base64.StdEncoding.EncodeToString([]byte(msg))
+fmt.Println(encoded)
+// Output: SGVsbG8sIOS4lueVjA==
+```
+
+**AppendEncode**
+
+```go
+func (enc *Encoding) AppendEncode(dst, src []byte) []byte
+```
+
+AppendEncode appends the base64 encoded src to dst and returns the extended buffer.
+
+<ParamField path="dst" type="[]byte" required>
+  Destination buffer to append to
+</ParamField>
+
+<ParamField path="src" type="[]byte" required>
+  Source data to encode and append
+</ParamField>
+
+<ResponseField name="[]byte" type="[]byte">
+  The extended buffer containing dst followed by the encoded src
+</ResponseField>
+
+**Decode**
+
+```go
+func (enc *Encoding) Decode(dst, src []byte) (n int, err error)
+```
+
+Decode decodes src using the encoding enc. It writes at most DecodedLen(len(src)) bytes to dst and returns the number of bytes written.
+
+<ParamField path="dst" type="[]byte" required>
+  Destination buffer to write decoded data to
+</ParamField>
+
+<ParamField path="src" type="[]byte" required>
+  Base64-encoded source data
+</ParamField>
+
+<ResponseField name="n" type="int">
+  The number of bytes written to dst
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Returns CorruptInputError if the input is not valid base64
+</ResponseField>
+
+**Example:**
+
+```go
+str := "SGVsbG8sIHdvcmxkIQ=="
+dst := make([]byte, base64.StdEncoding.DecodedLen(len(str)))
+n, err := base64.StdEncoding.Decode(dst, []byte(str))
+if err != nil {
+    fmt.Println("decode error:", err)
+    return
+}
+dst = dst[:n]
+fmt.Printf("%q\n", dst)
+// Output: "Hello, world!"
+```
+
+**DecodeString**
+
+```go
+func (enc *Encoding) DecodeString(s string) ([]byte, error)
+```
+
+DecodeString returns the bytes represented by the base64 string s.
+
+<ParamField path="s" type="string" required>
+  The base64-encoded string to decode
+</ParamField>
+
+<ResponseField name="[]byte" type="[]byte">
+  The decoded data
+</ResponseField>
+
+<ResponseField name="error" type="error">
+  Returns CorruptInputError if the input is not valid base64
+</ResponseField>
+
+**Example:**
+
+```go
+str := "c29tZSBkYXRhIHdpdGggACBhbmQg77u/"
+data, err := base64.StdEncoding.DecodeString(str)
+if err != nil {
+    fmt.Println("error:", err)
+    return
+}
+fmt.Printf("%q\n", data)
+// Output: "some data with \x00 and \ufeff"
+```
+
+**AppendDecode**
+
+```go
+func (enc *Encoding) AppendDecode(dst, src []byte) ([]byte, error)
+```
+
+AppendDecode appends the base64 decoded src to dst and returns the extended buffer.
+
+<ParamField path="dst" type="[]byte" required>
+  Destination buffer to append to
+</ParamField>
+
+<ParamField path="src" type="[]byte" required>
+  Base64-encoded source data to decode and append
+</ParamField>
+
+<ResponseField name="[]byte" type="[]byte">
+  The extended buffer containing dst followed by the decoded src
+</ResponseField>
+
+<ResponseField name="error" type="error">
+  Returns CorruptInputError if the input is not valid base64
+</ResponseField>
+
+**EncodedLen**
+
+```go
+func (enc *Encoding) EncodedLen(n int) int
+```
+
+EncodedLen returns the length in bytes of the base64 encoding of an input buffer of length n.
+
+<ParamField path="n" type="int" required>
+  The length of the input data
+</ParamField>
+
+<ResponseField name="int" type="int">
+  The length of the encoded output
+</ResponseField>
+
+**DecodedLen**
+
+```go
+func (enc *Encoding) DecodedLen(n int) int
+```
+
+DecodedLen returns the maximum length in bytes of the decoded data corresponding to n bytes of base64-encoded data.
+
+<ParamField path="n" type="int" required>
+  The length of the encoded data
+</ParamField>
+
+<ResponseField name="int" type="int">
+  The maximum length of the decoded output
+</ResponseField>
+
+**WithPadding**
+
+```go
+func (enc Encoding) WithPadding(padding rune) *Encoding
+```
+
+WithPadding creates a new encoding identical to enc except with a specified padding character, or NoPadding to disable padding.
+
+<ParamField path="padding" type="rune" required>
+  The padding character to use, or NoPadding (-1) to disable padding
+</ParamField>
+
+<ResponseField name="*Encoding" type="*Encoding">
+  A new Encoding instance with the specified padding
+</ResponseField>
+
+**Strict**
+
+```go
+func (enc Encoding) Strict() *Encoding
+```
+
+Strict creates a new encoding identical to enc except with strict decoding enabled. In this mode, the decoder requires that trailing padding bits are zero.
+
+<ResponseField name="*Encoding" type="*Encoding">
+  A new Encoding instance with strict decoding enabled
+</ResponseField>
+
+### Streaming Encoder
+
+#### NewEncoder
+
+```go
+func NewEncoder(enc *Encoding, w io.Writer) io.WriteCloser
+```
+
+NewEncoder returns a new base64 stream encoder. Data written to the returned writer will be encoded using enc and then written to w. Base64 encodings operate in 4-byte blocks; when finished writing, the caller must Close the returned encoder to flush any partially written blocks.
+
+<ParamField path="enc" type="*Encoding" required>
+  The encoding to use
+</ParamField>
+
+<ParamField path="w" type="io.Writer" required>
+  The writer to write encoded data to
+</ParamField>
+
+<ResponseField name="io.WriteCloser" type="io.WriteCloser">
+  A WriteCloser that encodes data written to it
+</ResponseField>
+
+**Example:**
+
+```go
+input := []byte("foo\x00bar")
+encoder := base64.NewEncoder(base64.StdEncoding, os.Stdout)
+encoder.Write(input)
+// Must close the encoder when finished to flush any partial blocks
+encoder.Close()
+// Output: Zm9vAGJhcg==
+```
+
+### Streaming Decoder
+
+#### NewDecoder
+
+```go
+func NewDecoder(enc *Encoding, r io.Reader) io.Reader
+```
+
+NewDecoder constructs a new base64 stream decoder.
+
+<ParamField path="enc" type="*Encoding" required>
+  The encoding to use
+</ParamField>
+
+<ParamField path="r" type="io.Reader" required>
+  The reader to read encoded data from
+</ParamField>
+
+<ResponseField name="io.Reader" type="io.Reader">
+  A Reader that decodes data read from it
+</ResponseField>
+
+## Error Types
+
+### CorruptInputError
+
+```go
+type CorruptInputError int64
+```
+
+CorruptInputError indicates that the input data is corrupted. The int64 value indicates the byte offset where the corruption was detected.
+
+```go
+func (e CorruptInputError) Error() string
+```
+
+## Encoding Examples
+
+### Standard Base64
+
+```go
+// Encoding
+data := []byte("any + old & data")
+str := base64.StdEncoding.EncodeToString(data)
+fmt.Println(str)
+// Output: YW55ICsgb2xkICYgZGF0YQ==
+
+// Decoding
+str := "SGVsbG8sIOS4lueVjA=="
+decoded, err := base64.StdEncoding.DecodeString(str)
+if err != nil {
+    fmt.Println("decode error:", err)
+    return
+}
+fmt.Println(string(decoded))
+// Output: Hello, 世界
+```
+
+### URL-Safe Base64
+
+```go
+// Use URLEncoding for URLs and filenames
+data := []byte("test?data=value&param=123")
+encoded := base64.URLEncoding.EncodeToString(data)
+fmt.Println(encoded)
+
+decoded, _ := base64.URLEncoding.DecodeString(encoded)
+fmt.Println(string(decoded))
+```
+
+### Raw (Unpadded) Base64
+
+```go
+// Use RawStdEncoding for base64 without padding
+data := []byte("hello")
+encoded := base64.RawStdEncoding.EncodeToString(data)
+fmt.Println(encoded)
+// Output: aGVsbG8 (no padding)
+
+// Use RawURLEncoding for URL-safe base64 without padding
+encoded = base64.RawURLEncoding.EncodeToString(data)
+fmt.Println(encoded)
+```
+
+### Custom Encoding
+
+```go
+// Create a custom encoding with different alphabet
+customEnc := base64.NewEncoding("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
+encoded := customEnc.EncodeToString([]byte("test"))
+
+// Create encoding without padding
+noPadEnc := customEnc.WithPadding(base64.NoPadding)
+encoded = noPadEnc.EncodeToString([]byte("test"))
+```

@@ -1,0 +1,499 @@
+---
+title: 'io'
+description: 'Basic interfaces to I/O primitives'
+---
+
+## Overview
+
+Package io provides basic interfaces to I/O primitives. Its primary job is to wrap existing implementations of such primitives into shared public interfaces that abstract the functionality.
+
+## Core Interfaces
+
+### Reader
+
+The interface that wraps the basic Read method.
+
+```go
+type Reader interface {
+    Read(p []byte) (n int, err error)
+}
+```
+
+<ParamField path="p" type="[]byte" required>
+  Byte slice to read data into
+</ParamField>
+
+<ResponseField name="n" type="int">
+  Number of bytes read (0 to len(p))
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Error encountered during read, or io.EOF at end
+</ResponseField>
+
+**Example:**
+```go
+buf := make([]byte, 100)
+n, err := reader.Read(buf)
+if err != nil && err != io.EOF {
+    log.Fatal(err)
+}
+fmt.Printf("Read %d bytes\n", n)
+```
+
+### Writer
+
+The interface that wraps the basic Write method.
+
+```go
+type Writer interface {
+    Write(p []byte) (n int, err error)
+}
+```
+
+<ParamField path="p" type="[]byte" required>
+  Byte slice containing data to write
+</ParamField>
+
+<ResponseField name="n" type="int">
+  Number of bytes written from p (0 to len(p))
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Error that caused the write to stop early
+</ResponseField>
+
+**Example:**
+```go
+data := []byte("Hello, World!")
+n, err := writer.Write(data)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### Closer
+
+The interface that wraps the basic Close method.
+
+```go
+type Closer interface {
+    Close() error
+}
+```
+
+**Example:**
+```go
+defer file.Close()
+```
+
+### Seeker
+
+The interface that wraps the basic Seek method.
+
+```go
+type Seeker interface {
+    Seek(offset int64, whence int) (int64, error)
+}
+```
+
+<ParamField path="offset" type="int64" required>
+  Offset to seek to
+</ParamField>
+
+<ParamField path="whence" type="int" required>
+  Reference point: SeekStart (0), SeekCurrent (1), or SeekEnd (2)
+</ParamField>
+
+<ResponseField name="position" type="int64">
+  New offset relative to start of file
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Error encountered during seek
+</ResponseField>
+
+**Example:**
+```go
+// Seek to beginning
+file.Seek(0, io.SeekStart)
+
+// Seek 10 bytes forward from current position
+file.Seek(10, io.SeekCurrent)
+
+// Seek to end
+file.Seek(0, io.SeekEnd)
+```
+
+## Composite Interfaces
+
+### ReadWriter
+
+Groups the basic Read and Write methods.
+
+```go
+type ReadWriter interface {
+    Reader
+    Writer
+}
+```
+
+### ReadCloser
+
+Groups the basic Read and Close methods.
+
+```go
+type ReadCloser interface {
+    Reader
+    Closer
+}
+```
+
+### WriteCloser
+
+Groups the basic Write and Close methods.
+
+```go
+type WriteCloser interface {
+    Writer
+    Closer
+}
+```
+
+### ReadWriteCloser
+
+Groups Read, Write, and Close methods.
+
+```go
+type ReadWriteCloser interface {
+    Reader
+    Writer
+    Closer
+}
+```
+
+### ReadSeeker
+
+Groups the basic Read and Seek methods.
+
+```go
+type ReadSeeker interface {
+    Reader
+    Seeker
+}
+```
+
+## Utility Functions
+
+### Copy
+
+Copies from src to dst until EOF or error.
+
+```go
+func Copy(dst Writer, src Reader) (written int64, err error)
+```
+
+<ParamField path="dst" type="Writer" required>
+  Destination to write to
+</ParamField>
+
+<ParamField path="src" type="Reader" required>
+  Source to read from
+</ParamField>
+
+<ResponseField name="written" type="int64">
+  Number of bytes copied
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  First error encountered while copying, if any
+</ResponseField>
+
+**Example:**
+```go
+src, _ := os.Open("source.txt")
+dst, _ := os.Create("dest.txt")
+defer src.Close()
+defer dst.Close()
+
+written, err := io.Copy(dst, src)
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("Copied %d bytes\n", written)
+```
+
+### CopyN
+
+Copies n bytes (or until an error) from src to dst.
+
+```go
+func CopyN(dst Writer, src Reader, n int64) (written int64, err error)
+```
+
+<ParamField path="dst" type="Writer" required>
+  Destination writer
+</ParamField>
+
+<ParamField path="src" type="Reader" required>
+  Source reader
+</ParamField>
+
+<ParamField path="n" type="int64" required>
+  Number of bytes to copy
+</ParamField>
+
+**Example:**
+```go
+// Copy first 100 bytes
+written, err := io.CopyN(dst, src, 100)
+```
+
+### ReadAll
+
+Reads from r until an error or EOF and returns the data it read.
+
+```go
+func ReadAll(r Reader) ([]byte, error)
+```
+
+<ParamField path="r" type="Reader" required>
+  Reader to read all data from
+</ParamField>
+
+<ResponseField name="data" type="[]byte">
+  All data read from the reader
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Error encountered (EOF is not treated as an error)
+</ResponseField>
+
+**Example:**
+```go
+data, err := io.ReadAll(reader)
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("Read %d bytes\n", len(data))
+```
+
+### ReadFull
+
+Reads exactly len(buf) bytes from r into buf.
+
+```go
+func ReadFull(r Reader, buf []byte) (n int, err error)
+```
+
+<ParamField path="r" type="Reader" required>
+  Reader to read from
+</ParamField>
+
+<ParamField path="buf" type="[]byte" required>
+  Buffer to fill completely
+</ParamField>
+
+**Example:**
+```go
+buf := make([]byte, 100)
+n, err := io.ReadFull(reader, buf)
+if err != nil {
+    log.Fatal(err)
+}
+// buf is now completely filled
+```
+
+### ReadAtLeast
+
+Reads from r into buf until it has read at least min bytes.
+
+```go
+func ReadAtLeast(r Reader, buf []byte, min int) (n int, err error)
+```
+
+<ParamField path="r" type="Reader" required>
+  Reader to read from
+</ParamField>
+
+<ParamField path="buf" type="[]byte" required>
+  Buffer to read into
+</ParamField>
+
+<ParamField path="min" type="int" required>
+  Minimum number of bytes to read
+</ParamField>
+
+### WriteString
+
+Writes the contents of string s to w.
+
+```go
+func WriteString(w Writer, s string) (n int, err error)
+```
+
+<ParamField path="w" type="Writer" required>
+  Writer to write to
+</ParamField>
+
+<ParamField path="s" type="string" required>
+  String to write
+</ParamField>
+
+**Example:**
+```go
+n, err := io.WriteString(writer, "Hello, World!")
+```
+
+## Special Readers and Writers
+
+### LimitReader
+
+Returns a Reader that reads from r but stops with EOF after n bytes.
+
+```go
+func LimitReader(r Reader, n int64) Reader
+```
+
+<ParamField path="r" type="Reader" required>
+  Underlying reader
+</ParamField>
+
+<ParamField path="n" type="int64" required>
+  Maximum number of bytes to read
+</ParamField>
+
+**Example:**
+```go
+// Read at most 100 bytes
+limited := io.LimitReader(file, 100)
+data, _ := io.ReadAll(limited)
+```
+
+### TeeReader
+
+Returns a Reader that writes to w what it reads from r.
+
+```go
+func TeeReader(r Reader, w Writer) Reader
+```
+
+<ParamField path="r" type="Reader" required>
+  Reader to read from
+</ParamField>
+
+<ParamField path="w" type="Writer" required>
+  Writer to copy data to
+</ParamField>
+
+**Example:**
+```go
+var buf bytes.Buffer
+tee := io.TeeReader(file, &buf)
+io.ReadAll(tee) // Reads from file and writes to buf
+```
+
+### NopCloser
+
+Returns a ReadCloser with a no-op Close method wrapping the provided Reader.
+
+```go
+func NopCloser(r Reader) ReadCloser
+```
+
+**Example:**
+```go
+rc := io.NopCloser(strings.NewReader("data"))
+defer rc.Close() // Close does nothing but satisfies interface
+```
+
+## Variables
+
+### EOF
+
+The error returned by Read when no more input is available.
+
+```go
+var EOF = errors.New("EOF")
+```
+
+**Example:**
+```go
+n, err := reader.Read(buf)
+if err == io.EOF {
+    fmt.Println("Reached end of file")
+}
+```
+
+### ErrUnexpectedEOF
+
+Means that EOF was encountered in the middle of reading a fixed-size block or data structure.
+
+```go
+var ErrUnexpectedEOF = errors.New("unexpected EOF")
+```
+
+### ErrShortWrite
+
+Means that a write accepted fewer bytes than requested but failed to return an explicit error.
+
+```go
+var ErrShortWrite = errors.New("short write")
+```
+
+### ErrShortBuffer
+
+Means that a read required a longer buffer than was provided.
+
+```go
+var ErrShortBuffer = errors.New("short buffer")
+```
+
+### Discard
+
+A Writer on which all Write calls succeed without doing anything.
+
+```go
+var Discard Writer = discard{}
+```
+
+**Example:**
+```go
+// Discard all output
+io.Copy(io.Discard, reader)
+```
+
+## Complete Example
+
+```go
+package main
+
+import (
+    "fmt"
+    "io"
+    "os"
+    "strings"
+)
+
+func main() {
+    // Reading from a string
+    reader := strings.NewReader("Hello, World!")
+    
+    // Copy to stdout
+    io.Copy(os.Stdout, reader)
+    fmt.Println()
+    
+    // Read with limit
+    reader = strings.NewReader("0123456789")
+    limited := io.LimitReader(reader, 5)
+    data, _ := io.ReadAll(limited)
+    fmt.Printf("Limited read: %s\n", data) // Output: 01234
+    
+    // Tee reader
+    var buf strings.Builder
+    reader = strings.NewReader("test")
+    tee := io.TeeReader(reader, &buf)
+    io.Copy(io.Discard, tee)
+    fmt.Printf("Tee captured: %s\n", buf.String())
+}
+```

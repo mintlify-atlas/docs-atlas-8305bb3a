@@ -1,0 +1,325 @@
+---
+title: regexp
+description: Regular expression search and matching
+---
+
+The `regexp` package implements regular expression search. The syntax is the same general syntax used by Perl, Python, and other languages (RE2 syntax).
+
+## Basic Usage
+
+```go
+import "regexp"
+
+// Compile regex
+re := regexp.MustCompile(`\d+`)
+
+// Find first match
+match := re.FindString("Age: 25 years") // "25"
+
+// Check if matches
+matched := re.MatchString("123") // true
+
+// Find all matches
+matches := re.FindAllString("1 2 3", -1) // ["1", "2", "3"]
+```
+
+## Compiling Patterns
+
+```go
+// Compile (returns error)
+re, err := regexp.Compile(`[a-z]+`)
+if err != nil {
+    log.Fatal(err)
+}
+
+// MustCompile (panics on error)
+re := regexp.MustCompile(`[a-z]+`)
+
+// Case-insensitive
+re := regexp.MustCompile(`(?i)hello`)
+```
+
+## Matching
+
+```go
+re := regexp.MustCompile(`go+`)
+
+// Match string
+matched := re.MatchString("goooo") // true
+
+// Match bytes
+matched = re.Match([]byte("goo")) // true
+
+// Find first match
+s := re.FindString("golang go goo") // "go"
+
+// Find with index
+loc := re.FindStringIndex("golang") // [0, 2]
+```
+
+## Find Operations
+
+```go
+re := regexp.MustCompile(`\d+`)
+text := "Age: 25, Height: 180"
+
+// Find first
+first := re.FindString(text) // "25"
+
+// Find all (n = -1 for all matches)
+all := re.FindAllString(text, -1) // ["25", "180"]
+
+// Find with limit
+some := re.FindAllString(text, 1) // ["25"]
+
+// Find with indices
+indices := re.FindAllStringIndex(text, -1)
+// [[5, 7], [18, 21]]
+```
+
+## Submatches (Capturing Groups)
+
+```go
+re := regexp.MustCompile(`(\w+)@(\w+\.\w+)`)
+email := "user@example.com"
+
+// Find submatches
+matches := re.FindStringSubmatch(email)
+// ["user@example.com", "user", "example.com"]
+
+if len(matches) > 0 {
+    full := matches[0]  // Full match
+    user := matches[1]  // First group
+    domain := matches[2] // Second group
+}
+
+// Find all submatches
+allMatches := re.FindAllStringSubmatch("user@ex.com, admin@test.org", -1)
+```
+
+## Replace
+
+```go
+re := regexp.MustCompile(`\d+`)
+
+// Replace all
+result := re.ReplaceAllString("Age: 25", "XX")
+// "Age: XX"
+
+// Replace with function
+result = re.ReplaceAllStringFunc("1 2 3", func(s string) string {
+    n, _ := strconv.Atoi(s)
+    return strconv.Itoa(n * 2)
+})
+// "2 4 6"
+
+// Replace with captured groups
+re = regexp.MustCompile(`(\w+)@(\w+)`)
+result = re.ReplaceAllString("user@example", "$1 at $2")
+// "user at example"
+```
+
+## Split
+
+```go
+re := regexp.MustCompile(`\s+`)
+parts := re.Split("one  two   three", -1)
+// ["one", "two", "three"]
+
+// Split with limit
+parts = re.Split("a b c d", 2)
+// ["a", "b c d"]
+```
+
+## Named Groups
+
+```go
+re := regexp.MustCompile(`(?P<user>\w+)@(?P<domain>\w+\.\w+)`)
+email := "alice@example.com"
+
+match := re.FindStringSubmatch(email)
+if match != nil {
+    names := re.SubexpNames()
+    result := make(map[string]string)
+    
+    for i, name := range names {
+        if i != 0 && name != "" {
+            result[name] = match[i]
+        }
+    }
+    
+    fmt.Println(result["user"])   // "alice"
+    fmt.Println(result["domain"]) // "example.com"
+}
+```
+
+## Practical Examples
+
+### Email Validation
+
+```go
+func isValidEmail(email string) bool {
+    re := regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+    return re.MatchString(email)
+}
+```
+
+### URL Extraction
+
+```go
+func extractURLs(text string) []string {
+    re := regexp.MustCompile(`https?://[^\s]+`)
+    return re.FindAllString(text, -1)
+}
+```
+
+### Phone Number Format
+
+```go
+func formatPhoneNumber(phone string) string {
+    re := regexp.MustCompile(`(\d{3})(\d{3})(\d{4})`)
+    return re.ReplaceAllString(phone, "($1) $2-$3")
+}
+
+// "5551234567" -> "(555) 123-4567"
+```
+
+### Password Validation
+
+```go
+func validatePassword(password string) bool {
+    // At least 8 chars, 1 uppercase, 1 lowercase, 1 digit
+    checks := []*regexp.Regexp{
+        regexp.MustCompile(`.{8,}`),
+        regexp.MustCompile(`[A-Z]`),
+        regexp.MustCompile(`[a-z]`),
+        regexp.MustCompile(`\d`),
+    }
+    
+    for _, re := range checks {
+        if !re.MatchString(password) {
+            return false
+        }
+    }
+    
+    return true
+}
+```
+
+### Extract Hashtags
+
+```go
+func extractHashtags(text string) []string {
+    re := regexp.MustCompile(`#\w+`)
+    return re.FindAllString(text, -1)
+}
+```
+
+### Clean HTML Tags
+
+```go
+func stripHTML(html string) string {
+    re := regexp.MustCompile(`<[^>]*>`)
+    return re.ReplaceAllString(html, "")
+}
+```
+
+### Parse Log Lines
+
+```go
+func parseLogLine(line string) map[string]string {
+    re := regexp.MustCompile(
+        `(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) ` +
+        `\[(?P<level>\w+)\] ` +
+        `(?P<message>.*)`)
+    
+    match := re.FindStringSubmatch(line)
+    if match == nil {
+        return nil
+    }
+    
+    result := make(map[string]string)
+    for i, name := range re.SubexpNames() {
+        if i != 0 && name != "" {
+            result[name] = match[i]
+        }
+    }
+    
+    return result
+}
+```
+
+## Common Patterns
+
+```go
+var patterns = map[string]string{
+    "email":    `^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`,
+    "url":      `https?://[^\s]+`,
+    "ip":       `\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b`,
+    "phone":    `\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}`,
+    "date":     `\d{4}-\d{2}-\d{2}`,
+    "time":     `\d{2}:\d{2}(:\d{2})?`,
+    "hex":      `#?[0-9A-Fa-f]{6}`,
+    "uuid":     `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`,
+    "username": `^[a-zA-Z0-9_]{3,16}$`,
+}
+```
+
+## Regex Syntax
+
+### Character Classes
+```
+.       any character
+[abc]   a, b, or c
+[^abc]  not a, b, or c
+[a-z]   a through z
+\d      digit
+\D      non-digit
+\w      word character
+\W      non-word character
+\s      whitespace
+\S      non-whitespace
+```
+
+### Quantifiers
+```
+*       0 or more
++       1 or more
+?       0 or 1
+{n}     exactly n
+{n,}    n or more
+{n,m}   between n and m
+```
+
+### Anchors
+```
+^       start of string
+$       end of string
+\b      word boundary
+\B      not word boundary
+```
+
+### Groups
+```
+(...)      capturing group
+(?:...)    non-capturing group
+(?P<name>...) named group
+```
+
+## Performance Tips
+
+1. **Compile once** - Reuse compiled regexes
+2. **Use raw strings** - `r"..."` to avoid escaping
+3. **Be specific** - Avoid .* when possible
+4. **Limit backtracking** - Use atomic groups
+5. **Test patterns** - Use regex testers
+6. **Consider alternatives** - strings package for simple cases
+
+## Best Practices
+
+1. **Cache compiled patterns** - Don't recompile in loops
+2. **Validate input** - Check for nil matches
+3. **Use named groups** - For complex patterns
+4. **Document patterns** - Add comments explaining regex
+5. **Handle errors** - Check Compile errors
+6. **Test thoroughly** - Regex can have edge cases

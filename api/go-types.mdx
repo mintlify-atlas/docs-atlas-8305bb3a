@@ -1,0 +1,567 @@
+---
+title: "go/types"
+description: "Type checking and semantic analysis for Go programs"
+---
+
+## Overview
+
+The `go/types` package implements type-checking for Go packages. It provides the algorithms and data structures for analyzing Go code beyond just parsing - including name resolution, type inference, constant evaluation, and semantic validation.
+
+**Key capabilities:**
+- Type checking Go source code
+- Name resolution (mapping identifiers to declarations)
+- Constant folding and evaluation
+- Type inference
+- Method set computation
+- Interface satisfaction checking
+
+<Tip>
+For a comprehensive tutorial, see the official [Go Types Tutorial](https://go.dev/s/types-tutorial).
+</Tip>
+
+## Core Types
+
+### Config
+
+Specifies the configuration for type checking.
+
+```go
+type Config struct {
+    Context          *Context
+    GoVersion        string
+    IgnoreFuncBodies bool
+    FakeImportC      bool
+    
+    // Error handling
+    Error func(err error)
+    
+    // Import resolution
+    Importer ImporterFrom
+    
+    // Size calculation
+    Sizes Sizes
+}
+```
+
+**Common configuration:**
+```go
+conf := &types.Config{
+    Importer: importer.Default(),
+    Error: func(err error) {
+        fmt.Println("Type error:", err)
+    },
+}
+```
+
+### Package
+
+Represents a type-checked Go package.
+
+```go
+type Package struct {
+    // Read-only fields
+}
+
+func (pkg *Package) Path() string
+func (pkg *Package) Name() string
+func (pkg *Package) Scope() *Scope
+func (pkg *Package) Imports() []*Package
+func (pkg *Package) Complete() bool
+```
+
+### Info
+
+Stores type-checking results.
+
+```go
+type Info struct {
+    Types      map[ast.Expr]TypeAndValue     // type info for expressions
+    Instances  map[*ast.Ident]Instance       // generic instantiations
+    Defs       map[*ast.Ident]Object         // identifier definitions
+    Uses       map[*ast.Ident]Object         // identifier uses
+    Implicits  map[ast.Node]Object           // implicit objects
+    Selections map[*ast.SelectorExpr]*Selection
+    Scopes     map[ast.Node]*Scope           // lexical scopes
+    InitOrder  []*Initializer                // initialization order
+    FileVersions map[*ast.File]string         // Go version per file
+}
+```
+
+**Example:**
+```go
+info := &types.Info{
+    Types: make(map[ast.Expr]types.TypeAndValue),
+    Defs:  make(map[*ast.Ident]types.Object),
+    Uses:  make(map[*ast.Ident]types.Object),
+}
+```
+
+## Type Checking
+
+### Check Function
+
+Type-checks a package.
+
+```go
+func (conf *Config) Check(
+    path string,
+    fset *token.FileSet,
+    files []*ast.File,
+    info *Info,
+) (*Package, error)
+```
+
+**Example:**
+```go
+package main
+
+import (
+    "go/ast"
+    "go/importer"
+    "go/parser"
+    "go/token"
+    "go/types"
+    "log"
+)
+
+func main() {
+    src := `package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Hello, World!")
+}`
+
+    // Parse the source
+    fset := token.NewFileSet()
+    file, err := parser.ParseFile(fset, "hello.go", src, 0)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Type-check the package
+    conf := types.Config{Importer: importer.Default()}
+    info := &types.Info{
+        Types: make(map[ast.Expr]types.TypeAndValue),
+    }
+    
+    pkg, err := conf.Check("main", fset, []*ast.File{file}, info)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    println("Package:", pkg.Name())
+}
+```
+
+## Type Interface
+
+The fundamental type interface.
+
+```go
+type Type interface {
+    Underlying() Type
+    String() string
+}
+```
+
+### Concrete Type Implementations
+
+**Basic** - Basic types (int, string, bool, etc.)
+```go
+type Basic struct {
+    Kind BasicKind
+    Info BasicInfo
+    Name string
+}
+```
+
+**Named** - Named types (type declarations)
+```go
+type Named struct { /* ... */ }
+
+func (n *Named) Obj() *TypeName
+func (n *Named) NumMethods() int
+func (n *Named) Method(i int) *Func
+```
+
+**Pointer** - Pointer types
+```go
+type Pointer struct { /* ... */ }
+
+func NewPointer(elem Type) *Pointer
+func (p *Pointer) Elem() Type
+```
+
+**Slice** - Slice types
+```go
+type Slice struct { /* ... */ }
+
+func NewSlice(elem Type) *Slice
+func (s *Slice) Elem() Type
+```
+
+**Array** - Array types
+```go
+type Array struct { /* ... */ }
+
+func NewArray(elem Type, len int64) *Array
+func (a *Array) Len() int64
+func (a *Array) Elem() Type
+```
+
+**Map** - Map types
+```go
+type Map struct { /* ... */ }
+
+func NewMap(key, elem Type) *Map
+func (m *Map) Key() Type
+func (m *Map) Elem() Type
+```
+
+**Chan** - Channel types
+```go
+type Chan struct { /* ... */ }
+
+func NewChan(dir ChanDir, elem Type) *Chan
+func (c *Chan) Dir() ChanDir
+func (c *Chan) Elem() Type
+```
+
+**Struct** - Struct types
+```go
+type Struct struct { /* ... */ }
+
+func NewStruct(fields []*Var, tags []string) *Struct
+func (s *Struct) NumFields() int
+func (s *Struct) Field(i int) *Var
+func (s *Struct) Tag(i int) string
+```
+
+**Interface** - Interface types
+```go
+type Interface struct { /* ... */ }
+
+func NewInterface(methods []*Func, embeddeds []Type) *Interface
+func (i *Interface) NumMethods() int
+func (i *Interface) Method(i int) *Func
+func (i *Interface) Empty() bool
+```
+
+**Signature** - Function types
+```go
+type Signature struct { /* ... */ }
+
+func NewSignature(recv *Var, params, results *Tuple, variadic bool) *Signature
+func (s *Signature) Recv() *Var
+func (s *Signature) Params() *Tuple
+func (s *Signature) Results() *Tuple
+func (s *Signature) Variadic() bool
+```
+
+## Object Types
+
+Objects represent declared entities.
+
+```go
+type Object interface {
+    Parent() *Scope
+    Pos() token.Pos
+    Pkg() *Package
+    Name() string
+    Type() Type
+    Exported() bool
+}
+```
+
+**Concrete object types:**
+- `*Const` - Constant
+- `*Var` - Variable (including parameters, results, struct fields)
+- `*Func` - Function or method
+- `*TypeName` - Type name
+- `*Label` - Statement label
+- `*PkgName` - Imported package
+- `*Builtin` - Built-in function
+- `*Nil` - Predeclared nil
+
+## Scope
+
+Represents a lexical scope.
+
+```go
+type Scope struct { /* ... */ }
+
+func (s *Scope) Parent() *Scope
+func (s *Scope) NumChildren() int
+func (s *Scope) Child(i int) *Scope
+func (s *Scope) Lookup(name string) Object
+func (s *Scope) Insert(obj Object) Object
+func (s *Scope) Pos() token.Pos
+func (s *Scope) End() token.Pos
+```
+
+**Example:**
+```go
+pkg, _ := conf.Check("example", fset, files, nil)
+scope := pkg.Scope()
+
+// Look up a name
+obj := scope.Lookup("MyFunc")
+if obj != nil {
+    fmt.Printf("Found: %s of type %s\n", obj.Name(), obj.Type())
+}
+```
+
+## Type Checking Examples
+
+### Basic Type Checking
+
+```go
+package main
+
+import (
+    "go/ast"
+    "go/importer"
+    "go/parser"
+    "go/token"
+    "go/types"
+    "fmt"
+)
+
+func main() {
+    src := `package main
+
+type Celsius float64
+
+func FToC(f float64) Celsius {
+    return Celsius(f - 32) * 5 / 9
+}`
+
+    fset := token.NewFileSet()
+    file, _ := parser.ParseFile(fset, "temp.go", src, 0)
+
+    conf := types.Config{Importer: importer.Default()}
+    pkg, err := conf.Check("temperature", fset, []*ast.File{file}, nil)
+    if err != nil {
+        fmt.Println("Type error:", err)
+        return
+    }
+
+    // Look up the FToC function
+    obj := pkg.Scope().Lookup("FToC")
+    fmt.Printf("%s: %s\n", obj.Name(), obj.Type())
+    // Output: FToC: func(f float64) temperature.Celsius
+}
+```
+
+### Analyzing Expressions
+
+```go
+func analyzeExpressions(src string) {
+    fset := token.NewFileSet()
+    file, _ := parser.ParseFile(fset, "", src, 0)
+
+    info := &types.Info{
+        Types: make(map[ast.Expr]types.TypeAndValue),
+    }
+
+    conf := types.Config{Importer: importer.Default()}
+    conf.Check("", fset, []*ast.File{file}, info)
+
+    // Print type of each expression
+    for expr, tv := range info.Types {
+        pos := fset.Position(expr.Pos())
+        fmt.Printf("%s: %s\n", pos, tv.Type)
+    }
+}
+```
+
+### Finding Definitions and Uses
+
+```go
+func findReferences(src string, name string) {
+    fset := token.NewFileSet()
+    file, _ := parser.ParseFile(fset, "", src, 0)
+
+    info := &types.Info{
+        Defs: make(map[*ast.Ident]types.Object),
+        Uses: make(map[*ast.Ident]types.Object),
+    }
+
+    conf := types.Config{}
+    conf.Check("", fset, []*ast.File{file}, info)
+
+    // Find definition
+    for ident, obj := range info.Defs {
+        if obj != nil && obj.Name() == name {
+            pos := fset.Position(ident.Pos())
+            fmt.Printf("Defined at %s\n", pos)
+        }
+    }
+
+    // Find uses
+    for ident, obj := range info.Uses {
+        if obj != nil && obj.Name() == name {
+            pos := fset.Position(ident.Pos())
+            fmt.Printf("Used at %s\n", pos)
+        }
+    }
+}
+```
+
+## Method Sets
+
+### MethodSet
+
+Computes the method set of a type.
+
+```go
+func NewMethodSet(T Type) *MethodSet
+
+type MethodSet struct { /* ... */ }
+
+func (s *MethodSet) Len() int
+func (s *MethodSet) At(i int) *Selection
+func (s *MethodSet) Lookup(pkg *Package, name string) *Selection
+```
+
+**Example:**
+```go
+package main
+
+import (
+    "go/importer"
+    "go/parser"
+    "go/token"
+    "go/types"
+    "fmt"
+)
+
+func main() {
+    src := `package main
+
+type Celsius float64
+
+func (c Celsius) String() string {
+    return fmt.Sprintf("%g°C", c)
+}
+
+func (c *Celsius) Set(f float64) {
+    *c = Celsius(f-32) * 5 / 9
+}`
+
+    fset := token.NewFileSet()
+    file, _ := parser.ParseFile(fset, "", src, 0)
+
+    conf := types.Config{Importer: importer.Default()}
+    pkg, _ := conf.Check("main", fset, []*ast.File{file}, nil)
+
+    celsius := pkg.Scope().Lookup("Celsius").Type()
+
+    // Method set of Celsius (value)
+    fmt.Println("Methods of Celsius:")
+    mset := types.NewMethodSet(celsius)
+    for i := 0; i < mset.Len(); i++ {
+        fmt.Printf("  %s\n", mset.At(i))
+    }
+
+    // Method set of *Celsius (pointer)
+    fmt.Println("Methods of *Celsius:")
+    ptrCelsius := types.NewPointer(celsius)
+    mset = types.NewMethodSet(ptrCelsius)
+    for i := 0; i < mset.Len(); i++ {
+        fmt.Printf("  %s\n", mset.At(i))
+    }
+}
+
+// Output:
+// Methods of Celsius:
+//   method (Celsius) String() string
+// Methods of *Celsius:
+//   method (*Celsius) Set(f float64)
+//   method (*Celsius) String() string
+```
+
+## Type Predicates
+
+Utility functions for checking type properties.
+
+```go
+// Identity comparisons
+func Identical(x, y Type) bool
+func IdenticalIgnoreTags(x, y Type) bool
+
+// Assignability
+func AssignableTo(V, T Type) bool
+func ConvertibleTo(V, T Type) bool
+
+// Interface implementation
+func Implements(V Type, T *Interface) bool
+func Satisfies(V Type, T *Interface) bool
+
+// Comparability
+func Comparable(T Type) bool
+```
+
+**Example:**
+```go
+// Check if type implements interface
+if types.Implements(myType, ioWriterInterface) {
+    fmt.Println("Type implements io.Writer")
+}
+
+// Check assignability
+if types.AssignableTo(srcType, dstType) {
+    fmt.Println("Can assign src to dst")
+}
+```
+
+## Sizes Interface
+
+Calculates size and alignment of types.
+
+```go
+type Sizes interface {
+    Alignof(T Type) int64
+    Offsetsof(fields []*Var) []int64
+    Sizeof(T Type) int64
+}
+
+// Standard sizes for common architectures
+func SizesFor(compiler, arch string) Sizes
+```
+
+**Example:**
+```go
+sizes := types.SizesFor("gc", "amd64")
+size := sizes.Sizeof(myType)
+align := sizes.Alignof(myType)
+
+fmt.Printf("Size: %d bytes, Alignment: %d\n", size, align)
+```
+
+## Error Handling
+
+```go
+conf := types.Config{
+    Error: func(err error) {
+        // Custom error handling
+        if typeErr, ok := err.(types.Error); ok {
+            fmt.Printf("%s: %s\n",
+                typeErr.Fset.Position(typeErr.Pos),
+                typeErr.Msg)
+        }
+    },
+}
+```
+
+## Related Packages
+
+- `go/ast` - Abstract syntax tree representation
+- `go/parser` - Parse Go source into AST
+- `go/token` - Token and position definitions
+- `go/constant` - Constant values and operations
+- `go/importer` - Package import mechanisms
+- `golang.org/x/tools/go/types/typeutil` - Type utilities
+- `golang.org/x/tools/go/packages` - High-level package loading and type checking

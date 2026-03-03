@@ -1,0 +1,233 @@
+---
+title: bufio
+description: Buffered I/O for efficient reading and writing
+---
+
+The `bufio` package implements buffered I/O. It wraps an `io.Reader` or `io.Writer` object, creating another object (Reader or Writer) that also implements the interface but provides buffering and some help for textual I/O.
+
+## Key Types
+
+### Reader
+
+Implements buffering for an `io.Reader` object.
+
+```go
+type Reader struct {
+    // contains filtered or unexported fields
+}
+```
+
+**Creating a Reader:**
+
+```go
+import (
+    "bufio"
+    "os"
+)
+
+func main() {
+    f, _ := os.Open("file.txt")
+    defer f.Close()
+    
+    reader := bufio.NewReader(f)
+    // or with custom buffer size
+    reader = bufio.NewReaderSize(f, 8192)
+}
+```
+
+### Writer
+
+Implements buffering for an `io.Writer` object.
+
+```go
+type Writer struct {
+    // contains filtered or unexported fields
+}
+```
+
+### Scanner
+
+Provides a convenient interface for reading data such as a file of newline-delimited lines of text.
+
+## Common Operations
+
+### Reading Lines
+
+```go
+import (
+    "bufio"
+    "fmt"
+    "os"
+)
+
+func readLines(filename string) error {
+    f, err := os.Open(filename)
+    if err != nil {
+        return err
+    }
+    defer f.Close()
+
+    scanner := bufio.NewScanner(f)
+    for scanner.Scan() {
+        line := scanner.Text()
+        fmt.Println(line)
+    }
+    
+    return scanner.Err()
+}
+```
+
+### Reading with Peek
+
+```go
+func peekExample(r io.Reader) error {
+    br := bufio.NewReader(r)
+    
+    // Peek at next 10 bytes without consuming them
+    b, err := br.Peek(10)
+    if err != nil {
+        return err
+    }
+    
+    fmt.Printf("Next bytes: %s\n", b)
+    return nil
+}
+```
+
+### Reading Until Delimiter
+
+```go
+func readUntil(r io.Reader) error {
+    br := bufio.NewReader(r)
+    
+    // Read until newline
+    line, err := br.ReadString('\n')
+    if err != nil {
+        return err
+    }
+    
+    fmt.Println(line)
+    return nil
+}
+```
+
+### Buffered Writing
+
+```go
+func writeBuffered(filename string, data []string) error {
+    f, err := os.Create(filename)
+    if err != nil {
+        return err
+    }
+    defer f.Close()
+
+    w := bufio.NewWriter(f)
+    defer w.Flush() // Important: flush buffer before closing
+
+    for _, line := range data {
+        _, err := w.WriteString(line + "\n")
+        if err != nil {
+            return err
+        }
+    }
+    
+    return w.Flush()
+}
+```
+
+### Custom Split Function
+
+```go
+import "bytes"
+
+func scanWords(data []byte, atEOF bool) (advance int, token []byte, err error) {
+    // Skip leading spaces
+    start := 0
+    for start < len(data) && data[start] == ' ' {
+        start++
+    }
+    
+    // Scan until space
+    for i := start; i < len(data); i++ {
+        if data[i] == ' ' {
+            return i + 1, data[start:i], nil
+        }
+    }
+    
+    // If at EOF, return remaining data
+    if atEOF && len(data) > start {
+        return len(data), data[start:], nil
+    }
+    
+    return start, nil, nil
+}
+
+func useCustomSplit(r io.Reader) {
+    scanner := bufio.NewScanner(r)
+    scanner.Split(scanWords)
+    
+    for scanner.Scan() {
+        fmt.Println(scanner.Text())
+    }
+}
+```
+
+## Key Methods
+
+### Reader Methods
+
+- `Read(p []byte)` - Read data into p
+- `ReadByte()` - Read a single byte
+- `ReadRune()` - Read a single UTF-8 encoded Unicode character
+- `ReadLine()` - Read a line of bytes
+- `ReadString(delim byte)` - Read until delimiter
+- `ReadBytes(delim byte)` - Read until delimiter, return bytes
+- `Peek(n int)` - Return next n bytes without advancing reader
+
+### Writer Methods
+
+- `Write(p []byte)` - Write data from p
+- `WriteByte(c byte)` - Write a single byte
+- `WriteRune(r rune)` - Write a single Unicode code point
+- `WriteString(s string)` - Write a string
+- `Flush()` - Write buffered data to underlying writer
+
+### Scanner Methods
+
+- `Scan()` - Advance to next token
+- `Text()` - Return most recent token as string
+- `Bytes()` - Return most recent token as byte slice
+- `Err()` - Return first error encountered
+- `Split(split SplitFunc)` - Set split function
+
+## Default Buffer Sizes
+
+- Default Reader buffer: **4096 bytes**
+- Default Writer buffer: **4096 bytes**
+- Scanner max token size: **64KB** (configurable with `Buffer` method)
+
+## Error Handling
+
+```go
+var (
+    ErrInvalidUnreadByte = errors.New("bufio: invalid use of UnreadByte")
+    ErrInvalidUnreadRune = errors.New("bufio: invalid use of UnreadRune")
+    ErrBufferFull        = errors.New("bufio: buffer full")
+    ErrNegativeCount     = errors.New("bufio: negative count")
+)
+```
+
+## Performance Tips
+
+1. **Choose appropriate buffer size** - Larger buffers reduce system calls but use more memory
+2. **Always flush writers** - Use `defer w.Flush()` to ensure data is written
+3. **Reuse buffers** - Use `Reset()` to reuse Reader/Writer with new underlying streams
+4. **Scanner for line-based input** - More convenient than manual ReadLine calls
+
+## Common Use Cases
+
+- Reading configuration files line by line
+- Processing log files
+- Parsing CSV or structured text data
+- Network protocol implementation
+- Improving performance of small, frequent I/O operations

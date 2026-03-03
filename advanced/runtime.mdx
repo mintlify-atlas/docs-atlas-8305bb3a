@@ -1,0 +1,286 @@
+---
+title: 'Go Runtime Internals'
+description: 'Deep dive into the Go runtime system architecture and internals'
+---
+
+## Overview
+
+The Go runtime is the foundation that powers every Go program. It provides essential services including memory management, goroutine scheduling, garbage collection, and system call interfaces. Understanding the runtime is crucial for writing high-performance Go applications and debugging complex issues.
+
+<Note>
+The runtime is part of every Go binary and runs alongside your application code. It's automatically linked when you build a Go program.
+</Note>
+
+## Scheduler Architecture
+
+The Go scheduler implements an M:N threading model, multiplexing goroutines onto OS threads for efficient concurrent execution.
+
+### Core Components: G, M, and P
+
+The scheduler manages three fundamental types of resources:
+
+#### G (Goroutine)
+A "G" represents a goroutine - a lightweight thread of execution. Key characteristics:
+- Represented by the `g` struct in the runtime
+- When a goroutine exits, its `g` object is returned to a pool for reuse
+- Contains the goroutine's stack, program counter, and scheduling information
+- Much cheaper than OS threads (typical stack starts at 2KB)
+
+#### M (Machine)
+An "M" is an OS thread that can execute Go code. Properties:
+- Represented by the `m` struct
+- Can execute user Go code, runtime code, system calls, or be idle
+- Any number of Ms can exist since threads may block in system calls
+- Each M has a system stack (g0) and optionally a signal stack (gsignal)
+
+#### P (Processor)
+A "P" represents resources required to execute Go code. Attributes:
+- Represented by the `p` struct
+- Exactly `GOMAXPROCS` Ps exist (default: number of CPUs)
+- Contains scheduler and memory allocator state
+- Acts like a CPU in the OS scheduler - provides execution context
+- Can be thought of as a "license" to execute Go code
+
+```go
+// Example: Setting GOMAXPROCS
+import "runtime"
+
+func main() {
+    // Set the number of P's to 4
+    runtime.GOMAXPROCS(4)
+    
+    // Get current setting
+    n := runtime.GOMAXPROCS(0)
+    println("GOMAXPROCS:", n)
+}
+```
+
+### Scheduler Operation
+
+The scheduler's job is to match up:
+- A G (code to execute)
+- An M (where to execute it)
+- A P (rights and resources to execute it)
+
+When an M stops executing user Go code (e.g., entering a system call), it returns its P to the idle pool. To resume executing Go code, it must acquire a P from the idle pool.
+
+## Stack Management
+
+### User Stacks
+
+Every non-dead goroutine has a user stack:
+- Start small (typically 2KB)
+- Grow and shrink dynamically as needed
+- Can be moved during stack growth (pointers must be updated)
+- Freed when goroutine exits (or retained for reuse if default size)
+
+### System Stacks
+
+Each M has a system stack (g0 stack):
+- Cannot grow (fixed size: 8K in pure Go binary)
+- Used for runtime code that must not be preempted
+- No garbage collection scanning of system stacks
+- Accessed via `systemstack`, `mcall`, or `asmcgocall`
+
+<Warning>
+Code running on the system stack is implicitly non-preemptible. The current user stack is not used for execution while on the system stack.
+</Warning>
+
+### nosplit Functions
+
+Functions can be marked with `//go:nosplit` to skip the stack growth prologue:
+
+```go
+//go:nosplit
+func criticalFunction() {
+    // This function cannot cause stack growth
+    // Useful for runtime internals and avoiding deadlocks
+}
+```
+
+Use cases for nosplit:
+- Functions that must run without stack growth (avoiding deadlocks)
+- Functions that must not be preempted on entry
+- Functions that run without a valid G (early startup, C callbacks)
+
+The linker checks that nosplit function call chains don't exceed available stack space.
+
+## Memory Management
+
+### Allocation Strategies
+
+The runtime uses different strategies for different allocation scenarios:
+
+#### Regular Heap Allocation
+- Default for most allocations
+- Type-accurate and garbage collected
+- Size-segregated per-P allocation areas minimize fragmentation
+- Lock-free in common cases
+
+#### Unmanaged Memory
+
+For special cases, the runtime allocates outside the GC heap:
+
+**sysAlloc**: Direct OS memory
+- Obtains memory from OS in page-size multiples
+- Can be freed with `sysFree`
+- Used for large runtime structures
+
+**persistentalloc**: Permanent allocations
+- Combines small allocations into single `sysAlloc` chunks
+- No way to free individual objects
+- Reduces fragmentation for long-lived objects
+
+**fixalloc**: Fixed-size SLAB allocator
+- Allocates objects of a single fixed size
+- Objects can be freed and reused
+- Memory only reusable for same object type
+
+<Note>
+Types allocated in unmanaged memory should embed `internal/runtime/sys.NotInHeap` to mark them as not being in the heap.
+</Note>
+
+## Synchronization Primitives
+
+The runtime provides several synchronization mechanisms with different characteristics:
+
+### mutex and rwmutex
+```go
+// Low-level lock (runtime internal)
+// Blocks M directly without interacting with scheduler
+lock(&someMutex)
+// ... critical section ...
+unlock(&someMutex)
+```
+
+Characteristics:
+- Blocks the M (OS thread) directly
+- Prevents associated G and P from being rescheduled
+- Safe to use from lowest runtime levels
+- Simple but can waste OS thread resources
+
+### note
+Race-free one-shot notifications:
+- `notesleep`: Block until notification (blocks M, G, and P)
+- `notewakeup`: Send notification
+- `notetsleepg`: Like blocking system call (allows P reuse)
+- `noteclear`: Reset for reuse (must not race with sleep/wakeup)
+
+### gopark and goready
+Direct interaction with goroutine scheduler:
+
+```go
+// Park current goroutine
+gopark(unlockf, lock, reason, traceEvent, traceskip)
+
+// Wake up parked goroutine
+goready(gp, traceskip)
+```
+
+- `gopark`: Puts goroutine in "waiting" state, removes from run queue
+- `goready`: Puts goroutine back in "runnable" state, adds to run queue
+- Most efficient - only blocks G, not M or P
+
+## Runtime Functions
+
+### Getting Current Goroutine
+
+```go
+// Get current g (may be g0 or gsignal on system/signal stacks)
+g := getg()
+
+// Get current user goroutine
+userG := getg().m.curg
+
+// Check if on user stack
+onUserStack := (getg() == getg().m.curg)
+```
+
+<Warning>
+Always use `getg().m.curg` to get the current user goroutine. Using `getg()` alone may return g0 or gsignal on system/signal stacks.
+</Warning>
+
+### Error Handling
+
+**panic**: For recoverable errors in user code
+- Normal panic mechanism
+- Cannot be used on system stack or during `mallocgc`
+
+**throw**: For unrecoverable runtime errors
+- Dumps traceback and terminates process immediately
+- Use with string constants to avoid allocation
+- Convention: prefix messages with "runtime:"
+
+**fatal**: For user-caused unrecoverable errors
+- Similar to throw but indicates user fault
+- Used for racing map writes and similar errors
+
+### Environment Variables
+
+Key runtime environment variables:
+
+- `GOMAXPROCS`: Number of P's (default: CPU count)
+- `GOGC`: GC target percentage (default: 100)
+- `GOMEMLIMIT`: Soft memory limit
+- `GODEBUG`: Runtime debugging options
+- `GOTRACEBACK`: Controls panic/throw output detail
+
+## Advanced Topics
+
+### Write Barriers
+
+The runtime uses write barriers for garbage collection:
+
+- `//go:nowritebarrier`: Assert function has no write barriers
+- `//go:nowritebarrierrec`: Assert function and callees have no write barriers
+- `//go:yeswritebarrierrec`: Stop the recursive check
+- Required for GC correctness with concurrent marking
+
+### Compiler Directives
+
+Runtime-specific directives:
+
+- `//go:systemstack`: Function must run on system stack
+- `//go:nowritebarrier`: No write barriers allowed
+- `//go:nosplit`: Skip stack growth check
+- `//go:linkname`: Link to symbol in another package
+
+### Debugging Tools
+
+**debuglog**: Ultra-low-overhead logging
+```go
+dlog().s("message").u32(value).end()
+```
+- Ring buffer per M
+- Minimal perturbation
+- Dumps on crashes
+- Enable with `-tags=debuglog`
+
+**Execution Tracer**: See goroutine scheduling
+```go
+import "runtime/trace"
+
+trace.Start(w)
+defer trace.Stop()
+```
+
+## Best Practices
+
+1. **Avoid runtime internals** in application code - use standard library instead
+2. **Use GOMAXPROCS wisely** - default is usually optimal
+3. **Don't guess, measure** - use pprof and execution traces
+4. **Respect nosplit budgets** - keep nosplit functions small
+5. **Understand stack growth** - be aware of stack scanning costs
+
+## References
+
+- [runtime package documentation](/pkg/runtime/)
+- [HACKING.md](https://github.com/golang/go/blob/master/src/runtime/HACKING.md) in Go source
+- [Go scheduler design document](https://golang.org/s/go11sched)
+- [Memory allocator design](https://golang.org/s/go11malloc)
+
+## Related Topics
+
+- [Garbage Collection](/advanced/garbage-collection)
+- [Assembly Language](/advanced/assembly)
+- [Diagnostics and Profiling](/advanced/diagnostics)

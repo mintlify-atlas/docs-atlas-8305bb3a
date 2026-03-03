@@ -1,0 +1,350 @@
+---
+title: fmt
+description: Formatted I/O with functions analogous to C's printf and scanf
+---
+
+Package fmt implements formatted I/O with functions analogous to C's printf and scanf. The format verbs are derived from C's but are simpler.
+
+## Overview
+
+The fmt package provides four families of printing functions organized by their output destination:
+
+- **Print, Println, Printf**: Write to `os.Stdout`
+- **Sprint, Sprintln, Sprintf**: Return a string
+- **Fprint, Fprintln, Fprintf**: Write to an `io.Writer`
+- **Append, Appendln, Appendf**: Append to a byte slice
+
+## Printing Functions
+
+### Standard Output
+
+<ParamField path="Print" type="func Print(a ...any) (n int, err error)">
+  Formats using default formats and writes to standard output. Spaces are added between operands when neither is a string.
+  
+  ```go
+  fmt.Print("Hello", "World")  // HelloWorld
+  fmt.Print("Count:", 42)      // Count: 42
+  ```
+</ParamField>
+
+<ParamField path="Println" type="func Println(a ...any) (n int, err error)">
+  Formats using default formats, adds spaces between operands, and appends a newline.
+  
+  ```go
+  fmt.Println("Hello", "World")  // Hello World\n
+  ```
+</ParamField>
+
+<ParamField path="Printf" type="func Printf(format string, a ...any) (n int, err error)">
+  Formats according to a format specifier and writes to standard output.
+  
+  ```go
+  name := "Alice"
+  age := 30
+  fmt.Printf("%s is %d years old\n", name, age)
+  // Output: Alice is 30 years old
+  ```
+</ParamField>
+
+### String Formatting
+
+<ParamField path="Sprint" type="func Sprint(a ...any) string">
+  Formats using default formats and returns the resulting string.
+  
+  ```go
+  s := fmt.Sprint("Value:", 42)
+  // s == "Value: 42"
+  ```
+</ParamField>
+
+<ParamField path="Sprintln" type="func Sprintln(a ...any) string">
+  Formats using default formats, adds spaces and newline, returns the string.
+  
+  ```go
+  s := fmt.Sprintln("Hello", "World")
+  // s == "Hello World\n"
+  ```
+</ParamField>
+
+<ParamField path="Sprintf" type="func Sprintf(format string, a ...any) string">
+  Formats according to a format specifier and returns the resulting string.
+  
+  ```go
+  s := fmt.Sprintf("Temperature: %.2f°C", 23.456)
+  // s == "Temperature: 23.46°C"
+  ```
+</ParamField>
+
+### Writing to io.Writer
+
+<ParamField path="Fprint" type="func Fprint(w io.Writer, a ...any) (n int, err error)">
+  Formats using default formats and writes to w.
+  
+  ```go
+  fmt.Fprint(os.Stderr, "Error: ", err)
+  ```
+</ParamField>
+
+<ParamField path="Fprintln" type="func Fprintln(w io.Writer, a ...any) (n int, err error)">
+  Formats using default formats and writes to w with newline.
+</ParamField>
+
+<ParamField path="Fprintf" type="func Fprintf(w io.Writer, format string, a ...any) (n int, err error)">
+  Formats according to format specifier and writes to w.
+  
+  ```go
+  fmt.Fprintf(w, "Status: %d\n", statusCode)
+  ```
+</ParamField>
+
+### Error Formatting
+
+<ParamField path="Errorf" type="func Errorf(format string, a ...any) error">
+  Formats according to format specifier and returns as an error value.
+  
+  ```go
+  err := fmt.Errorf("user %q (id %d) not found", name, id)
+  // Error wrapping with %w verb
+  err := fmt.Errorf("failed to open file: %w", originalErr)
+  ```
+</ParamField>
+
+## Format Verbs
+
+### General
+
+| Verb | Description |
+|------|-------------|
+| `%v` | Default format for the value |
+| `%+v` | When printing structs, adds field names |
+| `%#v` | Go-syntax representation of the value |
+| `%T` | Go-syntax representation of the type |
+| `%%` | Literal percent sign |
+
+### Boolean
+
+| Verb | Description |
+|------|-------------|
+| `%t` | The word true or false |
+
+### Integer
+
+| Verb | Description |
+|------|-------------|
+| `%b` | Base 2 (binary) |
+| `%c` | Character represented by Unicode code point |
+| `%d` | Base 10 (decimal) |
+| `%o` | Base 8 (octal) |
+| `%O` | Base 8 with 0o prefix |
+| `%q` | Single-quoted character literal |
+| `%x` | Base 16 (hexadecimal), lowercase |
+| `%X` | Base 16 (hexadecimal), uppercase |
+| `%U` | Unicode format: U+1234 |
+
+### Floating-Point
+
+| Verb | Description |
+|------|-------------|
+| `%e` | Scientific notation: -1.234456e+78 |
+| `%E` | Scientific notation: -1.234456E+78 |
+| `%f` | Decimal point, no exponent: 123.456 |
+| `%F` | Synonym for %f |
+| `%g` | %e for large exponents, %f otherwise |
+| `%G` | %E for large exponents, %F otherwise |
+
+### String and Bytes
+
+| Verb | Description |
+|------|-------------|
+| `%s` | String or slice |
+| `%q` | Double-quoted string with Go syntax |
+| `%x` | Base 16, lowercase, two chars per byte |
+| `%X` | Base 16, uppercase, two chars per byte |
+
+### Pointer
+
+| Verb | Description |
+|------|-------------|
+| `%p` | Base 16 notation with leading 0x |
+
+## Width and Precision
+
+```go
+// Width
+fmt.Printf("%5d\n", 42)      // "   42" (width 5)
+fmt.Printf("%-5d\n", 42)     // "42   " (left-justified)
+
+// Precision for floats
+fmt.Printf("%.2f\n", 3.14159) // "3.14"
+fmt.Printf("%6.2f\n", 3.14)  // "  3.14" (width 6, precision 2)
+
+// Dynamic width and precision
+fmt.Printf("%*.*f\n", 6, 2, 3.14159) // "  3.14"
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `+` | Always print sign for numbers |
+| `-` | Left-justify (pad on right) |
+| `#` | Alternate format (0x for hex, etc.) |
+| ` ` | Space for elided sign |
+| `0` | Pad with zeros instead of spaces |
+
+```go
+fmt.Printf("%+d\n", 42)     // "+42"
+fmt.Printf("%#x\n", 255)    // "0xff"
+fmt.Printf("%05d\n", 42)    // "00042"
+```
+
+## Scanning Functions
+
+<ParamField path="Scan" type="func Scan(a ...any) (n int, err error)">
+  Scans text read from standard input, storing successive space-separated values into arguments.
+  
+  ```go
+  var name string
+  var age int
+  fmt.Scan(&name, &age)
+  ```
+</ParamField>
+
+<ParamField path="Scanf" type="func Scanf(format string, a ...any) (n int, err error)">
+  Scans text from standard input according to a format string.
+  
+  ```go
+  var name string
+  var age int
+  fmt.Scanf("%s is %d years old", &name, &age)
+  ```
+</ParamField>
+
+<ParamField path="Sscanf" type="func Sscanf(str string, format string, a ...any) (n int, err error)">
+  Scans formatted text from a string.
+  
+  ```go
+  var name string
+  var age int
+  n, err := fmt.Sscanf("Kim is 22 years old", "%s is %d years old", &name, &age)
+  // name == "Kim", age == 22, n == 2
+  ```
+</ParamField>
+
+## Interfaces
+
+<ParamField path="Stringer" type="interface">
+  Implemented by any value with a String method that defines the native format.
+  
+  ```go
+  type Stringer interface {
+      String() string
+  }
+  ```
+  
+  Custom types implementing Stringer:
+  ```go
+  type Person struct {
+      Name string
+      Age  int
+  }
+  
+  func (p Person) String() string {
+      return fmt.Sprintf("%s (%d years)", p.Name, p.Age)
+  }
+  
+  p := Person{"Alice", 30}
+  fmt.Println(p)  // Alice (30 years)
+  ```
+</ParamField>
+
+<ParamField path="Formatter" type="interface">
+  Implemented by values with a Format method for custom formatting.
+  
+  ```go
+  type Formatter interface {
+      Format(f State, verb rune)
+  }
+  ```
+</ParamField>
+
+## Examples
+
+### Basic Formatting
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+    name := "Alice"
+    age := 30
+    height := 1.68
+    
+    // Various format verbs
+    fmt.Printf("Name: %s\n", name)
+    fmt.Printf("Age: %d\n", age)
+    fmt.Printf("Height: %.2f m\n", height)
+    fmt.Printf("Detailed: %+v\n", struct{Name string; Age int}{name, age})
+}
+```
+
+### String Building
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+    // Build strings without printing
+    message := fmt.Sprintf("User %s (ID: %d) logged in", "alice", 42)
+    
+    // Multiple values
+    status := fmt.Sprint("Status:", "OK", "Code:", 200)
+    
+    fmt.Println(message)
+    fmt.Println(status)
+}
+```
+
+### Error Messages
+
+```go
+package main
+
+import (
+    "fmt"
+    "os"
+)
+
+func openFile(filename string) error {
+    f, err := os.Open(filename)
+    if err != nil {
+        return fmt.Errorf("failed to open %s: %w", filename, err)
+    }
+    defer f.Close()
+    return nil
+}
+```
+
+### Custom Stringer
+
+```go
+package main
+
+import "fmt"
+
+type Temperature float64
+
+func (t Temperature) String() string {
+    return fmt.Sprintf("%.1f°C", float64(t))
+}
+
+func main() {
+    temp := Temperature(23.456)
+    fmt.Println(temp)  // 23.5°C
+    fmt.Printf("Current temperature: %v\n", temp)
+}
+```

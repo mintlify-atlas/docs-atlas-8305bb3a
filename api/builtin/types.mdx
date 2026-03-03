@@ -1,0 +1,485 @@
+---
+title: 'Built-in Types'
+description: 'Complete reference for Go built-in types including numeric types, strings, booleans, and special types'
+keywords: ['builtin', 'types', 'int', 'string', 'bool', 'float', 'complex', 'byte', 'rune', 'any', 'comparable', 'error']
+---
+
+Go's built-in types are predeclared and available in all packages without import. These types form the foundation of Go's type system.
+
+## Boolean Type
+
+### bool
+
+The set of boolean values.
+
+<ResponseField name="bool" type="bool" required>
+  Boolean type with two possible values: `true` and `false`.
+</ResponseField>
+
+```go
+var isValid bool = true
+var isComplete bool = false
+
+// Used in conditions
+if isValid {
+    fmt.Println("Valid")
+}
+
+// Result of comparisons
+isEqual := (5 == 5)  // true
+isGreater := (3 > 5) // false
+```
+
+## Numeric Types
+
+### Integer Types
+
+Go provides signed and unsigned integer types in various sizes.
+
+<Tabs>
+  <Tab title="Signed integers">
+
+<ResponseField name="int8" type="int8">
+  Signed 8-bit integer.
+  
+  **Range**: -128 to 127
+</ResponseField>
+
+<ResponseField name="int16" type="int16">
+  Signed 16-bit integer.
+  
+  **Range**: -32,768 to 32,767
+</ResponseField>
+
+<ResponseField name="int32" type="int32">
+  Signed 32-bit integer.
+  
+  **Range**: -2,147,483,648 to 2,147,483,647
+</ResponseField>
+
+<ResponseField name="int64" type="int64">
+  Signed 64-bit integer.
+  
+  **Range**: -9,223,372,036,854,775,808 to 9,223,372,036,854,775,807
+</ResponseField>
+
+<ResponseField name="int" type="int">
+  Platform-dependent signed integer type, at least 32 bits.
+  
+  **Size**: 32 bits on 32-bit systems, 64 bits on 64-bit systems
+</ResponseField>
+
+```go
+var a int8 = 127
+var b int16 = 32767
+var c int32 = 2147483647
+var d int64 = 9223372036854775807
+var e int = 42 // Most commonly used
+```
+
+  </Tab>
+  <Tab title="Unsigned integers">
+
+<ResponseField name="uint8" type="uint8">
+  Unsigned 8-bit integer.
+  
+  **Range**: 0 to 255
+</ResponseField>
+
+<ResponseField name="uint16" type="uint16">
+  Unsigned 16-bit integer.
+  
+  **Range**: 0 to 65,535
+</ResponseField>
+
+<ResponseField name="uint32" type="uint32">
+  Unsigned 32-bit integer.
+  
+  **Range**: 0 to 4,294,967,295
+</ResponseField>
+
+<ResponseField name="uint64" type="uint64">
+  Unsigned 64-bit integer.
+  
+  **Range**: 0 to 18,446,744,073,709,551,615
+</ResponseField>
+
+<ResponseField name="uint" type="uint">
+  Platform-dependent unsigned integer type, at least 32 bits.
+  
+  **Size**: 32 bits on 32-bit systems, 64 bits on 64-bit systems
+</ResponseField>
+
+<ResponseField name="uintptr" type="uintptr">
+  Unsigned integer large enough to hold any pointer's bit pattern.
+  
+  Used for low-level programming and unsafe operations.
+</ResponseField>
+
+```go
+var a uint8 = 255
+var b uint16 = 65535
+var c uint32 = 4294967295
+var d uint64 = 18446744073709551615
+var e uint = 42
+
+// uintptr for pointer arithmetic
+var ptr uintptr = uintptr(unsafe.Pointer(&e))
+```
+
+  </Tab>
+</Tabs>
+
+<Note>
+  `int` and `uint` are distinct types from their sized variants (e.g., `int` is not an alias for `int32` or `int64`).
+</Note>
+
+### Floating-Point Types
+
+<ResponseField name="float32" type="float32">
+  IEEE 754 32-bit floating-point number.
+  
+  **Precision**: ~6-7 decimal digits
+</ResponseField>
+
+<ResponseField name="float64" type="float64">
+  IEEE 754 64-bit floating-point number.
+  
+  **Precision**: ~15-16 decimal digits
+</ResponseField>
+
+```go
+var f32 float32 = 3.14159265
+var f64 float64 = 3.141592653589793
+
+// Scientific notation
+var big = 1.23e9    // 1.23 × 10^9
+var small = 1.23e-9 // 1.23 × 10^-9
+
+// Special values
+var inf = math.Inf(1)  // Positive infinity
+var nan = math.NaN()   // Not a number
+```
+
+<Tip>
+  Use `float64` by default unless you have a specific reason to use `float32`. Most math operations return `float64`.
+</Tip>
+
+### Complex Types
+
+<ResponseField name="complex64" type="complex64">
+  Complex number with float32 real and imaginary parts.
+</ResponseField>
+
+<ResponseField name="complex128" type="complex128">
+  Complex number with float64 real and imaginary parts.
+</ResponseField>
+
+```go
+var c64 complex64 = 3 + 4i
+var c128 complex128 = complex(3.0, 4.0)
+
+// Operations
+sum := c128 + (1 + 2i)
+product := c128 * (2 + 0i)
+
+// Extract parts
+realPart := real(c128)  // 3.0
+imagPart := imag(c128)  // 4.0
+```
+
+## String Type
+
+### string
+
+Immutable sequence of bytes, conventionally UTF-8 encoded text.
+
+<ResponseField name="string" type="string" required>
+  Sequence of 8-bit bytes. May be empty but never nil. Values are immutable.
+</ResponseField>
+
+```go
+var s string = "Hello, 世界"
+
+// Length in bytes (not characters)
+len(s) // 13 ("Hello, " is 7 bytes, "世界" is 6 bytes)
+
+// Indexing returns bytes
+firstByte := s[0] // 'H' (byte)
+
+// Concatenation
+greeting := "Hello" + " " + "World"
+
+// Substring
+sub := s[0:5] // "Hello"
+
+// Raw string literals
+path := `C:\Users\Name\file.txt` // No escape sequences
+
+// Multi-line strings
+multi := `Line 1
+Line 2
+Line 3`
+```
+
+<Warning>
+  Indexing a string returns bytes, not characters. Use `range` or the `unicode/utf8` package for proper Unicode handling.
+</Warning>
+
+<CodeGroup>
+
+```go Iterating bytes
+s := "Hello"
+for i := 0; i < len(s); i++ {
+    fmt.Printf("%c ", s[i]) // H e l l o
+}
+```
+
+```go Iterating runes
+s := "Hello, 世界"
+for i, r := range s {
+    fmt.Printf("%d: %c\n", i, r)
+}
+// 0: H
+// 1: e
+// 2: l
+// 3: l
+// 4: o
+// 5: ,
+// 6:  
+// 7: 世
+// 10: 界
+```
+
+</CodeGroup>
+
+## Type Aliases
+
+### byte
+
+Alias for `uint8`. Used to distinguish byte values from 8-bit integers.
+
+<ResponseField name="byte" type="uint8" required>
+  Equivalent to `uint8` in all ways. Used by convention for raw binary data.
+</ResponseField>
+
+```go
+var b byte = 255
+var bytes []byte = []byte("Hello")
+
+// Reading files returns []byte
+data, err := os.ReadFile("file.txt")
+
+// Convert between string and []byte
+s := string(bytes)     // []byte to string
+bytes = []byte(s)      // string to []byte
+```
+
+### rune
+
+Alias for `int32`. Used to distinguish character values from integers.
+
+<ResponseField name="rune" type="int32" required>
+  Equivalent to `int32` in all ways. Represents a Unicode code point.
+</ResponseField>
+
+```go
+var r rune = '世' // Single quotes for rune literals
+var r2 rune = 0x4E16 // Unicode code point
+
+// Convert string to runes
+s := "Hello, 世界"
+runes := []rune(s)
+fmt.Println(len(runes)) // 9 (character count)
+
+// Character literals
+var newline rune = '\n'
+var tab rune = '\t'
+var unicode rune = '\u4E16' // Unicode escape
+```
+
+<Note>
+  Use `rune` when working with Unicode characters. Use `byte` when working with binary data or ASCII.
+</Note>
+
+### any
+
+Alias for `interface{}`. Represents any type.
+
+<ResponseField name="any" type="interface{}" required>
+  Equivalent to `interface{}` in all ways. Can hold values of any type.
+</ResponseField>
+
+```go
+var a any = 42
+var b any = "hello"
+var c any = []int{1, 2, 3}
+
+// Type assertion
+if str, ok := a.(string); ok {
+    fmt.Println("String:", str)
+}
+
+// Type switch
+switch v := a.(type) {
+case int:
+    fmt.Println("Integer:", v)
+case string:
+    fmt.Println("String:", v)
+default:
+    fmt.Println("Unknown type")
+}
+```
+
+## Special Types
+
+### comparable
+
+Interface implemented by all comparable types.
+
+<ResponseField name="comparable" type="interface{ comparable }" required>
+  Constraint for types that support `==` and `!=` operators.
+  
+  Can only be used as a type parameter constraint, not as a variable type.
+</ResponseField>
+
+```go
+// Valid: type parameter constraint
+func Equal[T comparable](a, b T) bool {
+    return a == b
+}
+
+fmt.Println(Equal(5, 5))           // true
+fmt.Println(Equal("a", "b"))       // false
+fmt.Println(Equal(3.14, 3.14))     // true
+
+// Invalid: cannot use as variable type
+// var x comparable = 42 // Compile error
+```
+
+<Info>
+  Comparable types include booleans, numbers, strings, pointers, channels, arrays of comparable types, and structs whose fields are all comparable.
+</Info>
+
+### error
+
+Conventional interface for representing errors.
+
+<ResponseField name="error" type="interface" required>
+  Interface with a single `Error() string` method.
+  
+  The nil value represents no error.
+</ResponseField>
+
+```go
+type error interface {
+    Error() string
+}
+```
+
+<CodeGroup>
+
+```go Creating errors
+import "errors"
+
+err := errors.New("something went wrong")
+err := fmt.Errorf("failed to process %s", filename)
+```
+
+```go Handling errors
+f, err := os.Open("file.txt")
+if err != nil {
+    log.Fatal(err)
+}
+defer f.Close()
+
+// Use the file
+```
+
+```go Custom errors
+type ValidationError struct {
+    Field string
+    Value any
+}
+
+func (e *ValidationError) Error() string {
+    return fmt.Sprintf("invalid %s: %v", e.Field, e.Value)
+}
+
+func validate(age int) error {
+    if age < 0 {
+        return &ValidationError{Field: "age", Value: age}
+    }
+    return nil
+}
+```
+
+</CodeGroup>
+
+<Tip>
+  Always check error values. The Go convention is to return errors as the last return value and check them immediately.
+</Tip>
+
+## Documentation Types
+
+These types appear in the builtin package for documentation purposes only.
+
+<AccordionGroup>
+  <Accordion title="Type" icon="info-circle">
+    Stand-in for any Go type in function signatures. Represents the same type within a function invocation.
+    
+    Not a real type; used only in documentation.
+  </Accordion>
+  
+  <Accordion title="Type1" icon="info-circle">
+    Stand-in for a second distinct Go type in function signatures.
+    
+    Not a real type; used only in documentation.
+  </Accordion>
+  
+  <Accordion title="TypeOrExpr" icon="info-circle">
+    Stand-in for either a Go type or an expression in function signatures.
+    
+    Not a real type; used only in documentation.
+  </Accordion>
+  
+  <Accordion title="IntegerType" icon="info-circle">
+    Stand-in for any integer type: int, uint, int8, int16, int32, int64, uint8, uint16, uint32, uint64, uintptr.
+    
+    Not a real type; used only in documentation.
+  </Accordion>
+  
+  <Accordion title="FloatType" icon="info-circle">
+    Stand-in for either float32 or float64.
+    
+    Not a real type; used only in documentation.
+  </Accordion>
+  
+  <Accordion title="ComplexType" icon="info-circle">
+    Stand-in for either complex64 or complex128.
+    
+    Not a real type; used only in documentation.
+  </Accordion>
+</AccordionGroup>
+
+## Type Conversion
+
+```go
+// Numeric conversions
+var i int = 42
+var f float64 = float64(i)
+var u uint = uint(i)
+
+// String conversions
+var s string = string([]byte{'h', 'e', 'l', 'l', 'o'})
+var b []byte = []byte("hello")
+var r []rune = []rune("hello")
+
+// Rune to string
+var ch rune = '世'
+var str string = string(ch)
+```
+
+<Warning>
+  Converting between numeric types may change the value. Converting a larger type to a smaller type may truncate or overflow.
+</Warning>

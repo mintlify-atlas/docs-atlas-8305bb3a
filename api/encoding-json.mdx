@@ -1,0 +1,366 @@
+---
+title: encoding/json
+description: API reference for the encoding/json package - JSON encoding and decoding
+---
+
+# encoding/json
+
+Package json implements encoding and decoding of JSON as defined in RFC 7159. The mapping between JSON and Go values is described in the documentation for the Marshal and Unmarshal functions.
+
+## Overview
+
+The json package provides two main approaches for working with JSON data:
+
+1. **Marshal/Unmarshal functions** - For converting between Go values and JSON byte slices
+2. **Encoder/Decoder types** - For streaming JSON data to/from io.Reader and io.Writer
+
+## Functions
+
+### Marshal
+
+```go
+func Marshal(v any) ([]byte, error)
+```
+
+Marshal returns the JSON encoding of v.
+
+<ParamField path="v" type="any" required>
+  The Go value to encode as JSON. Can be any type except channels, complex numbers, and functions.
+</ParamField>
+
+<ResponseField name="[]byte" type="[]byte">
+  The JSON encoding of the value
+</ResponseField>
+
+<ResponseField name="error" type="error">
+  An error if the value cannot be marshaled. Returns UnsupportedTypeError for unsupported types like channels, complex numbers, and functions. Returns UnsupportedValueError for NaN or +/-Inf float values.
+</ResponseField>
+
+**Example:**
+
+```go
+type ColorGroup struct {
+    ID     int
+    Name   string
+    Colors []string
+}
+
+group := ColorGroup{
+    ID:     1,
+    Name:   "Reds",
+    Colors: []string{"Crimson", "Red", "Ruby", "Maroon"},
+}
+
+b, err := json.Marshal(group)
+if err != nil {
+    fmt.Println("error:", err)
+}
+fmt.Println(string(b))
+// Output: {"ID":1,"Name":"Reds","Colors":["Crimson","Red","Ruby","Maroon"]}
+```
+
+### Unmarshal
+
+```go
+func Unmarshal(data []byte, v any) error
+```
+
+Unmarshal parses the JSON-encoded data and stores the result in the value pointed to by v. If v is nil or not a pointer, Unmarshal returns an InvalidUnmarshalError.
+
+<ParamField path="data" type="[]byte" required>
+  The JSON-encoded data to parse
+</ParamField>
+
+<ParamField path="v" type="any" required>
+  A pointer to the destination value where the decoded data will be stored
+</ParamField>
+
+<ResponseField name="error" type="error">
+  Returns InvalidUnmarshalError if v is nil or not a pointer. Returns SyntaxError if the data contains invalid JSON. Returns UnmarshalTypeError if a JSON value is not appropriate for the target type.
+</ResponseField>
+
+**Example:**
+
+```go
+var jsonBlob = []byte(`[
+    {"Name": "Platypus", "Order": "Monotremata"},
+    {"Name": "Quoll",    "Order": "Dasyuromorphia"}
+]`)
+
+type Animal struct {
+    Name  string
+    Order string
+}
+
+var animals []Animal
+err := json.Unmarshal(jsonBlob, &animals)
+if err != nil {
+    fmt.Println("error:", err)
+}
+fmt.Printf("%+v", animals)
+// Output: [{Name:Platypus Order:Monotremata} {Name:Quoll Order:Dasyuromorphia}]
+```
+
+### MarshalIndent
+
+```go
+func MarshalIndent(v any, prefix, indent string) ([]byte, error)
+```
+
+MarshalIndent is like Marshal but applies indentation to format the output. Each JSON element begins on a new indented line starting with prefix followed by one or more copies of indent according to the indentation nesting.
+
+<ParamField path="v" type="any" required>
+  The Go value to encode as JSON
+</ParamField>
+
+<ParamField path="prefix" type="string" required>
+  String to prefix each line with
+</ParamField>
+
+<ParamField path="indent" type="string" required>
+  String to use for each level of indentation
+</ParamField>
+
+## Types
+
+### Encoder
+
+```go
+type Encoder struct {
+    // contains filtered or unexported fields
+}
+```
+
+An Encoder writes JSON values to an output stream.
+
+#### NewEncoder
+
+```go
+func NewEncoder(w io.Writer) *Encoder
+```
+
+NewEncoder returns a new encoder that writes to w.
+
+<ParamField path="w" type="io.Writer" required>
+  The writer to encode JSON to
+</ParamField>
+
+<ResponseField name="*Encoder" type="*Encoder">
+  A new Encoder instance
+</ResponseField>
+
+#### Methods
+
+**Encode**
+
+```go
+func (enc *Encoder) Encode(v any) error
+```
+
+Encode writes the JSON encoding of v to the stream.
+
+<ParamField path="v" type="any" required>
+  The value to encode
+</ParamField>
+
+**SetEscapeHTML**
+
+```go
+func (enc *Encoder) SetEscapeHTML(on bool)
+```
+
+SetEscapeHTML specifies whether problematic HTML characters should be escaped inside JSON quoted strings. The default behavior is to escape ampersand, less than, and greater than to their Unicode equivalents to avoid certain safety problems that can arise when embedding JSON in HTML.
+
+**SetIndent**
+
+```go
+func (enc *Encoder) SetIndent(prefix, indent string)
+```
+
+SetIndent instructs the encoder to format each encoded value with indentation.
+
+### Decoder
+
+```go
+type Decoder struct {
+    // contains filtered or unexported fields
+}
+```
+
+A Decoder reads and decodes JSON values from an input stream.
+
+#### NewDecoder
+
+```go
+func NewDecoder(r io.Reader) *Decoder
+```
+
+NewDecoder returns a new decoder that reads from r. The decoder introduces its own buffering and may read data from r beyond the JSON values requested.
+
+<ParamField path="r" type="io.Reader" required>
+  The reader to decode JSON from
+</ParamField>
+
+<ResponseField name="*Decoder" type="*Decoder">
+  A new Decoder instance
+</ResponseField>
+
+**Example:**
+
+```go
+const jsonStream = `
+    {"Name": "Ed", "Text": "Knock knock."}
+    {"Name": "Sam", "Text": "Who's there?"}
+    {"Name": "Ed", "Text": "Go fmt."}
+`
+
+type Message struct {
+    Name, Text string
+}
+
+dec := json.NewDecoder(strings.NewReader(jsonStream))
+for {
+    var m Message
+    if err := dec.Decode(&m); err == io.EOF {
+        break
+    } else if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Printf("%s: %s\n", m.Name, m.Text)
+}
+```
+
+#### Methods
+
+**Decode**
+
+```go
+func (dec *Decoder) Decode(v any) error
+```
+
+Decode reads the next JSON-encoded value from its input and stores it in the value pointed to by v.
+
+<ParamField path="v" type="any" required>
+  A pointer to the destination value
+</ParamField>
+
+**UseNumber**
+
+```go
+func (dec *Decoder) UseNumber()
+```
+
+UseNumber causes the Decoder to unmarshal a number into an interface value as a Number instead of as a float64.
+
+**DisallowUnknownFields**
+
+```go
+func (dec *Decoder) DisallowUnknownFields()
+```
+
+DisallowUnknownFields causes the Decoder to return an error when the destination is a struct and the input contains object keys which do not match any non-ignored, exported fields in the destination.
+
+**Buffered**
+
+```go
+func (dec *Decoder) Buffered() io.Reader
+```
+
+Buffered returns a reader of the data remaining in the Decoder's buffer.
+
+### Number
+
+```go
+type Number string
+```
+
+A Number represents a JSON number literal.
+
+**Methods:**
+
+```go
+func (n Number) String() string
+func (n Number) Float64() (float64, error)
+func (n Number) Int64() (int64, error)
+```
+
+## Interfaces
+
+### Marshaler
+
+```go
+type Marshaler interface {
+    MarshalJSON() ([]byte, error)
+}
+```
+
+Marshaler is the interface implemented by types that can marshal themselves into valid JSON.
+
+### Unmarshaler
+
+```go
+type Unmarshaler interface {
+    UnmarshalJSON([]byte) error
+}
+```
+
+Unmarshaler is the interface implemented by types that can unmarshal a JSON description of themselves.
+
+## Struct Tags
+
+The encoding of each struct field can be customized by the format string stored under the "json" key in the struct field's tag:
+
+```go
+// Field appears in JSON as key "myName"
+Field int `json:"myName"`
+
+// Field is omitted if empty
+Field int `json:"myName,omitempty"`
+
+// Field is omitted if zero value
+Field int `json:"myName,omitzero"`
+
+// Field is ignored
+Field int `json:"-"`
+
+// Field appears as key "-"
+Field int `json:"-,"`
+
+// Encode as string
+Int64String int64 `json:",string"`
+```
+
+## Error Types
+
+### SyntaxError
+
+```go
+type SyntaxError struct {
+    Offset int64 // byte offset where the error occurred
+    // contains filtered or unexported fields
+}
+```
+
+A SyntaxError represents a syntax error in the JSON input.
+
+### UnmarshalTypeError
+
+```go
+type UnmarshalTypeError struct {
+    Value  string       // description of JSON value
+    Type   reflect.Type // type of Go value it could not be assigned to
+    Offset int64        // error occurred after reading Offset bytes
+    Struct string       // name of the struct type containing the field
+    Field  string       // full path from root node to the field
+}
+```
+
+### InvalidUnmarshalError
+
+```go
+type InvalidUnmarshalError struct {
+    Type reflect.Type
+}
+```
+
+An InvalidUnmarshalError describes an invalid argument passed to Unmarshal (the argument must be a non-nil pointer).

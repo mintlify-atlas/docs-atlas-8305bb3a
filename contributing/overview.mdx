@@ -1,0 +1,92 @@
+---
+title: Contributing to Go
+description: Learn how to contribute to the Go programming language project
+---
+
+Go is an open source project maintained by hundreds of contributors. We appreciate your help and welcome contributions from the community.
+
+## Before Filing an Issue
+
+If you are unsure whether you have found a bug, please consider asking in the [golang-nuts mailing list](https://groups.google.com/forum/#!forum/golang-nuts) or [other forums](https://golang.org/help/) first. 
+
+If the behavior you are seeing is confirmed as a bug or issue, it can easily be re-raised in the issue tracker.
+
+## Filing Issues
+
+<Warning>
+Sensitive security-related issues should be reported to [security@golang.org](mailto:security@golang.org). See the [security policy](/contributing/security) for details.
+</Warning>
+
+### Using go bug
+
+The recommended way to file an issue is by running:
+
+```bash
+go bug
+```
+
+This command automatically collects relevant system information and opens your default editor to compose the issue.
+
+### Manual Issue Reporting
+
+When filing an issue manually, make sure to answer these five questions:
+
+<Steps>
+  <Step title="Go Version">
+    What version of Go are you using?
+    
+    ```bash
+    go version
+    ```
+  </Step>
+  
+  <Step title="System Information">
+    What operating system and processor architecture are you using?
+  </Step>
+  
+  <Step title="Steps to Reproduce">
+    What did you do?
+  </Step>
+  
+  <Step title="Expected Behavior">
+    What did you expect to see?
+  </Step>
+  
+  <Step title="Actual Behavior">
+    What did you see instead?
+  </Step>
+</Steps>
+
+## Change Proposals
+
+For proposing changes to the Go language, standard library, or tools, see [Proposing Changes To Go](https://go.dev/s/proposal-process).
+
+## Contributing Code
+
+Before sending patches, please read the complete [Contribution Guidelines](https://golang.org/doc/contribute.html).
+
+<Steps>
+  <Step title="Read the Guidelines">
+    Review the official [Contribution Guidelines](https://golang.org/doc/contribute.html) to understand the process.
+  </Step>
+  
+  <Step title="Sign the CLA">
+    You may need to sign the Contributor License Agreement (CLA) before your contribution can be accepted.
+  </Step>
+  
+  <Step title="Follow Code Review Process">
+    All code changes go through the [code review process](/contributing/code-review).
+  </Step>
+</Steps>
+
+## License
+
+Unless otherwise noted, the Go source files are distributed under the BSD-style license found in the LICENSE file.
+
+## Getting Help
+
+If you need help with contributing:
+
+- Join the [golang-nuts mailing list](https://groups.google.com/forum/#!forum/golang-nuts)
+- Visit the [Go community forums](https://golang.org/help/)
+- Read the [contribution documentation](https://golang.org/doc/contribute.html)

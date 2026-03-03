@@ -1,0 +1,138 @@
+---
+title: Security Policy
+description: Learn about Go's security policy and how to report vulnerabilities
+---
+
+The Go team takes security seriously and has established processes for handling security vulnerabilities.
+
+## Supported Versions
+
+The Go team maintains and provides security updates for the **past two Go releases**.
+
+<Info>
+For example, when Go 1.18.x is the latest stable release, both Go 1.17.x and Go 1.18.x receive security updates.
+</Info>
+
+### Release Cycle
+
+Go follows a predictable release cycle:
+
+- **Major releases**: Approximately every 6 months
+- **Minor releases**: As needed for bug fixes and security patches
+- **Security updates**: Provided for the two most recent major releases
+
+For detailed information, see the [Go Release Cycle](https://go.dev/wiki/Go-Release-Cycle) and the [Release Maintenance](https://go.dev/wiki/Go-Release-Cycle#release-maintenance) documentation.
+
+## Reporting a Vulnerability
+
+<Warning>
+If you discover a security vulnerability in Go, please report it responsibly. **Do not** file a public issue.
+</Warning>
+
+### How to Report
+
+<Steps>
+  <Step title="Review the Policy">
+    Read the complete security policy at [go.dev/security/policy](https://go.dev/security/policy).
+  </Step>
+  
+  <Step title="Email the Security Team">
+    Send a detailed report to [security@golang.org](mailto:security@golang.org).
+    
+    Include:
+    - Description of the vulnerability
+    - Steps to reproduce
+    - Potential impact
+    - Any suggested fixes (optional)
+  </Step>
+  
+  <Step title="Wait for Response">
+    The security team will acknowledge your report and work with you on addressing the issue.
+  </Step>
+  
+  <Step title="Coordinated Disclosure">
+    The team will coordinate with you on timing for public disclosure after a fix is available.
+  </Step>
+</Steps>
+
+### What to Include in Your Report
+
+A good security report should include:
+
+```markdown
+**Summary**: Brief description of the vulnerability
+
+**Go Version**: Output of `go version`
+
+**Operating System**: OS and architecture affected
+
+**Description**: Detailed explanation of the vulnerability
+
+**Steps to Reproduce**:
+1. Step one
+2. Step two
+3. Step three
+
+**Impact**: What an attacker could accomplish
+
+**Mitigation**: Suggested fix or workaround (if known)
+```
+
+## Security Best Practices
+
+While using Go:
+
+<CardGroup cols={2}>
+  <Card title="Keep Go Updated" icon="arrow-up">
+    Regularly update to the latest patch release of your Go version
+  </Card>
+  
+  <Card title="Monitor Announcements" icon="bell">
+    Subscribe to the [golang-announce mailing list](https://groups.google.com/g/golang-announce) for security updates
+  </Card>
+  
+  <Card title="Review Dependencies" icon="boxes-stacked">
+    Keep your dependencies updated and check for known vulnerabilities
+  </Card>
+  
+  <Card title="Use go.sum" icon="shield-check">
+    Commit your go.sum file to ensure reproducible builds
+  </Card>
+</CardGroup>
+
+## Vulnerability Scanning
+
+Go provides tools to help identify known vulnerabilities:
+
+```bash
+# Install govulncheck
+go install golang.org/x/vuln/cmd/govulncheck@latest
+
+# Scan your project
+govulncheck ./...
+```
+
+## Security Updates
+
+When security issues are fixed:
+
+1. **Announcement**: Posted to [golang-announce](https://groups.google.com/g/golang-announce)
+2. **CVE Assignment**: Critical issues receive CVE identifiers
+3. **Patch Release**: Fixed in new patch releases for supported versions
+4. **Documentation**: Security advisories published on [go.dev](https://go.dev)
+
+## Response Timeline
+
+The Go security team aims to:
+
+- **Acknowledge** reports within 48 hours
+- **Provide initial assessment** within 7 days
+- **Develop and test fixes** as quickly as possible
+- **Coordinate disclosure** with the reporter
+
+## Additional Resources
+
+- [Official Security Policy](https://go.dev/security/policy)
+- [Go Security Database](https://vuln.go.dev)
+- [golang-announce Mailing List](https://groups.google.com/g/golang-announce)
+- [Contributing Guidelines](/contributing/overview)

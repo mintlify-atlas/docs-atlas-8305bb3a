@@ -1,0 +1,373 @@
+---
+title: "crypto/tls"
+description: "TLS 1.2 and TLS 1.3 implementation"
+icon: "shield-halved"
+---
+
+The crypto/tls package partially implements TLS 1.2 (RFC 5246) and TLS 1.3 (RFC 8446) for secure network communications.
+
+## Overview
+
+The package provides:
+- TLS client and server connections
+- Certificate management
+- Secure listeners
+- Session resumption
+- ALPN and SNI support
+- FIPS 140-3 mode compliance
+
+<Warning>
+**FIPS 140-3 Mode**: When the program is in FIPS 140-3 mode, this package only uses SP 800-140C and SP 800-140D approved protocol versions, cipher suites, and algorithms. Others are silently ignored or rejected.
+</Warning>
+
+## Protocol Versions
+
+```go
+const (
+    VersionTLS10 = 0x0301
+    VersionTLS11 = 0x0302
+    VersionTLS12 = 0x0303
+    VersionTLS13 = 0x0304
+)
+```
+
+### VersionName()
+
+Returns the name for a TLS version number.
+
+```go
+func VersionName(version uint16) string
+```
+
+**Example:**
+```go
+name := tls.VersionName(tls.VersionTLS13) // "TLS 1.3"
+```
+
+## Client Connections
+
+### Dial()
+
+Connects to a network address and initiates a TLS handshake.
+
+```go
+func Dial(network, addr string, config *Config) (*Conn, error)
+```
+
+**Example:**
+```go
+import "crypto/tls"
+
+config := &tls.Config{
+    ServerName: "example.com",
+}
+
+conn, err := tls.Dial("tcp", "example.com:443", config)
+if err != nil {
+    log.Fatal(err)
+}
+defer conn.Close()
+
+// Use conn for secure communication
+conn.Write([]byte("GET / HTTP/1.0\r\n\r\n"))
+```
+
+### DialWithDialer()
+
+Connects using a custom dialer with timeout support.
+
+```go
+func DialWithDialer(dialer *net.Dialer, network, addr string, config *Config) (*Conn, error)
+```
+
+**Example:**
+```go
+import (
+    "crypto/tls"
+    "net"
+    "time"
+)
+
+dialer := &net.Dialer{
+    Timeout: 10 * time.Second,
+}
+
+conn, err := tls.DialWithDialer(dialer, "tcp", "example.com:443", nil)
+```
+
+### Dialer Type
+
+Provides context-aware dialing with configuration.
+
+```go
+type Dialer struct {
+    NetDialer *net.Dialer
+    Config    *Config
+}
+```
+
+**Example with Context:**
+```go
+import (
+    "context"
+    "crypto/tls"
+    "time"
+)
+
+ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+defer cancel()
+
+dialer := &tls.Dialer{
+    Config: &tls.Config{
+        MinVersion: tls.VersionTLS12,
+    },
+}
+
+conn, err := dialer.DialContext(ctx, "tcp", "example.com:443")
+```
+
+### Client()
+
+Returns a new TLS client side connection using an existing connection.
+
+```go
+func Client(conn net.Conn, config *Config) *Conn
+```
+
+<Warning>
+The config cannot be nil. You must set either `ServerName` or `InsecureSkipVerify` in the config.
+</Warning>
+
+## Server Connections
+
+### Listen()
+
+Creates a TLS listener accepting connections on a network address.
+
+```go
+func Listen(network, laddr string, config *Config) (net.Listener, error)
+```
+
+**Example:**
+```go
+import (
+    "crypto/tls"
+    "log"
+)
+
+cert, err := tls.LoadX509KeyPair("server.crt", "server.key")
+if err != nil {
+    log.Fatal(err)
+}
+
+config := &tls.Config{
+    Certificates: []tls.Certificate{cert},
+}
+
+listener, err := tls.Listen("tcp", ":443", config)
+if err != nil {
+    log.Fatal(err)
+}
+defer listener.Close()
+
+for {
+    conn, err := listener.Accept()
+    if err != nil {
+        log.Println(err)
+        continue
+    }
+    go handleConnection(conn)
+}
+```
+
+### NewListener()
+
+Wraps an existing listener to accept TLS connections.
+
+```go
+func NewListener(inner net.Listener, config *Config) net.Listener
+```
+
+### Server()
+
+Returns a new TLS server side connection using an existing connection.
+
+```go
+func Server(conn net.Conn, config *Config) *Conn
+```
+
+<Warning>
+The configuration must be non-nil and include at least one certificate or set `GetCertificate`.
+</Warning>
+
+## Certificate Management
+
+### LoadX509KeyPair()
+
+Reads and parses a public/private key pair from files.
+
+```go
+func LoadX509KeyPair(certFile, keyFile string) (Certificate, error)
+```
+
+**Example:**
+```go
+cert, err := tls.LoadX509KeyPair("server.crt", "server.key")
+if err != nil {
+    log.Fatal(err)
+}
+
+config := &tls.Config{
+    Certificates: []tls.Certificate{cert},
+}
+```
+
+### X509KeyPair()
+
+Parses a public/private key pair from PEM encoded data.
+
+```go
+func X509KeyPair(certPEMBlock, keyPEMBlock []byte) (Certificate, error)
+```
+
+**Example:**
+```go
+import "os"
+
+certPEM, _ := os.ReadFile("server.crt")
+keyPEM, _ := os.ReadFile("server.key")
+
+cert, err := tls.X509KeyPair(certPEM, keyPEM)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+## Configuration
+
+### Config Type
+
+The `Config` structure configures TLS clients and servers. Key fields include:
+
+```go
+type Config struct {
+    // Certificates contains one or more certificate chains
+    Certificates []Certificate
+    
+    // RootCAs defines the set of root CAs for client verification
+    RootCAs *x509.CertPool
+    
+    // ServerName is used to verify the hostname (client-side)
+    ServerName string
+    
+    // InsecureSkipVerify disables certificate verification (INSECURE)
+    InsecureSkipVerify bool
+    
+    // MinVersion specifies the minimum TLS version
+    MinVersion uint16
+    
+    // MaxVersion specifies the maximum TLS version
+    MaxVersion uint16
+    
+    // CipherSuites is a list of enabled cipher suites
+    CipherSuites []uint16
+    
+    // NextProtos is a list of supported application protocols (ALPN)
+    NextProtos []string
+}
+```
+
+**Example Configuration:**
+```go
+config := &tls.Config{
+    MinVersion: tls.VersionTLS12,
+    CipherSuites: []uint16{
+        tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+        tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+    },
+    NextProtos: []string{"h2", "http/1.1"},
+}
+```
+
+<Warning>
+**Never use in production:**
+```go
+config := &tls.Config{
+    InsecureSkipVerify: true, // DANGEROUS: Disables certificate verification
+}
+```
+This makes connections vulnerable to man-in-the-middle attacks.
+</Warning>
+
+## Supported Curves
+
+```go
+const (
+    CurveP256          CurveID = 23
+    CurveP384          CurveID = 24
+    CurveP521          CurveID = 25
+    X25519             CurveID = 29
+    X25519MLKEM768     CurveID = 4588  // Hybrid post-quantum
+    SecP256r1MLKEM768  CurveID = 4587  // Hybrid post-quantum
+    SecP384r1MLKEM1024 CurveID = 4589  // Hybrid post-quantum
+)
+```
+
+## Connection Type
+
+The `Conn` type represents a secured connection.
+
+**Common Methods:**
+- `Handshake()` - Runs the client or server handshake
+- `HandshakeContext(ctx)` - Runs handshake with context
+- `ConnectionState()` - Returns connection state information
+- `VerifyHostname(host)` - Verifies hostname against peer's certificate
+- `Read(b)` - Reads data from the connection
+- `Write(b)` - Writes data to the connection
+- `Close()` - Closes the connection
+
+**Example:**
+```go
+conn, _ := tls.Dial("tcp", "example.com:443", nil)
+defer conn.Close()
+
+// Get connection state
+state := conn.ConnectionState()
+log.Printf("TLS Version: %s", tls.VersionName(state.Version))
+log.Printf("Cipher Suite: %d", state.CipherSuite)
+log.Printf("Server Name: %s", state.ServerName)
+
+// Verify hostname
+err := conn.VerifyHostname("example.com")
+if err != nil {
+    log.Fatal("Hostname verification failed")
+}
+```
+
+## Security Best Practices
+
+<Warning>
+**Security Guidelines:**
+
+1. **Use Modern TLS Versions**: Set `MinVersion` to at least `VersionTLS12`
+2. **Verify Certificates**: Never set `InsecureSkipVerify: true` in production
+3. **Use Strong Cipher Suites**: Let the package choose unless you have specific requirements
+4. **Server Name Indication**: Always set `ServerName` for client connections
+5. **Certificate Validation**: Properly configure `RootCAs` for custom CA verification
+6. **Keep Certificates Current**: Monitor and renew certificates before expiration
+7. **Use ALPN**: Configure `NextProtos` for HTTP/2 and other protocols
+8. **Session Tickets**: Consider security implications of session resumption
+</Warning>
+
+## Known Issues
+
+<Warning>
+The crypto/tls package only implements some countermeasures against Lucky13 attacks on CBC-mode encryption, and only on SHA1 variants. Consider using AEAD cipher suites for better security.
+</Warning>
+
+## See Also
+
+- [crypto](/api/crypto) - Common cryptographic constants
+- [crypto/x509](/api/crypto-x509) - X.509 certificate parsing and verification
+- RFC 5246 - TLS 1.2 specification
+- RFC 8446 - TLS 1.3 specification

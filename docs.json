@@ -1,122 +1,214 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Go",
+  "theme": "aspen",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#00ADD8",
+    "light": "#5DC9E2",
+    "dark": "#00758D"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/golang/go"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/golang/go"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
+              "introduction",
+              "installation",
               "quickstart",
-              "development"
+              "tutorial"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Language Guide",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "language/specification",
+              "language/effective-go",
+              "language/memory-model",
+              "language/godebug"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Standard Library",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "stdlib/overview",
+              "stdlib/builtin",
+              "stdlib/fmt",
+              "stdlib/io",
+              "stdlib/os",
+              "stdlib/strings",
+              "stdlib/time",
+              "stdlib/net-http",
+              "stdlib/encoding-json",
+              "stdlib/testing"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Core Packages",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "packages/archive",
+              "packages/bufio",
+              "packages/bytes",
+              "packages/compress",
+              "packages/container",
+              "packages/context",
+              "packages/crypto",
+              "packages/database",
+              "packages/debug",
+              "packages/embed",
+              "packages/encoding",
+              "packages/errors",
+              "packages/flag",
+              "packages/hash",
+              "packages/html",
+              "packages/image",
+              "packages/log",
+              "packages/math",
+              "packages/mime",
+              "packages/net",
+              "packages/path",
+              "packages/reflect",
+              "packages/regexp",
+              "packages/runtime",
+              "packages/sort",
+              "packages/strconv",
+              "packages/sync",
+              "packages/syscall",
+              "packages/text",
+              "packages/unicode"
+            ]
+          },
+          {
+            "group": "Tools & Commands",
+            "pages": [
+              "tools/go-command",
+              "tools/gofmt",
+              "tools/compile",
+              "tools/build",
+              "tools/test",
+              "tools/modules",
+              "tools/workspaces"
+            ]
+          },
+          {
+            "group": "Advanced Topics",
+            "pages": [
+              "advanced/runtime",
+              "advanced/assembly",
+              "advanced/cgo",
+              "advanced/garbage-collection",
+              "advanced/diagnostics",
+              "advanced/security"
+            ]
+          },
+          {
+            "group": "Contributing",
+            "pages": [
+              "contributing/overview",
+              "contributing/code-review",
+              "contributing/security"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Language Constructs",
             "pages": [
-              "api-reference/introduction"
+              "api/builtin/functions",
+              "api/builtin/types",
+              "api/builtin/constants"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "I/O & System",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/fmt",
+              "api/io",
+              "api/os",
+              "api/bufio",
+              "api/bytes",
+              "api/strings"
+            ]
+          },
+          {
+            "group": "Data Structures",
+            "pages": [
+              "api/container",
+              "api/sort",
+              "api/slices",
+              "api/maps"
+            ]
+          },
+          {
+            "group": "Networking",
+            "pages": [
+              "api/net",
+              "api/net-http",
+              "api/net-url",
+              "api/net-rpc"
+            ]
+          },
+          {
+            "group": "Encoding",
+            "pages": [
+              "api/encoding-json",
+              "api/encoding-xml",
+              "api/encoding-csv",
+              "api/encoding-base64"
+            ]
+          },
+          {
+            "group": "Cryptography",
+            "pages": [
+              "api/crypto",
+              "api/crypto-tls",
+              "api/crypto-x509",
+              "api/hash"
+            ]
+          },
+          {
+            "group": "Concurrency",
+            "pages": [
+              "api/sync",
+              "api/context",
+              "api/runtime"
+            ]
+          },
+          {
+            "group": "Testing & Debugging",
+            "pages": [
+              "api/testing",
+              "api/debug",
+              "api/log"
+            ]
+          },
+          {
+            "group": "Reflection & Parsing",
+            "pages": [
+              "api/reflect",
+              "api/go-ast",
+              "api/go-parser",
+              "api/go-types"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

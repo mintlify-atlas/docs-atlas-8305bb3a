@@ -1,0 +1,302 @@
+---
+title: hash
+description: Hash functions and checksums
+---
+
+The `hash` package provides interfaces for hash functions. It contains subpackages implementing various hash algorithms.
+
+## Core Interface
+
+```go
+type Hash interface {
+    io.Writer
+    Sum(b []byte) []byte
+    Reset()
+    Size() int
+    BlockSize() int
+}
+```
+
+## Subpackages
+
+### hash/crc32
+
+CRC-32 checksums (IEEE and Castagnoli polynomials).
+
+```go
+import "hash/crc32"
+
+func calculateCRC32(data []byte) uint32 {
+    return crc32.ChecksumIEEE(data)
+}
+
+func crc32Example() {
+    h := crc32.NewIEEE()
+    h.Write([]byte("hello world"))
+    checksum := h.Sum32()
+    fmt.Printf("CRC32: %x\n", checksum)
+}
+```
+
+### hash/crc64
+
+CRC-64 checksums.
+
+```go
+import "hash/crc64"
+
+func calculateCRC64(data []byte) uint64 {
+    table := crc64.MakeTable(crc64.ISO)
+    return crc64.Checksum(data, table)
+}
+```
+
+### hash/fnv
+
+FNV-1 and FNV-1a hash functions.
+
+```go
+import "hash/fnv"
+
+func hashFNV(s string) uint64 {
+    h := fnv.New64a()
+    h.Write([]byte(s))
+    return h.Sum64()
+}
+```
+
+### hash/adler32
+
+Adler-32 checksum.
+
+```go
+import "hash/adler32"
+
+func calculateAdler32(data []byte) uint32 {
+    return adler32.Checksum(data)
+}
+```
+
+### hash/maphash
+
+Fast, non-cryptographic hash for hash tables.
+
+```go
+import "hash/maphash"
+
+func hashString(s string) uint64 {
+    var h maphash.Hash
+    h.WriteString(s)
+    return h.Sum64()
+}
+
+// With seed for consistency
+func hashWithSeed(s string, seed maphash.Seed) uint64 {
+    var h maphash.Hash
+    h.SetSeed(seed)
+    h.WriteString(s)
+    return h.Sum64()
+}
+```
+
+## Practical Examples
+
+### File Checksum
+
+```go
+import (
+    "crypto/sha256"
+    "hash"
+    "io"
+    "os"
+)
+
+func fileChecksum(filename string, h hash.Hash) ([]byte, error) {
+    f, err := os.Open(filename)
+    if err != nil {
+        return nil, err
+    }
+    defer f.Close()
+    
+    if _, err := io.Copy(h, f); err != nil {
+        return nil, err
+    }
+    
+    return h.Sum(nil), nil
+}
+
+func sha256File(filename string) (string, error) {
+    checksum, err := fileChecksum(filename, sha256.New())
+    if err != nil {
+        return "", err
+    }
+    return fmt.Sprintf("%x", checksum), nil
+}
+```
+
+### Verify File Integrity
+
+```go
+func verifyFile(filename, expectedHash string) (bool, error) {
+    actualHash, err := sha256File(filename)
+    if err != nil {
+        return false, err
+    }
+    return actualHash == expectedHash, nil
+}
+```
+
+### Hash-based Deduplication
+
+```go
+type FileRegistry struct {
+    files map[string][]string // hash -> filenames
+}
+
+func NewFileRegistry() *FileRegistry {
+    return &FileRegistry{
+        files: make(map[string][]string),
+    }
+}
+
+func (r *FileRegistry) AddFile(filename string) error {
+    hash, err := sha256File(filename)
+    if err != nil {
+        return err
+    }
+    
+    r.files[hash] = append(r.files[hash], filename)
+    return nil
+}
+
+func (r *FileRegistry) FindDuplicates() map[string][]string {
+    duplicates := make(map[string][]string)
+    
+    for hash, files := range r.files {
+        if len(files) > 1 {
+            duplicates[hash] = files
+        }
+    }
+    
+    return duplicates
+}
+```
+
+### Hash Table with Custom Hash
+
+```go
+type HashTable struct {
+    seed    maphash.Seed
+    buckets [][]entry
+}
+
+type entry struct {
+    key   string
+    value interface{}
+}
+
+func NewHashTable(size int) *HashTable {
+    return &HashTable{
+        seed:    maphash.MakeSeed(),
+        buckets: make([][]entry, size),
+    }
+}
+
+func (ht *HashTable) hash(key string) int {
+    var h maphash.Hash
+    h.SetSeed(ht.seed)
+    h.WriteString(key)
+    return int(h.Sum64() % uint64(len(ht.buckets)))
+}
+
+func (ht *HashTable) Set(key string, value interface{}) {
+    idx := ht.hash(key)
+    bucket := ht.buckets[idx]
+    
+    for i, e := range bucket {
+        if e.key == key {
+            bucket[i].value = value
+            return
+        }
+    }
+    
+    ht.buckets[idx] = append(bucket, entry{key, value})
+}
+
+func (ht *HashTable) Get(key string) (interface{}, bool) {
+    idx := ht.hash(key)
+    
+    for _, e := range ht.buckets[idx] {
+        if e.key == key {
+            return e.value, true
+        }
+    }
+    
+    return nil, false
+}
+```
+
+### Content-Addressable Storage
+
+```go
+import "crypto/sha256"
+
+type ContentStore struct {
+    basePath string
+}
+
+func (cs *ContentStore) Store(data []byte) (string, error) {
+    hash := sha256.Sum256(data)
+    hashStr := fmt.Sprintf("%x", hash)
+    
+    // Store in subdirectory based on first 2 chars
+    dir := filepath.Join(cs.basePath, hashStr[:2])
+    if err := os.MkdirAll(dir, 0755); err != nil {
+        return "", err
+    }
+    
+    path := filepath.Join(dir, hashStr[2:])
+    if err := os.WriteFile(path, data, 0644); err != nil {
+        return "", err
+    }
+    
+    return hashStr, nil
+}
+
+func (cs *ContentStore) Retrieve(hash string) ([]byte, error) {
+    path := filepath.Join(cs.basePath, hash[:2], hash[2:])
+    return os.ReadFile(path)
+}
+```
+
+## Hash Function Comparison
+
+| Algorithm | Output Size | Cryptographic | Speed | Use Case |
+|-----------|-------------|---------------|-------|----------|
+| **CRC32** | 32 bits | No | Very Fast | Error detection |
+| **CRC64** | 64 bits | No | Very Fast | Error detection |
+| **Adler32** | 32 bits | No | Very Fast | Checksums |
+| **FNV-1a** | 32/64 bits | No | Fast | Hash tables |
+| **maphash** | 64 bits | No | Very Fast | Hash tables (Go) |
+| **MD5** | 128 bits | Broken | Fast | Legacy, non-security |
+| **SHA-1** | 160 bits | Broken | Fast | Legacy, non-security |
+| **SHA-256** | 256 bits | Yes | Medium | Integrity, security |
+| **SHA-512** | 512 bits | Yes | Medium | Security |
+
+## Best Practices
+
+1. **Choose appropriate hash** - Cryptographic for security, non-cryptographic for speed
+2. **Use crypto/sha256** - For file integrity and digital signatures
+3. **Use hash/maphash** - For hash tables and non-cryptographic hashing
+4. **Avoid MD5/SHA-1** - For security purposes (use SHA-256+)
+5. **Stream large files** - Use io.Copy instead of loading into memory
+6. **Reuse hash objects** - Call Reset() instead of creating new instances
+
+## Common Use Cases
+
+- **File integrity**: Verify downloads haven't been corrupted
+- **Deduplication**: Identify duplicate files by content
+- **Caching**: Generate cache keys from content
+- **Hash tables**: Fast lookups with maphash
+- **Checksums**: Detect data corruption with CRC
+- **Content addressing**: Store and retrieve by hash

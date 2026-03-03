@@ -1,0 +1,475 @@
+---
+title: 'GODEBUG Settings'
+description: 'Go backwards compatibility and GODEBUG environment variable settings for controlling runtime behavior'
+keywords: ['go', 'godebug', 'backwards compatibility', 'environment variables', 'runtime']
+icon: 'bug'
+---
+
+## Introduction
+
+Go's emphasis on backwards compatibility is one of its key strengths. However, there are times when we cannot maintain complete compatibility. If code depends on buggy (including insecure) behavior, then fixing the bug will break that code.
+
+<Info>
+  GODEBUG provides a mechanism to reduce the impact that behavior changes have on Go developers using newer toolchains to compile old code.
+</Info>
+
+A GODEBUG setting is a `key=value` pair that controls the execution of certain parts of a Go program. The environment variable `GODEBUG` can hold a comma-separated list of these settings.
+
+## Basic Usage
+
+If a Go program is running in an environment that contains:
+
+```bash
+GODEBUG=http2client=0,http2server=0
+```
+
+Then that Go program will disable the use of HTTP/2 by default in both the HTTP client and the HTTP server.
+
+<Note>
+  Unrecognized settings in the `GODEBUG` environment variable are ignored.
+</Note>
+
+### Setting GODEBUG
+
+<Tabs>
+  <Tab title="Command line">
+    ```bash
+    GODEBUG=http2client=0 ./myprogram
+    ```
+  </Tab>
+  <Tab title="Shell export">
+    ```bash
+    export GODEBUG=http2client=0,panicnil=1
+    ./myprogram
+    ```
+  </Tab>
+  <Tab title="Go source">
+    ```go
+    //go:debug panicnil=1
+    //go:debug asynctimerchan=0
+    
+    package main
+    ```
+  </Tab>
+</Tabs>
+
+## Default GODEBUG Values
+
+When a GODEBUG setting is not listed in the environment variable, its value is derived from three sources:
+
+<Steps>
+  <Step title="Toolchain defaults">
+    The defaults for the Go toolchain used to build the program
+  </Step>
+  <Step title="go.mod version">
+    Amended to match the Go version listed in `go.mod`
+  </Step>
+  <Step title="//go:debug directives">
+    Overridden by explicit `//go:debug` lines in the program
+  </Step>
+</Steps>
+
+### Example: panicnil Setting
+
+Go 1.21 introduces the `panicnil` setting, controlling whether `panic(nil)` is allowed. It defaults to `panicnil=0`, making `panic(nil)` a run-time error.
+
+When a Go 1.21 toolchain compiles a program, if the work module's `go.mod` says `go 1.20`, then the program defaults to `panicnil=1`, matching Go 1.20 instead of Go 1.21.
+
+### Using godebug Directives
+
+Starting in Go 1.23, the work module's `go.mod` or workspace's `go.work` can list one or more `godebug` lines:
+
+```go
+godebug (
+    default=go1.21
+    panicnil=1
+    asynctimerchan=0
+)
+```
+
+<Info>
+  The special key `default` indicates a Go version to take unspecified settings from. This allows setting the GODEBUG defaults separately from the Go language version in the module.
+</Info>
+
+### Using //go:debug Directives
+
+Starting in Go 1.21, a main package's source files can include one or more `//go:debug` directives at the top of the file:
+
+```go
+//go:debug default=go1.21
+//go:debug panicnil=1
+//go:debug asynctimerchan=0
+
+package main
+```
+
+<Warning>
+  Go 1.21+ treats a `//go:debug` directive with an unrecognized GODEBUG setting as an invalid program. Programs with more than one `//go:debug` line for a given setting are also invalid.
+</Warning>
+
+## Runtime Metrics
+
+When possible, each GODEBUG setting has an associated runtime/metrics counter named `/godebug/non-default-behavior/<name>:events` that counts the number of times a particular program's behavior has changed based on a non-default value.
+
+For example, when `GODEBUG=http2client=0` is set, `/godebug/non-default-behavior/http2client:events` counts the number of HTTP transports that the program has configured without HTTP/2 support.
+
+## GODEBUG History
+
+GODEBUG settings are introduced when behavior changes and maintained for a minimum of two years (four Go releases). Some settings are maintained much longer or indefinitely.
+
+### Go 1.27
+
+Go 1.27 removed the `gotypesalias` setting.
+
+### Go 1.26
+
+<AccordionGroup>
+  <Accordion title="httpcookiemaxnum - Cookie parsing limit">
+    Controls the maximum number of cookies that `net/http` will accept when parsing HTTP headers.
+    
+    - Default: `httpcookiemaxnum=3000`
+    - Setting to `0` allows unlimited cookies
+    - Backported to Go 1.25.2 and Go 1.24.8
+  </Accordion>
+  
+  <Accordion title="urlmaxqueryparams - Query parameter limit">
+    Controls the maximum number of query parameters that `net/url` will accept.
+    
+    - Default: `urlmaxqueryparams=10000`
+    - Setting to `0` disables the limit
+    - Backported to Go 1.25.6 and Go 1.24.12
+  </Accordion>
+  
+  <Accordion title="urlstrictcolons - URL hostname validation">
+    Controls whether `net/url.Parse` allows malformed hostnames containing colons.
+    
+    - Default: `urlstrictcolons=1` (rejects `http://localhost:1:2`)
+    - Colons permitted in bracketed IPv6 addresses like `http://[::1]/`
+  </Accordion>
+  
+  <Accordion title="tlssecpmlkem - Post-quantum TLS">
+    Enables additional post-quantum key exchange mechanisms: SecP256r1MLKEM768 and SecP384r1MLKEM1024.
+    
+    - Default: Enabled
+    - Revert with `tlssecpmlkem=0`
+  </Accordion>
+  
+  <Accordion title="tracebacklabels - Goroutine labels">
+    Controls inclusion of goroutine labels set through `runtime/pprof` in tracebacks.
+    
+    - Default: `tracebacklabels=0`
+    - Enable with `tracebacklabels=1`
+  </Accordion>
+  
+  <Accordion title="cryptocustomrand - Crypto random source">
+    Controls whether most `crypto/*` APIs ignore the random `io.Reader` parameter.
+    
+    - Default: `cryptocustomrand=0` (ignores random parameters)
+    - Use `cryptocustomrand=1` for pre-Go 1.26 behavior
+  </Accordion>
+</AccordionGroup>
+
+### Go 1.25
+
+<AccordionGroup>
+  <Accordion title="decoratemappings - Memory mapping annotations">
+    Controls whether the Go runtime annotates OS anonymous memory mappings (Linux only).
+    
+    - Default: `decoratemappings=1`
+    - Annotations appear in `/proc/self/maps` as "[anon: Go: ...]"
+    - Fixed at program startup time
+  </Accordion>
+  
+  <Accordion title="embedfollowsymlinks - Embed symlink behavior">
+    Controls whether the Go command follows symlinks when embedding files.
+    
+    - Default: `embedfollowsymlinks=0` (don't follow)
+    - Use `embedfollowsymlinks=1` to follow symlinks
+  </Accordion>
+  
+  <Accordion title="containermaxprocs - Container CPU limits">
+    Controls whether the Go runtime considers cgroup CPU limits for GOMAXPROCS (Linux only).
+    
+    - Default: `containermaxprocs=1` (use cgroup limits)
+    - Set to `0` to disable
+  </Accordion>
+  
+  <Accordion title="updatemaxprocs - Dynamic GOMAXPROCS">
+    Controls whether the Go runtime periodically updates GOMAXPROCS for new CPU affinity or cgroup limits.
+    
+    - Default: `updatemaxprocs=1` (enable periodic updates)
+    - Set to `0` to disable
+  </Accordion>
+  
+  <Accordion title="tlssha1 - SHA-1 in TLS">
+    Go 1.25 disabled SHA-1 signature algorithms in TLS 1.2 per RFC 9155.
+    
+    - Default: SHA-1 disabled
+    - Use `tlssha1=1` to revert
+  </Accordion>
+  
+  <Accordion title="x509sha256skid - Certificate SubjectKeyId">
+    Go 1.25 switched to SHA-256 for missing SubjectKeyId in `crypto/x509.CreateCertificate`.
+    
+    - Default: SHA-256
+    - Use `x509sha256skid=0` to revert to SHA-1
+  </Accordion>
+  
+  <Accordion title="allowmultiplevcs - Multiple VCS security">
+    Go 1.25 RC 2 disabled build information stamping when multiple VCS are detected.
+    
+    - Default: Disabled
+    - Use `allowmultiplevcs=1` to re-enable
+    - Backported to Go 1.24.5 and Go 1.23.11
+  </Accordion>
+</AccordionGroup>
+
+### Go 1.24
+
+<AccordionGroup>
+  <Accordion title="fips140 - FIPS 140-3 mode">
+    Controls whether the Go Cryptographic Module operates in FIPS 140-3 mode.
+    
+    - `"off"`: No FIPS 140-3 support (default)
+    - `"on"`: FIPS 140-3 mode enabled
+    - `"only"`: Like "on", but non-approved algorithms return errors
+    - Fixed at program startup time
+  </Accordion>
+  
+  <Accordion title="randseednop - math/rand.Seed behavior">
+    Go 1.24 changed global `math/rand.Seed` to be a no-op.
+    
+    - Default: `randseednop=1` (no-op)
+    - Use `randseednop=0` for pre-Go 1.24 behavior
+  </Accordion>
+  
+  <Accordion title="multipathtcp - Multipath TCP">
+    Controls MPTCP on dialers and listeners.
+    
+    - `"0"`: Disable MPTCP on dialers and listeners
+    - `"1"`: Enable MPTCP on dialers and listeners
+    - `"2"`: Enable MPTCP on listeners only (default for Go 1.24)
+    - `"3"`: Enable MPTCP on dialers only
+  </Accordion>
+  
+  <Accordion title="gotestjsonbuildtext - Test JSON output">
+    Go 1.24 changed `go test -json` to emit build errors as JSON.
+    
+    - Default: JSON format
+    - Use `gotestjsonbuildtext=1` for Go 1.23 text format
+    - Will be removed in Go 1.28 at the earliest
+  </Accordion>
+  
+  <Accordion title="rsa1024min - Minimum RSA key size">
+    Go 1.24 requires RSA keys to be at least 1024 bits.
+    
+    - Default: 1024-bit minimum
+    - Use `rsa1024min=0` for Go 1.23 behavior
+  </Accordion>
+  
+  <Accordion title="dataindependenttiming - Data Independent Timing">
+    Enables platform-specific DIT modes (currently arm64 only).
+    
+    - Default: `dataindependenttiming=0`
+    - Use `dataindependenttiming=1` to enable
+  </Accordion>
+  
+  <Accordion title="tlsmlkem - Post-quantum TLS (X25519MLKEM768)">
+    Go 1.24 enabled X25519MLKEM768 by default.
+    
+    - Default: Enabled
+    - Use `tlsmlkem=0` to disable (useful for buggy TLS servers)
+  </Accordion>
+  
+  <Accordion title="x509rsacrt - RSA CRT parameters">
+    Go 1.24 made `ParsePKCS1PrivateKey` use and validate CRT parameters.
+    
+    - Default: Validate CRT parameters
+    - Use `x509rsacrt=0` for Go 1.23 behavior
+  </Accordion>
+</AccordionGroup>
+
+### Go 1.23
+
+<AccordionGroup>
+  <Accordion title="asynctimerchan - Timer channels">
+    Go 1.23 changed time package channels to be unbuffered (synchronous).
+    
+    - Default: Unbuffered channels
+    - Use `asynctimerchan=1` for buffered channels
+    - Will be removed in Go 1.27
+  </Accordion>
+  
+  <Accordion title="winsymlink - Windows symlink mode bits">
+    Changed mode bits reported by `os.Lstat` and `os.Stat` for reparse points (Windows only).
+    
+    - Default: `winsymlink=1`
+    - Mount points no longer have `os.ModeSymlink` set
+  </Accordion>
+  
+  <Accordion title="winreadlinkvolume - Windows volume normalization">
+    Changed `os.Readlink` and `filepath.EvalSymlinks` to avoid normalizing volumes to drive letters.
+    
+    - Default: `winreadlinkvolume=1`
+  </Accordion>
+  
+  <Accordion title="tls3des - 3DES cipher suites">
+    Go 1.23 removed 3DES cipher suites from default TLS configuration.
+    
+    - Default: 3DES disabled
+    - Use `tls3des=1` to revert
+    - Will be removed in Go 1.27
+  </Accordion>
+  
+  <Accordion title="x509keypairleaf - TLS Certificate Leaf field">
+    Go 1.23 changed `tls.X509KeyPair` and `tls.LoadX509KeyPair` to populate the Leaf field.
+    
+    - Default: `x509keypairleaf=1`
+    - Will be removed in Go 1.27
+  </Accordion>
+</AccordionGroup>
+
+### Go 1.22
+
+<AccordionGroup>
+  <Accordion title="tlsmaxrsasize - Maximum RSA key size in TLS">
+    Limits maximum acceptable RSA key size in TLS handshakes.
+    
+    - Default: `tlsmaxrsasize=8192`
+    - Backported to Go 1.19.13, 1.20.8, and 1.21.1
+  </Accordion>
+  
+  <Accordion title="httplaxcontentlength - Empty Content-Length">
+    Made it an error for requests/responses to have empty Content-Length headers.
+    
+    - Default: Strict validation
+    - Use `httplaxcontentlength=1` to allow empty headers
+  </Accordion>
+  
+  <Accordion title="httpmuxgo121 - ServeMux pattern matching">
+    Changed ServeMux to accept extended patterns and unescape paths by segment.
+    
+    - Default: New behavior
+    - Use `httpmuxgo121=1` for Go 1.21 behavior
+  </Accordion>
+  
+  <Accordion title="gotypesalias - Type aliases in go/types">
+    Added Alias type to go/types for explicit type alias representation.
+    
+    - Go 1.22 default: `gotypesalias=0`
+    - Go 1.23+ default: `gotypesalias=1`
+    - Removed in Go 1.27
+  </Accordion>
+  
+  <Accordion title="tls10server - Minimum TLS version">
+    Changed default minimum TLS version to TLS 1.2.
+    
+    - Default: TLS 1.2 minimum
+    - Use `tls10server=1` to revert to TLS 1.0
+    - Will be removed in Go 1.27
+  </Accordion>
+  
+  <Accordion title="disablethp - Transparent huge pages">
+    Controls interaction with transparent huge pages on Linux.
+    
+    - Use `disablethp=1` to disable THP for Go memory
+    - Available starting Go 1.21.6
+    - May be removed in future release
+  </Accordion>
+</AccordionGroup>
+
+### Go 1.21 and Earlier
+
+<AccordionGroup>
+  <Accordion title="panicnil - panic(nil) behavior (Go 1.21)">
+    Made it a run-time error to call `panic` with a nil interface value.
+    
+    - Default: Error on `panic(nil)`
+    - No plan to remove this setting
+  </Accordion>
+  
+  <Accordion title="multipathtcp - Multipath TCP support (Go 1.21)">
+    Added support for Multipath TCP (opt-in).
+    
+    - Default: Disabled unless explicitly requested
+    - No plan to remove this setting
+  </Accordion>
+  
+  <Accordion title="randautoseed - math/rand auto-seeding (Go 1.20)">
+    Automatic seeding of global `math/rand` generator.
+    
+    - Default: Auto-seed enabled
+    - No plan to remove this setting
+  </Accordion>
+  
+  <Accordion title="execerrdot - Path lookup in current directory (Go 1.19)">
+    Made it an error for path lookups to resolve to binaries in current directory.
+    
+    - Default: Error on current directory lookups
+    - No plan to remove this setting
+  </Accordion>
+  
+  <Accordion title="http2client/http2server - HTTP/2 support (Go 1.6)">
+    Controls transparent HTTP/2 support.
+    
+    - Default: HTTP/2 enabled
+    - Set to `0` to disable
+    - No plan to remove these settings
+  </Accordion>
+  
+  <Accordion title="netdns - DNS resolver (Go 1.5)">
+    Controls whether to use pure Go DNS resolver or system resolver.
+    
+    - Platform-dependent default
+    - No plan to remove this setting
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Test new versions" icon="vial">
+    Test your code with new Go versions without GODEBUG first to ensure forward compatibility.
+  </Card>
+  <Card title="Minimize GODEBUG use" icon="minimize">
+    Use GODEBUG settings as temporary migration aids, not permanent solutions.
+  </Card>
+  <Card title="Document usage" icon="file-lines">
+    If you must use GODEBUG, document why and plan to remove it before the setting is retired.
+  </Card>
+  <Card title="Monitor metrics" icon="chart-line">
+    Use runtime/metrics counters to track when non-default behaviors are triggered.
+  </Card>
+  <Card title="Update dependencies" icon="arrows-rotate">
+    Keep dependencies updated to avoid relying on old behavior.
+  </Card>
+  <Card title="Plan for removal" icon="calendar">
+    Remember that GODEBUG settings are maintained for only 2+ years (4 releases).
+  </Card>
+</CardGroup>
+
+## Checking Default GODEBUG Values
+
+The defaults that will be compiled into a main package are reported by:
+
+```bash
+go list -f '{{.DefaultGODEBUG}}' my/main/package
+```
+
+<Info>
+  Only differences from the base Go toolchain defaults are reported.
+</Info>
+
+## Related Resources
+
+<CardGroup cols={3}>
+  <Card title="Language Specification" href="/language/specification" icon="file-code">
+    Complete Go language reference
+  </Card>
+  <Card title="Effective Go" href="/language/effective-go" icon="book">
+    Best practices and idiomatic patterns
+  </Card>
+  <Card title="Memory Model" href="/language/memory-model" icon="brain">
+    Concurrency and synchronization guarantees
+  </Card>
+</CardGroup>

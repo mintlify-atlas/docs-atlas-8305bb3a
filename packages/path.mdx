@@ -1,0 +1,193 @@
+---
+title: path
+description: Path manipulation for slash-separated paths
+---
+
+The `path` package implements utility routines for manipulating slash-separated paths. For file system paths, use `path/filepath`.
+
+## path Package
+
+```go
+import "path"
+
+// Join path elements
+joined := path.Join("a", "b", "c") // "a/b/c"
+
+// Clean path
+cleaned := path.Clean("a//b/../c") // "a/c"
+
+// Get directory
+dir := path.Dir("/a/b/c.txt") // "/a/b"
+
+// Get base name
+base := path.Base("/a/b/c.txt") // "c.txt"
+
+// Get extension
+ext := path.Ext("file.txt") // ".txt"
+
+// Split path
+dir, file := path.Split("/a/b/c.txt") // "/a/b/", "c.txt"
+
+// Check if absolute
+isAbs := path.IsAbs("/a/b") // true
+```
+
+## path/filepath Package
+
+For OS-specific file paths.
+
+```go
+import "path/filepath"
+
+// Join with OS separator
+joined := filepath.Join("a", "b", "c.txt")
+// Windows: "a\\b\\c.txt"
+// Unix: "a/b/c.txt"
+
+// Absolute path
+abs, err := filepath.Abs("file.txt")
+
+// Clean path
+cleaned := filepath.Clean("a//b/../c")
+
+// Get directory and file
+dir := filepath.Dir("/a/b/c.txt")
+base := filepath.Base("/a/b/c.txt")
+
+// Extension
+ext := filepath.Ext("file.tar.gz") // ".gz"
+
+// Split extension
+name := filepath.Base("file.txt")
+extension := filepath.Ext(name)
+baseName := name[:len(name)-len(extension)] // "file"
+```
+
+## Walking Directories
+
+```go
+func walkDir(root string) error {
+    return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+        if err != nil {
+            return err
+        }
+        
+        if info.IsDir() {
+            fmt.Printf("Dir: %s\n", path)
+        } else {
+            fmt.Printf("File: %s (%d bytes)\n", path, info.Size())
+        }
+        
+        return nil
+    })
+}
+
+// WalkDir (more efficient, Go 1.16+)
+func walkDirNew(root string) error {
+    return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+        if err != nil {
+            return err
+        }
+        
+        fmt.Println(path)
+        return nil
+    })
+}
+```
+
+## Globbing
+
+```go
+func findFiles(pattern string) ([]string, error) {
+    matches, err := filepath.Glob("*.txt")
+    if err != nil {
+        return nil, err
+    }
+    
+    return matches, nil
+}
+
+// Complex patterns
+matches, _ := filepath.Glob("/home/*/*.go")
+matches, _ := filepath.Glob("data/**/*.json")
+```
+
+## Relative Paths
+
+```go
+func relativePath() error {
+    rel, err := filepath.Rel("/a/b", "/a/b/c/d")
+    // rel = "c/d"
+    
+    rel, err = filepath.Rel("/a/b/c", "/a/d")
+    // rel = "../../d"
+    
+    return err
+}
+```
+
+## Practical Examples
+
+### Find All Go Files
+
+```go
+func findGoFiles(root string) ([]string, error) {
+    var files []string
+    
+    err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+        if err != nil {
+            return err
+        }
+        
+        if !info.IsDir() && filepath.Ext(path) == ".go" {
+            files = append(files, path)
+        }
+        
+        return nil
+    })
+    
+    return files, err
+}
+```
+
+### Create Directory Tree
+
+```go
+func ensureDir(path string) error {
+    dir := filepath.Dir(path)
+    return os.MkdirAll(dir, 0755)
+}
+```
+
+### Copy Directory Structure
+
+```go
+func copyDirStructure(src, dst string) error {
+    return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+        if err != nil {
+            return err
+        }
+        
+        if !info.IsDir() {
+            return nil
+        }
+        
+        relPath, err := filepath.Rel(src, path)
+        if err != nil {
+            return err
+        }
+        
+        dstPath := filepath.Join(dst, relPath)
+        return os.MkdirAll(dstPath, info.Mode())
+    })
+}
+```
+
+## Best Practices
+
+1. **Use filepath for file paths** - OS-independent
+2. **Use path for URLs** - Slash-separated
+3. **Clean paths** - Remove redundant separators
+4. **Check errors** - Path operations can fail
+5. **Use Join** - Don't concatenate strings
+6. **Validate paths** - Check for directory traversal

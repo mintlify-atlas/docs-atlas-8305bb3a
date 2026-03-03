@@ -1,0 +1,583 @@
+---
+title: "crypto/x509"
+description: "X.509 certificate parsing, generation, and verification"
+icon: "certificate"
+---
+
+The crypto/x509 package implements a subset of the X.509 standard for parsing and generating certificates, certificate signing requests (CSRs), certificate revocation lists (CRLs), and encoded public and private keys.
+
+## Overview
+
+The package provides:
+- Certificate parsing and generation
+- Certificate chain verification
+- Certificate signing requests (CSR)
+- Certificate revocation lists (CRL)
+- Public and private key encoding/decoding
+- Root certificate pool management
+
+<Warning>
+On macOS and Windows, certificate verification is handled by system APIs. The package aims to apply consistent validation rules across operating systems but behavior may vary.
+</Warning>
+
+## Certificate Structure
+
+### Certificate Type
+
+Represents an X.509 certificate.
+
+```go
+type Certificate struct {
+    Raw                     []byte
+    RawTBSCertificate       []byte
+    RawSubjectPublicKeyInfo []byte
+    RawSubject              []byte
+    RawIssuer               []byte
+
+    Signature          []byte
+    SignatureAlgorithm SignatureAlgorithm
+
+    PublicKeyAlgorithm PublicKeyAlgorithm
+    PublicKey          any
+
+    Version             int
+    SerialNumber        *big.Int
+    Issuer              pkix.Name
+    Subject             pkix.Name
+    NotBefore, NotAfter time.Time
+    KeyUsage            KeyUsage
+
+    DNSNames       []string
+    EmailAddresses []string
+    IPAddresses    []net.IP
+    URIs           []*url.URL
+}
+```
+
+## Parsing Certificates
+
+### ParseCertificate()
+
+Parses a single certificate from DER encoded data.
+
+```go
+func ParseCertificate(der []byte) (*Certificate, error)
+```
+
+**Example:**
+```go
+import (
+    "crypto/x509"
+    "encoding/pem"
+    "os"
+)
+
+certPEM, _ := os.ReadFile("certificate.pem")
+block, _ := pem.Decode(certPEM)
+if block == nil {
+    log.Fatal("failed to parse PEM block")
+}
+
+cert, err := x509.ParseCertificate(block.Bytes)
+if err != nil {
+    log.Fatal(err)
+}
+
+log.Printf("Subject: %s", cert.Subject)
+log.Printf("Issuer: %s", cert.Issuer)
+log.Printf("Valid: %s to %s", cert.NotBefore, cert.NotAfter)
+```
+
+### ParseCertificates()
+
+Parses multiple certificates from DER encoded data.
+
+```go
+func ParseCertificates(der []byte) ([]*Certificate, error)
+```
+
+## Public Key Operations
+
+### ParsePKIXPublicKey()
+
+Parses a public key in PKIX, ASN.1 DER form.
+
+```go
+func ParsePKIXPublicKey(derBytes []byte) (pub any, err error)
+```
+
+Returns one of:
+- `*rsa.PublicKey`
+- `*dsa.PublicKey`
+- `*ecdsa.PublicKey`
+- `ed25519.PublicKey`
+- `*ecdh.PublicKey` (for X25519)
+
+**Example:**
+```go
+import (
+    "crypto/x509"
+    "encoding/pem"
+)
+
+pubPEM := []byte(`-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...
+-----END PUBLIC KEY-----`)
+
+block, _ := pem.Decode(pubPEM)
+pub, err := x509.ParsePKIXPublicKey(block.Bytes)
+if err != nil {
+    log.Fatal(err)
+}
+
+switch pub := pub.(type) {
+case *rsa.PublicKey:
+    log.Printf("RSA public key, %d bits", pub.N.BitLen())
+case *ecdsa.PublicKey:
+    log.Printf("ECDSA public key, curve: %s", pub.Curve.Params().Name)
+}
+```
+
+### MarshalPKIXPublicKey()
+
+Converts a public key to PKIX, ASN.1 DER form.
+
+```go
+func MarshalPKIXPublicKey(pub any) ([]byte, error)
+```
+
+**Example:**
+```go
+import (
+    "crypto/rsa"
+    "crypto/x509"
+    "encoding/pem"
+)
+
+privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+publicKey := &privateKey.PublicKey
+
+pubDER, err := x509.MarshalPKIXPublicKey(publicKey)
+if err != nil {
+    log.Fatal(err)
+}
+
+pubPEM := pem.EncodeToMemory(&pem.Block{
+    Type:  "PUBLIC KEY",
+    Bytes: pubDER,
+})
+```
+
+## Private Key Operations
+
+### ParsePKCS1PrivateKey()
+
+Parses an RSA private key in PKCS #1, ASN.1 DER form.
+
+```go
+func ParsePKCS1PrivateKey(der []byte) (*rsa.PrivateKey, error)
+```
+
+### ParsePKCS8PrivateKey()
+
+Parses an unencrypted private key in PKCS #8, ASN.1 DER form.
+
+```go
+func ParsePKCS8PrivateKey(der []byte) (key any, err error)
+```
+
+Returns one of:
+- `*rsa.PrivateKey`
+- `*ecdsa.PrivateKey`
+- `ed25519.PrivateKey`
+
+**Example:**
+```go
+import (
+    "crypto/x509"
+    "encoding/pem"
+    "os"
+)
+
+keyPEM, _ := os.ReadFile("private.key")
+block, _ := pem.Decode(keyPEM)
+
+key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+if err != nil {
+    log.Fatal(err)
+}
+
+switch key := key.(type) {
+case *rsa.PrivateKey:
+    log.Printf("RSA private key")
+case *ecdsa.PrivateKey:
+    log.Printf("ECDSA private key")
+case ed25519.PrivateKey:
+    log.Printf("Ed25519 private key")
+}
+```
+
+### ParseECPrivateKey()
+
+Parses an EC private key in SEC 1, ASN.1 DER form.
+
+```go
+func ParseECPrivateKey(der []byte) (*ecdsa.PrivateKey, error)
+```
+
+### MarshalPKCS8PrivateKey()
+
+Converts a private key to PKCS #8, ASN.1 DER form.
+
+```go
+func MarshalPKCS8PrivateKey(key any) ([]byte, error)
+```
+
+## Certificate Verification
+
+### Certificate.Verify()
+
+Verifies a certificate chain.
+
+```go
+func (c *Certificate) Verify(opts VerifyOptions) (chains [][]*Certificate, err error)
+```
+
+**Example:**
+```go
+import (
+    "crypto/x509"
+    "time"
+)
+
+// Load root CA pool
+roots := x509.NewCertPool()
+rootPEM, _ := os.ReadFile("root-ca.pem")
+roots.AppendCertsFromPEM(rootPEM)
+
+// Parse certificate to verify
+certPEM, _ := os.ReadFile("server.crt")
+block, _ := pem.Decode(certPEM)
+cert, _ := x509.ParseCertificate(block.Bytes)
+
+// Verify
+opts := x509.VerifyOptions{
+    Roots:       roots,
+    DNSName:     "example.com",
+    CurrentTime: time.Now(),
+}
+
+chains, err := cert.Verify(opts)
+if err != nil {
+    log.Fatal("Certificate verification failed:", err)
+}
+
+log.Printf("Certificate verified. Chain length: %d", len(chains[0]))
+```
+
+### VerifyOptions
+
+```go
+type VerifyOptions struct {
+    DNSName       string
+    Intermediates *CertPool
+    Roots         *CertPool
+    CurrentTime   time.Time
+    KeyUsages     []ExtKeyUsage
+}
+```
+
+### Certificate.CheckSignatureFrom()
+
+Verifies that the certificate signature is valid from a parent certificate.
+
+```go
+func (c *Certificate) CheckSignatureFrom(parent *Certificate) error
+```
+
+## Certificate Pools
+
+### NewCertPool()
+
+Creates a new, empty certificate pool.
+
+```go
+func NewCertPool() *CertPool
+```
+
+### CertPool.AppendCertsFromPEM()
+
+Appends certificates from PEM encoded data.
+
+```go
+func (s *CertPool) AppendCertsFromPEM(pemCerts []byte) (ok bool)
+```
+
+**Example:**
+```go
+import "crypto/x509"
+
+pool := x509.NewCertPool()
+
+// Add certificates from PEM file
+caPEM, _ := os.ReadFile("ca-bundle.pem")
+if ok := pool.AppendCertsFromPEM(caPEM); !ok {
+    log.Fatal("Failed to parse CA certificates")
+}
+```
+
+### SystemCertPool()
+
+Returns a copy of the system certificate pool.
+
+```go
+func SystemCertPool() (*CertPool, error)
+```
+
+**Example:**
+```go
+// Use system roots plus custom CA
+roots, err := x509.SystemCertPool()
+if err != nil {
+    // Fallback for systems without cert pool
+    roots = x509.NewCertPool()
+}
+
+customCA, _ := os.ReadFile("custom-ca.pem")
+roots.AppendCertsFromPEM(customCA)
+```
+
+## Certificate Generation
+
+### CreateCertificate()
+
+Creates a new X.509 certificate.
+
+```go
+func CreateCertificate(rand io.Reader, template, parent *Certificate, pub, priv any) ([]byte, error)
+```
+
+**Example - Self-signed Certificate:**
+```go
+import (
+    "crypto/rand"
+    "crypto/rsa"
+    "crypto/x509"
+    "crypto/x509/pkix"
+    "math/big"
+    "time"
+)
+
+// Generate key pair
+privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+
+// Create certificate template
+template := &x509.Certificate{
+    SerialNumber: big.NewInt(1),
+    Subject: pkix.Name{
+        Organization: []string{"My Organization"},
+        CommonName:   "example.com",
+    },
+    NotBefore:             time.Now(),
+    NotAfter:              time.Now().Add(365 * 24 * time.Hour),
+    KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+    ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+    BasicConstraintsValid: true,
+    DNSNames:              []string{"example.com", "*.example.com"},
+}
+
+// Create self-signed certificate
+certDER, err := x509.CreateCertificate(
+    rand.Reader,
+    template,
+    template, // self-signed: parent = template
+    &privateKey.PublicKey,
+    privateKey,
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Save to PEM
+certPEM := pem.EncodeToMemory(&pem.Block{
+    Type:  "CERTIFICATE",
+    Bytes: certDER,
+})
+os.WriteFile("cert.pem", certPEM, 0644)
+```
+
+## Signature Algorithms
+
+```go
+type SignatureAlgorithm int
+
+const (
+    UnknownSignatureAlgorithm SignatureAlgorithm = iota
+    MD5WithRSA      // Unsupported
+    SHA1WithRSA     // Limited support
+    SHA256WithRSA
+    SHA384WithRSA
+    SHA512WithRSA
+    ECDSAWithSHA256
+    ECDSAWithSHA384
+    ECDSAWithSHA512
+    SHA256WithRSAPSS
+    SHA384WithRSAPSS
+    SHA512WithRSAPSS
+    PureEd25519
+)
+```
+
+<Warning>
+**Deprecated Algorithms:**
+- `MD5WithRSA` - Unsupported for security reasons
+- `SHA1WithRSA` - Only supported for CRLs, CSRs, and OCSP responses
+- `ECDSAWithSHA1` - Only supported for CRLs, CSRs, and OCSP responses
+</Warning>
+
+## Public Key Algorithms
+
+```go
+type PublicKeyAlgorithm int
+
+const (
+    UnknownPublicKeyAlgorithm PublicKeyAlgorithm = iota
+    RSA
+    DSA     // Only supported for parsing
+    ECDSA
+    Ed25519
+)
+```
+
+## Key Usage
+
+```go
+type KeyUsage int
+
+const (
+    KeyUsageDigitalSignature KeyUsage = 1 << iota
+    KeyUsageContentCommitment
+    KeyUsageKeyEncipherment
+    KeyUsageDataEncipherment
+    KeyUsageKeyAgreement
+    KeyUsageCertSign
+    KeyUsageCRLSign
+    KeyUsageEncipherOnly
+    KeyUsageDecipherOnly
+)
+```
+
+## Extended Key Usage
+
+```go
+type ExtKeyUsage int
+
+const (
+    ExtKeyUsageAny ExtKeyUsage = iota
+    ExtKeyUsageServerAuth
+    ExtKeyUsageClientAuth
+    ExtKeyUsageCodeSigning
+    ExtKeyUsageEmailProtection
+    ExtKeyUsageTimeStamping
+    ExtKeyUsageOCSPSigning
+)
+```
+
+**Example:**
+```go
+template := &x509.Certificate{
+    KeyUsage: x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+    ExtKeyUsage: []x509.ExtKeyUsage{
+        x509.ExtKeyUsageServerAuth,
+        x509.ExtKeyUsageClientAuth,
+    },
+}
+```
+
+## Certificate Requests (CSR)
+
+### CreateCertificateRequest()
+
+Creates a new certificate signing request.
+
+```go
+func CreateCertificateRequest(rand io.Reader, template *CertificateRequest, priv any) (csr []byte, err error)
+```
+
+**Example:**
+```go
+import (
+    "crypto/rand"
+    "crypto/rsa"
+    "crypto/x509"
+    "crypto/x509/pkix"
+)
+
+privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+
+template := &x509.CertificateRequest{
+    Subject: pkix.Name{
+        CommonName:   "example.com",
+        Organization: []string{"My Organization"},
+    },
+    DNSNames: []string{"example.com", "www.example.com"},
+}
+
+csrDER, err := x509.CreateCertificateRequest(rand.Reader, template, privateKey)
+if err != nil {
+    log.Fatal(err)
+}
+
+csrPEM := pem.EncodeToMemory(&pem.Block{
+    Type:  "CERTIFICATE REQUEST",
+    Bytes: csrDER,
+})
+```
+
+### ParseCertificateRequest()
+
+Parses a certificate request.
+
+```go
+func ParseCertificateRequest(asn1Data []byte) (*CertificateRequest, error)
+```
+
+## Security Best Practices
+
+<Warning>
+**Security Guidelines:**
+
+1. **Certificate Validation**: Always verify certificates in production with proper root CAs
+2. **Hostname Verification**: Use `DNSName` in `VerifyOptions` to verify the server hostname
+3. **Expiration Checking**: Certificates are automatically checked for expiration during verification
+4. **Strong Keys**: Use at least 2048-bit RSA or 256-bit ECDSA keys
+5. **Modern Algorithms**: Prefer SHA-256 or stronger signature algorithms
+6. **Chain Verification**: Verify the complete certificate chain to a trusted root
+7. **Revocation**: Consider implementing CRL or OCSP checking for critical applications
+8. **Private Key Security**: Protect private keys with appropriate file permissions and encryption
+</Warning>
+
+## Common Errors
+
+### InsecureAlgorithmError
+
+Returned when a certificate uses an insecure algorithm.
+
+```go
+type InsecureAlgorithmError SignatureAlgorithm
+```
+
+### ConstraintViolationError
+
+Returned when a certificate doesn't match verification constraints.
+
+```go
+type ConstraintViolationError struct{}
+```
+
+## See Also
+
+- [crypto](/api/crypto) - Common cryptographic constants
+- [crypto/tls](/api/crypto-tls) - TLS implementation
+- RFC 5280 - X.509 PKI Certificate and CRL Profile
+- RFC 2986 - PKCS #10: Certification Request Syntax

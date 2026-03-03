@@ -1,0 +1,474 @@
+---
+title: os
+description: Platform-independent interface to operating system functionality
+---
+
+Package os provides a platform-independent interface to operating system functionality. The design is Unix-like, although the error handling is Go-like; failing calls return values of type error rather than error numbers.
+
+## File Operations
+
+### Opening Files
+
+<ParamField path="Open" type="func Open(name string) (*File, error)">
+  Opens the named file for reading. If successful, methods on the returned file can be used for reading.
+  
+  ```go
+  file, err := os.Open("config.txt")
+  if err != nil {
+      log.Fatal(err)
+  }
+  defer file.Close()
+  ```
+</ParamField>
+
+<ParamField path="Create" type="func Create(name string) (*File, error)">
+  Creates or truncates the named file. If the file already exists, it is truncated. The file is opened with mode 0666.
+  
+  ```go
+  file, err := os.Create("output.txt")
+  if err != nil {
+      log.Fatal(err)
+  }
+  defer file.Close()
+  ```
+</ParamField>
+
+<ParamField path="OpenFile" type="func OpenFile(name string, flag int, perm FileMode) (*File, error)">
+  Opens a file with specified flags and permissions. This is the generalized open call.
+  
+  ```go
+  // Open for append
+  file, err := os.OpenFile("log.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+  if err != nil {
+      log.Fatal(err)
+  }
+  defer file.Close()
+  ```
+</ParamField>
+
+### File Flags
+
+<ParamField path="O_RDONLY" type="const int">
+  Open the file read-only
+</ParamField>
+
+<ParamField path="O_WRONLY" type="const int">
+  Open the file write-only
+</ParamField>
+
+<ParamField path="O_RDWR" type="const int">
+  Open the file read-write
+</ParamField>
+
+<ParamField path="O_APPEND" type="const int">
+  Append data to the file when writing
+</ParamField>
+
+<ParamField path="O_CREATE" type="const int">
+  Create a new file if none exists
+</ParamField>
+
+<ParamField path="O_EXCL" type="const int">
+  Used with O_CREATE, file must not exist
+</ParamField>
+
+<ParamField path="O_SYNC" type="const int">
+  Open for synchronous I/O
+</ParamField>
+
+<ParamField path="O_TRUNC" type="const int">
+  Truncate regular writable file when opened
+</ParamField>
+
+## File Methods
+
+<ParamField path="File.Read" type="func (f *File) Read(b []byte) (n int, err error)">
+  Reads up to len(b) bytes from the file. Returns the number of bytes read and any error encountered.
+  
+  ```go
+  data := make([]byte, 100)
+  n, err := file.Read(data)
+  ```
+</ParamField>
+
+<ParamField path="File.Write" type="func (f *File) Write(b []byte) (n int, err error)">
+  Writes len(b) bytes to the file. Returns the number of bytes written and any error encountered.
+  
+  ```go
+  n, err := file.Write([]byte("Hello, World!"))
+  ```
+</ParamField>
+
+<ParamField path="File.WriteString" type="func (f *File) WriteString(s string) (n int, err error)">
+  Writes a string to the file. Returns the number of bytes written.
+  
+  ```go
+  n, err := file.WriteString("Hello, World!\n")
+  ```
+</ParamField>
+
+<ParamField path="File.Close" type="func (f *File) Close() error">
+  Closes the file, rendering it unusable for I/O. Always defer Close after opening a file.
+  
+  ```go
+  defer file.Close()
+  ```
+</ParamField>
+
+<ParamField path="File.Seek" type="func (f *File) Seek(offset int64, whence int) (ret int64, err error)">
+  Sets the offset for the next Read or Write. Returns the new offset.
+  
+  ```go
+  // Seek to beginning
+  file.Seek(0, io.SeekStart)
+  
+  // Seek to end
+  file.Seek(0, io.SeekEnd)
+  ```
+</ParamField>
+
+<ParamField path="File.Stat" type="func (f *File) Stat() (FileInfo, error)">
+  Returns the FileInfo structure describing file. Can be used to get file size, permissions, modification time, etc.
+  
+  ```go
+  info, err := file.Stat()
+  if err != nil {
+      log.Fatal(err)
+  }
+  fmt.Printf("Size: %d bytes\n", info.Size())
+  ```
+</ParamField>
+
+## File Information
+
+<ParamField path="Stat" type="func Stat(name string) (FileInfo, error)">
+  Returns a FileInfo describing the named file.
+  
+  ```go
+  info, err := os.Stat("example.txt")
+  if err != nil {
+      log.Fatal(err)
+  }
+  fmt.Println("Size:", info.Size())
+  fmt.Println("Modified:", info.ModTime())
+  fmt.Println("Is directory:", info.IsDir())
+  ```
+</ParamField>
+
+<ParamField path="Lstat" type="func Lstat(name string) (FileInfo, error)">
+  Like Stat but if the file is a symbolic link, it returns information about the link itself.
+</ParamField>
+
+<ParamField path="FileInfo" type="interface">
+  Describes a file and is returned by Stat and Lstat.
+  
+  ```go
+  type FileInfo interface {
+      Name() string       // base name of the file
+      Size() int64        // length in bytes
+      Mode() FileMode     // file mode bits
+      ModTime() time.Time // modification time
+      IsDir() bool        // is a directory
+      Sys() any           // underlying data source
+  }
+  ```
+</ParamField>
+
+## Directory Operations
+
+<ParamField path="Mkdir" type="func Mkdir(name string, perm FileMode) error">
+  Creates a new directory with the specified name and permission bits.
+  
+  ```go
+  err := os.Mkdir("testdir", 0755)
+  if err != nil {
+      log.Fatal(err)
+  }
+  ```
+</ParamField>
+
+<ParamField path="MkdirAll" type="func MkdirAll(path string, perm FileMode) error">
+  Creates a directory named path, along with any necessary parents. If path is already a directory, MkdirAll does nothing.
+  
+  ```go
+  err := os.MkdirAll("path/to/dir", 0755)
+  ```
+</ParamField>
+
+<ParamField path="Remove" type="func Remove(name string) error">
+  Removes the named file or empty directory.
+  
+  ```go
+  err := os.Remove("oldfile.txt")
+  ```
+</ParamField>
+
+<ParamField path="RemoveAll" type="func RemoveAll(path string) error">
+  Removes path and any children it contains. It removes everything it can but returns the first error encountered.
+  
+  ```go
+  err := os.RemoveAll("temp_directory")
+  ```
+</ParamField>
+
+<ParamField path="ReadDir" type="func ReadDir(name string) ([]DirEntry, error)">
+  Reads the named directory and returns a list of directory entries sorted by filename.
+  
+  ```go
+  entries, err := os.ReadDir(".")
+  if err != nil {
+      log.Fatal(err)
+  }
+  
+  for _, entry := range entries {
+      fmt.Println(entry.Name())
+  }
+  ```
+</ParamField>
+
+## File Content Operations
+
+<ParamField path="ReadFile" type="func ReadFile(name string) ([]byte, error)">
+  Reads the named file and returns the contents. A successful call returns err == nil.
+  
+  ```go
+  data, err := os.ReadFile("config.json")
+  if err != nil {
+      log.Fatal(err)
+  }
+  fmt.Println(string(data))
+  ```
+</ParamField>
+
+<ParamField path="WriteFile" type="func WriteFile(name string, data []byte, perm FileMode) error">
+  Writes data to the named file, creating it if necessary. If the file exists, WriteFile truncates it before writing.
+  
+  ```go
+  data := []byte("Hello, World!")
+  err := os.WriteFile("output.txt", data, 0644)
+  if err != nil {
+      log.Fatal(err)
+  }
+  ```
+</ParamField>
+
+## Path Operations
+
+<ParamField path="Getwd" type="func Getwd() (dir string, err error)">
+  Returns a rooted path name corresponding to the current directory.
+  
+  ```go
+  dir, err := os.Getwd()
+  if err != nil {
+      log.Fatal(err)
+  }
+  fmt.Println("Current directory:", dir)
+  ```
+</ParamField>
+
+<ParamField path="Chdir" type="func Chdir(dir string) error">
+  Changes the current working directory to the named directory.
+  
+  ```go
+  err := os.Chdir("/tmp")
+  ```
+</ParamField>
+
+<ParamField path="Rename" type="func Rename(oldpath, newpath string) error">
+  Renames (moves) oldpath to newpath. If newpath already exists and is not a directory, Rename replaces it.
+  
+  ```go
+  err := os.Rename("old.txt", "new.txt")
+  ```
+</ParamField>
+
+## Process Operations
+
+<ParamField path="Getenv" type="func Getenv(key string) string">
+  Retrieves the value of the environment variable named by the key. Returns empty string if the variable is not present.
+  
+  ```go
+  home := os.Getenv("HOME")
+  path := os.Getenv("PATH")
+  ```
+</ParamField>
+
+<ParamField path="Setenv" type="func Setenv(key, value string) error">
+  Sets the value of the environment variable named by the key.
+  
+  ```go
+  err := os.Setenv("API_KEY", "secret123")
+  ```
+</ParamField>
+
+<ParamField path="Environ" type="func Environ() []string">
+  Returns a copy of strings representing the environment in the form "key=value".
+  
+  ```go
+  for _, env := range os.Environ() {
+      fmt.Println(env)
+  }
+  ```
+</ParamField>
+
+<ParamField path="Exit" type="func Exit(code int)">
+  Causes the current program to exit with the given status code. Conventionally, code zero indicates success, non-zero an error.
+  
+  ```go
+  if err != nil {
+      os.Exit(1)
+  }
+  ```
+</ParamField>
+
+## Standard File Descriptors
+
+<ParamField path="Stdin" type="*File">
+  Open File pointing to standard input
+  
+  ```go
+  scanner := bufio.NewScanner(os.Stdin)
+  ```
+</ParamField>
+
+<ParamField path="Stdout" type="*File">
+  Open File pointing to standard output
+  
+  ```go
+  fmt.Fprintln(os.Stdout, "Hello")
+  ```
+</ParamField>
+
+<ParamField path="Stderr" type="*File">
+  Open File pointing to standard error
+  
+  ```go
+  fmt.Fprintln(os.Stderr, "Error occurred")
+  ```
+</ParamField>
+
+## Examples
+
+### Reading a File
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    "os"
+)
+
+func main() {
+    // Simple way - read entire file
+    data, err := os.ReadFile("example.txt")
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Println(string(data))
+    
+    // Advanced way - streaming read
+    file, err := os.Open("example.txt")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer file.Close()
+    
+    buffer := make([]byte, 1024)
+    for {
+        n, err := file.Read(buffer)
+        if err != nil {
+            break
+        }
+        fmt.Print(string(buffer[:n]))
+    }
+}
+```
+
+### Writing to a File
+
+```go
+package main
+
+import (
+    "log"
+    "os"
+)
+
+func main() {
+    // Simple way
+    data := []byte("Hello, World!\n")
+    err := os.WriteFile("output.txt", data, 0644)
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    // Append to file
+    file, err := os.OpenFile("log.txt", 
+        os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer file.Close()
+    
+    file.WriteString("New log entry\n")
+}
+```
+
+### Working with Directories
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    "os"
+)
+
+func main() {
+    // Create directory
+    err := os.MkdirAll("path/to/dir", 0755)
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    // List directory contents
+    entries, err := os.ReadDir(".")
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    for _, entry := range entries {
+        info, _ := entry.Info()
+        fmt.Printf("%s\t%d bytes\n", entry.Name(), info.Size())
+    }
+}
+```
+
+### Environment Variables
+
+```go
+package main
+
+import (
+    "fmt"
+    "os"
+)
+
+func main() {
+    // Get environment variable
+    home := os.Getenv("HOME")
+    fmt.Println("Home directory:", home)
+    
+    // Set environment variable
+    os.Setenv("MY_VAR", "my_value")
+    
+    // Check if exists
+    value, exists := os.LookupEnv("MY_VAR")
+    if exists {
+        fmt.Println("MY_VAR =", value)
+    }
+}
+```

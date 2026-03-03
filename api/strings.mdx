@@ -1,0 +1,591 @@
+---
+title: 'strings'
+description: 'Simple functions to manipulate UTF-8 encoded strings'
+---
+
+## Overview
+
+Package strings implements simple functions to manipulate UTF-8 encoded strings. It is the string equivalent of the bytes package.
+
+## Comparison Functions
+
+### Compare
+
+Returns an integer comparing two strings lexicographically.
+
+```go
+func Compare(a, b string) int
+```
+
+<ParamField path="a" type="string" required>
+  First string
+</ParamField>
+
+<ParamField path="b" type="string" required>
+  Second string
+</ParamField>
+
+<ResponseField name="result" type="int">
+  0 if a == b, -1 if a < b, +1 if a > b
+</ResponseField>
+
+**Example:**
+```go
+result := strings.Compare("a", "b")
+// result = -1
+```
+
+### EqualFold
+
+Reports whether s and t are equal under Unicode case-folding.
+
+```go
+func EqualFold(s, t string) bool
+```
+
+**Example:**
+```go
+if strings.EqualFold("Hello", "hello") {
+    fmt.Println("Equal (case-insensitive)")
+}
+```
+
+## Search Functions
+
+### Contains
+
+Reports whether substr is within s.
+
+```go
+func Contains(s, substr string) bool
+```
+
+**Example:**
+```go
+if strings.Contains("seafood", "foo") {
+    fmt.Println("Contains foo")
+}
+```
+
+### ContainsAny
+
+Reports whether any Unicode code points in chars are within s.
+
+```go
+func ContainsAny(s, chars string) bool
+```
+
+**Example:**
+```go
+if strings.ContainsAny("failure", "ui") {
+    fmt.Println("Contains u or i")
+}
+```
+
+### Index
+
+Returns the index of the first instance of substr in s, or -1 if substr is not present.
+
+```go
+func Index(s, substr string) int
+```
+
+**Example:**
+```go
+idx := strings.Index("chicken", "ken")
+// idx = 4
+```
+
+### IndexByte
+
+Returns the index of the first instance of c in s, or -1 if c is not present.
+
+```go
+func IndexByte(s string, c byte) int
+```
+
+**Example:**
+```go
+idx := strings.IndexByte("hello", 'e')
+// idx = 1
+```
+
+### LastIndex
+
+Returns the index of the last instance of substr in s, or -1 if substr is not present.
+
+```go
+func LastIndex(s, substr string) int
+```
+
+**Example:**
+```go
+idx := strings.LastIndex("go gopher", "go")
+// idx = 3
+```
+
+### Count
+
+Counts the number of non-overlapping instances of substr in s.
+
+```go
+func Count(s, substr string) int
+```
+
+**Example:**
+```go
+count := strings.Count("cheese", "e")
+// count = 3
+```
+
+## Prefix and Suffix Functions
+
+### HasPrefix
+
+Tests whether the string s begins with prefix.
+
+```go
+func HasPrefix(s, prefix string) bool
+```
+
+**Example:**
+```go
+if strings.HasPrefix("Gopher", "Go") {
+    fmt.Println("Starts with Go")
+}
+```
+
+### HasSuffix
+
+Tests whether the string s ends with suffix.
+
+```go
+func HasSuffix(s, suffix string) bool
+```
+
+**Example:**
+```go
+if strings.HasSuffix("Gopher", "er") {
+    fmt.Println("Ends with er")
+}
+```
+
+## Transformation Functions
+
+### ToUpper
+
+Returns s with all Unicode letters mapped to their upper case.
+
+```go
+func ToUpper(s string) string
+```
+
+**Example:**
+```go
+upper := strings.ToUpper("hello")
+// upper = "HELLO"
+```
+
+### ToLower
+
+Returns s with all Unicode letters mapped to their lower case.
+
+```go
+func ToLower(s string) string
+```
+
+**Example:**
+```go
+lower := strings.ToLower("HELLO")
+// lower = "hello"
+```
+
+### ToTitle
+
+Returns a copy of the string s with all Unicode letters mapped to their title case.
+
+```go
+func ToTitle(s string) string
+```
+
+**Example:**
+```go
+title := strings.ToTitle("loud noises")
+// title = "LOUD NOISES"
+```
+
+### Title (Deprecated)
+
+Returns a copy of the string s with all Unicode letters that begin words mapped to their title case.
+
+```go
+func Title(s string) string
+```
+
+### Trim
+
+Returns a slice of the string s with all leading and trailing Unicode code points contained in cutset removed.
+
+```go
+func Trim(s, cutset string) string
+```
+
+**Example:**
+```go
+trimmed := strings.Trim("¡¡¡Hello, Gophers!!!", "!¡")
+// trimmed = "Hello, Gophers"
+```
+
+### TrimSpace
+
+Returns a slice of the string s, with all leading and trailing white space removed.
+
+```go
+func TrimSpace(s string) string
+```
+
+**Example:**
+```go
+trimmed := strings.TrimSpace("  \t\n Hello \n\t  ")
+// trimmed = "Hello"
+```
+
+### TrimPrefix
+
+Returns s without the provided leading prefix string.
+
+```go
+func TrimPrefix(s, prefix string) string
+```
+
+**Example:**
+```go
+result := strings.TrimPrefix("Goodbye!", "Good")
+// result = "bye!"
+```
+
+### TrimSuffix
+
+Returns s without the provided trailing suffix string.
+
+```go
+func TrimSuffix(s, suffix string) string
+```
+
+**Example:**
+```go
+result := strings.TrimSuffix("Hello!", "!")
+// result = "Hello"
+```
+
+### Replace
+
+Returns a copy of the string s with the first n non-overlapping instances of old replaced by new.
+
+```go
+func Replace(s, old, new string, n int) string
+```
+
+<ParamField path="s" type="string" required>
+  Source string
+</ParamField>
+
+<ParamField path="old" type="string" required>
+  String to replace
+</ParamField>
+
+<ParamField path="new" type="string" required>
+  Replacement string
+</ParamField>
+
+<ParamField path="n" type="int" required>
+  Number of replacements (-1 means all)
+</ParamField>
+
+**Example:**
+```go
+result := strings.Replace("oink oink oink", "oink", "moo", -1)
+// result = "moo moo moo"
+```
+
+### ReplaceAll
+
+Returns a copy of s with all non-overlapping instances of old replaced by new.
+
+```go
+func ReplaceAll(s, old, new string) string
+```
+
+**Example:**
+```go
+result := strings.ReplaceAll("oink oink oink", "oink", "moo")
+// result = "moo moo moo"
+```
+
+## Split and Join Functions
+
+### Split
+
+Slices s into all substrings separated by sep.
+
+```go
+func Split(s, sep string) []string
+```
+
+**Example:**
+```go
+parts := strings.Split("a,b,c", ",")
+// parts = []string{"a", "b", "c"}
+```
+
+### SplitN
+
+Slices s into substrings separated by sep and returns a slice of the substrings between those separators.
+
+```go
+func SplitN(s, sep string, n int) []string
+```
+
+<ParamField path="n" type="int" required>
+  Maximum number of substrings to return
+</ParamField>
+
+**Example:**
+```go
+parts := strings.SplitN("a,b,c", ",", 2)
+// parts = []string{"a", "b,c"}
+```
+
+### SplitAfter
+
+Slices s into all substrings after each instance of sep.
+
+```go
+func SplitAfter(s, sep string) []string
+```
+
+**Example:**
+```go
+parts := strings.SplitAfter("a,b,c", ",")
+// parts = []string{"a,", "b,", "c"}
+```
+
+### Fields
+
+Splits the string s around each instance of one or more consecutive white space characters.
+
+```go
+func Fields(s string) []string
+```
+
+**Example:**
+```go
+fields := strings.Fields("  foo bar  baz   ")
+// fields = []string{"foo", "bar", "baz"}
+```
+
+### Join
+
+Concatenates the elements of its first argument to create a single string.
+
+```go
+func Join(elems []string, sep string) string
+```
+
+<ParamField path="elems" type="[]string" required>
+  Strings to join
+</ParamField>
+
+<ParamField path="sep" type="string" required>
+  Separator to insert between elements
+</ParamField>
+
+**Example:**
+```go
+parts := []string{"foo", "bar", "baz"}
+result := strings.Join(parts, ",")
+// result = "foo,bar,baz"
+```
+
+## Repeat Function
+
+### Repeat
+
+Returns a new string consisting of count copies of the string s.
+
+```go
+func Repeat(s string, count int) string
+```
+
+**Example:**
+```go
+repeated := strings.Repeat("na", 3)
+// repeated = "nanana"
+```
+
+## Builder Type
+
+### Builder
+
+Used to efficiently build a string using Write methods.
+
+```go
+type Builder struct {
+    // contains filtered or unexported fields
+}
+```
+
+### Builder.WriteString
+
+Appends the contents of s to b's buffer.
+
+```go
+func (b *Builder) WriteString(s string) (int, error)
+```
+
+**Example:**
+```go
+var builder strings.Builder
+builder.WriteString("Hello, ")
+builder.WriteString("World!")
+result := builder.String()
+// result = "Hello, World!"
+```
+
+### Builder.WriteByte
+
+Appends the byte c to b's buffer.
+
+```go
+func (b *Builder) WriteByte(c byte) error
+```
+
+### Builder.WriteRune
+
+Appends the UTF-8 encoding of Unicode code point r to b's buffer.
+
+```go
+func (b *Builder) WriteRune(r rune) (int, error)
+```
+
+**Example:**
+```go
+var builder strings.Builder
+builder.WriteRune('世')
+builder.WriteRune('界')
+fmt.Println(builder.String()) // Output: 世界
+```
+
+### Builder.String
+
+Returns the accumulated string.
+
+```go
+func (b *Builder) String() string
+```
+
+### Builder.Len
+
+Returns the number of accumulated bytes.
+
+```go
+func (b *Builder) Len() int
+```
+
+### Builder.Reset
+
+Resets the Builder to be empty.
+
+```go
+func (b *Builder) Reset()
+```
+
+### Builder.Grow
+
+Grows b's capacity to guarantee space for another n bytes.
+
+```go
+func (b *Builder) Grow(n int)
+```
+
+**Example:**
+```go
+var builder strings.Builder
+builder.Grow(100) // Pre-allocate space
+for i := 0; i < 10; i++ {
+    builder.WriteString("test")
+}
+```
+
+## Reader Type
+
+### NewReader
+
+Returns a new Reader reading from s.
+
+```go
+func NewReader(s string) *Reader
+```
+
+**Example:**
+```go
+reader := strings.NewReader("Hello, World!")
+data := make([]byte, 5)
+n, _ := reader.Read(data)
+fmt.Printf("Read %d bytes: %s\n", n, data)
+```
+
+## Complete Example
+
+```go
+package main
+
+import (
+    "fmt"
+    "strings"
+)
+
+func main() {
+    // Searching
+    if strings.Contains("seafood", "foo") {
+        fmt.Println("Contains foo")
+    }
+    
+    // Case conversion
+    upper := strings.ToUpper("hello")
+    fmt.Printf("Uppercase: %s\n", upper)
+    
+    // Replacement
+    result := strings.ReplaceAll("foo foo foo", "foo", "bar")
+    fmt.Printf("Replaced: %s\n", result)
+    
+    // Trimming
+    trimmed := strings.TrimSpace("  hello  ")
+    fmt.Printf("Trimmed: '%s'\n", trimmed)
+    
+    // Splitting
+    parts := strings.Split("a,b,c", ",")
+    for _, part := range parts {
+        fmt.Printf("Part: %s\n", part)
+    }
+    
+    // Joining
+    joined := strings.Join([]string{"foo", "bar", "baz"}, "-")
+    fmt.Printf("Joined: %s\n", joined)
+    
+    // Builder for efficient string concatenation
+    var builder strings.Builder
+    for i := 0; i < 5; i++ {
+        builder.WriteString("Hello ")
+    }
+    fmt.Println(builder.String())
+    
+    // Prefix/Suffix
+    if strings.HasPrefix("Gopher", "Go") {
+        fmt.Println("Starts with Go")
+    }
+    if strings.HasSuffix("Gopher", "er") {
+        fmt.Println("Ends with er")
+    }
+}
+```

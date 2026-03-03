@@ -1,0 +1,216 @@
+---
+title: mime
+description: MIME type detection and parsing
+---
+
+The `mime` package implements parts of the MIME spec, including media type parsing and file extension mapping.
+
+## MIME Type Detection
+
+```go
+import "mime"
+
+func detectMIME() {
+    // Get MIME type by file extension
+    mimeType := mime.TypeByExtension(".html") 
+    // text/html; charset=utf-8
+    
+    mimeType = mime.TypeByExtension(".json")
+    // application/json
+    
+    mimeType = mime.TypeByExtension(".png")
+    // image/png
+}
+```
+
+## Parsing MIME Types
+
+```go
+func parseMIME() {
+    mediaType, params, err := mime.ParseMediaType(
+        "text/html; charset=utf-8",
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    fmt.Println(mediaType) // text/html
+    fmt.Println(params)    // map[charset:utf-8]
+}
+```
+
+## Adding Custom Types
+
+```go
+func registerCustomType() error {
+    return mime.AddExtensionType(".md", "text/markdown; charset=utf-8")
+}
+```
+
+## Practical Examples
+
+### HTTP Content-Type Handler
+
+```go
+func serveFile(w http.ResponseWriter, r *http.Request, filename string) {
+    ext := filepath.Ext(filename)
+    contentType := mime.TypeByExtension(ext)
+    
+    if contentType == "" {
+        contentType = "application/octet-stream"
+    }
+    
+    w.Header().Set("Content-Type", contentType)
+    http.ServeFile(w, r, filename)
+}
+```
+
+### Email Attachment
+
+```go
+func attachmentContentType(filename string) string {
+    ext := filepath.Ext(filename)
+    mimeType := mime.TypeByExtension(ext)
+    
+    if mimeType == "" {
+        return "application/octet-stream"
+    }
+    
+    return mimeType
+}
+```
+
+## mime/multipart Package
+
+Handling multipart MIME data.
+
+```go
+import "mime/multipart"
+
+func parseMultipartForm(r *http.Request) error {
+    // Parse multipart form (32MB max memory)
+    err := r.ParseMultipartForm(32 << 20)
+    if err != nil {
+        return err
+    }
+    
+    // Access form values
+    name := r.FormValue("name")
+    
+    // Access uploaded files
+    file, header, err := r.FormFile("upload")
+    if err != nil {
+        return err
+    }
+    defer file.Close()
+    
+    fmt.Printf("Uploaded: %s (%d bytes)\n", 
+        header.Filename, header.Size)
+    
+    return nil
+}
+```
+
+### Create Multipart Form
+
+```go
+func createMultipartForm() ([]byte, string, error) {
+    var buf bytes.Buffer
+    writer := multipart.NewWriter(&buf)
+    
+    // Add form field
+    writer.WriteField("name", "Alice")
+    
+    // Add file
+    fileWriter, err := writer.CreateFormFile("file", "document.pdf")
+    if err != nil {
+        return nil, "", err
+    }
+    
+    fileData := []byte("PDF content")
+    fileWriter.Write(fileData)
+    
+    writer.Close()
+    
+    return buf.Bytes(), writer.FormDataContentType(), nil
+}
+```
+
+## mime/quotedprintable Package
+
+Quoted-printable encoding (RFC 2045).
+
+```go
+import "mime/quotedprintable"
+
+func encodeQuotedPrintable(s string) (string, error) {
+    var buf bytes.Buffer
+    w := quotedprintable.NewWriter(&buf)
+    
+    _, err := w.Write([]byte(s))
+    if err != nil {
+        return "", err
+    }
+    
+    w.Close()
+    return buf.String(), nil
+}
+
+func decodeQuotedPrintable(s string) (string, error) {
+    r := quotedprintable.NewReader(strings.NewReader(s))
+    
+    decoded, err := io.ReadAll(r)
+    if err != nil {
+        return "", err
+    }
+    
+    return string(decoded), nil
+}
+```
+
+## Common MIME Types
+
+```go
+var commonMIMETypes = map[string]string{
+    // Text
+    ".txt":  "text/plain",
+    ".html": "text/html",
+    ".css":  "text/css",
+    ".js":   "application/javascript",
+    ".json": "application/json",
+    ".xml":  "application/xml",
+    
+    // Images
+    ".jpg":  "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png":  "image/png",
+    ".gif":  "image/gif",
+    ".svg":  "image/svg+xml",
+    ".webp": "image/webp",
+    
+    // Documents
+    ".pdf":  "application/pdf",
+    ".doc":  "application/msword",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xls":  "application/vnd.ms-excel",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    
+    // Archives
+    ".zip":  "application/zip",
+    ".tar":  "application/x-tar",
+    ".gz":   "application/gzip",
+    
+    // Media
+    ".mp3":  "audio/mpeg",
+    ".mp4":  "video/mp4",
+    ".webm": "video/webm",
+}
+```
+
+## Best Practices
+
+1. **Validate MIME types** - Don't trust client-provided types
+2. **Use fallback** - Default to application/octet-stream
+3. **Parse carefully** - Check errors when parsing media types
+4. **Set correct charset** - Include charset parameter for text types
+5. **Limit upload size** - Set reasonable limits for multipart forms

@@ -1,0 +1,313 @@
+---
+title: "testing"
+description: "API reference for the testing package - automated testing support for Go packages"
+---
+
+## Overview
+
+The `testing` package provides support for automated testing of Go packages. It is intended to be used in concert with the `go test` command, which automates execution of test functions.
+
+## Types
+
+### T
+
+The `T` type is passed to test functions to manage test state and support formatted test logs.
+
+```go
+type T struct {
+    // contains filtered or unexported fields
+}
+```
+
+A test ends when its Test function returns or calls any of the methods `FailNow`, `Fatal`, `Fatalf`, `SkipNow`, `Skip`, or `Skipf`.
+
+#### Methods
+
+<ResponseField name="Error" type="func(args ...any)">
+  Equivalent to Log followed by Fail.
+</ResponseField>
+
+<ResponseField name="Errorf" type="func(format string, args ...any)">
+  Equivalent to Logf followed by Fail.
+</ResponseField>
+
+<ResponseField name="Fail" type="func()">
+  Marks the function as having failed but continues execution.
+</ResponseField>
+
+<ResponseField name="FailNow" type="func()">
+  Marks the function as having failed and stops its execution by calling runtime.Goexit.
+</ResponseField>
+
+<ResponseField name="Failed" type="func() bool">
+  Reports whether the function has failed.
+</ResponseField>
+
+<ResponseField name="Fatal" type="func(args ...any)">
+  Equivalent to Log followed by FailNow.
+</ResponseField>
+
+<ResponseField name="Fatalf" type="func(format string, args ...any)">
+  Equivalent to Logf followed by FailNow.
+</ResponseField>
+
+<ResponseField name="Helper" type="func()">
+  Marks the calling function as a test helper function. When printing file and line information, that function will be skipped.
+</ResponseField>
+
+<ResponseField name="Log" type="func(args ...any)">
+  Formats its arguments using default formatting, analogous to fmt.Println, and records the text in the error log.
+</ResponseField>
+
+<ResponseField name="Logf" type="func(format string, args ...any)">
+  Formats its arguments according to the format, analogous to fmt.Printf, and records the text in the error log.
+</ResponseField>
+
+<ResponseField name="Name" type="func() string">
+  Returns the name of the running test or subtest.
+</ResponseField>
+
+<ResponseField name="Parallel" type="func()">
+  Signals that this test is to be run in parallel with (and only with) other parallel tests.
+</ResponseField>
+
+<ResponseField name="Run" type="func(name string, f func(t *T)) bool">
+  Runs f as a subtest of t called name. It returns whether the subtest succeeded.
+</ResponseField>
+
+<ResponseField name="Skip" type="func(args ...any)">
+  Equivalent to Log followed by SkipNow.
+</ResponseField>
+
+<ResponseField name="SkipNow" type="func()">
+  Marks the test as having been skipped and stops its execution.
+</ResponseField>
+
+<ResponseField name="Skipf" type="func(format string, args ...any)">
+  Equivalent to Logf followed by SkipNow.
+</ResponseField>
+
+<ResponseField name="Skipped" type="func() bool">
+  Reports whether the test was skipped.
+</ResponseField>
+
+<ResponseField name="TempDir" type="func() string">
+  Returns a temporary directory for the test to use. The directory is automatically removed when the test completes.
+</ResponseField>
+
+<ResponseField name="Cleanup" type="func(f func())">
+  Registers a function to be called when the test and all its subtests complete.
+</ResponseField>
+
+<ResponseField name="Setenv" type="func(key, value string)">
+  Calls os.Setenv and uses Cleanup to restore the environment variable to its original value after the test.
+</ResponseField>
+
+### B
+
+The `B` type is passed to benchmark functions to manage benchmark timing and control the number of iterations.
+
+```go
+type B struct {
+    N int // The number of iterations to run
+    // contains filtered or unexported fields
+}
+```
+
+#### Methods
+
+<ResponseField name="Loop" type="func() bool">
+  Reports whether the benchmark should continue running iterations. Modern benchmarks should use Loop instead of iterating over b.N.
+</ResponseField>
+
+<ResponseField name="ResetTimer" type="func()">
+  Resets the benchmark timer. This can be used to ignore expensive setup before the benchmark loop.
+</ResponseField>
+
+<ResponseField name="StartTimer" type="func()">
+  Starts timing a test. This function is called automatically before a benchmark starts.
+</ResponseField>
+
+<ResponseField name="StopTimer" type="func()">
+  Stops timing a test. This can be used to pause the timer while performing complex initialization.
+</ResponseField>
+
+<ResponseField name="RunParallel" type="func(body func(*PB))">
+  Runs a benchmark in parallel. It creates multiple goroutines and distributes iterations among them.
+</ResponseField>
+
+<ResponseField name="SetBytes" type="func(n int64)">
+  Records the number of bytes processed in a single operation.
+</ResponseField>
+
+### M
+
+The `M` type is a type passed to a TestMain function to run the actual tests.
+
+```go
+type M struct {
+    // contains filtered or unexported fields
+}
+```
+
+#### Methods
+
+<ResponseField name="Run" type="func() int">
+  Runs the tests. It returns an exit code to pass to os.Exit.
+</ResponseField>
+
+## Functions
+
+<ResponseField name="Short" type="func() bool">
+  Reports whether the -test.short flag is set.
+</ResponseField>
+
+<ResponseField name="Verbose" type="func() bool">
+  Reports whether the -test.v flag is set.
+</ResponseField>
+
+<ResponseField name="Testing" type="func() bool">
+  Reports whether the current code is being run in a test. This will report true in programs created by "go test", false in programs created by "go build".
+</ResponseField>
+
+<ResponseField name="CoverMode" type="func() string">
+  Reports what the test coverage mode is set to. The values are "set", "count", or "atomic".
+</ResponseField>
+
+## Examples
+
+### Basic Test
+
+```go
+func TestAbs(t *testing.T) {
+    got := abs(-1)
+    if got != 1 {
+        t.Errorf("abs(-1) = %d; want 1", got)
+    }
+}
+```
+
+### Subtest
+
+```go
+func TestFoo(t *testing.T) {
+    t.Run("A=1", func(t *testing.T) {
+        // test case 1
+    })
+    t.Run("A=2", func(t *testing.T) {
+        // test case 2
+    })
+}
+```
+
+### Table-Driven Test
+
+```go
+func TestSum(t *testing.T) {
+    tests := []struct {
+        name string
+        a, b int
+        want int
+    }{
+        {"positive", 1, 2, 3},
+        {"negative", -1, -2, -3},
+        {"mixed", 1, -1, 0},
+    }
+    
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            got := Sum(tt.a, tt.b)
+            if got != tt.want {
+                t.Errorf("Sum(%d, %d) = %d; want %d", tt.a, tt.b, got, tt.want)
+            }
+        })
+    }
+}
+```
+
+### Benchmark (Modern Style with Loop)
+
+```go
+func BenchmarkRandInt(b *testing.B) {
+    for b.Loop() {
+        rand.Int()
+    }
+}
+```
+
+### Benchmark with Setup
+
+```go
+func BenchmarkBigLen(b *testing.B) {
+    big := NewBig()
+    for b.Loop() {
+        big.Len()
+    }
+}
+```
+
+### Parallel Benchmark
+
+```go
+func BenchmarkTemplateParallel(b *testing.B) {
+    templ := template.Must(template.New("test").Parse("Hello, {{.}}!"))
+    b.RunParallel(func(pb *testing.PB) {
+        var buf bytes.Buffer
+        for pb.Next() {
+            buf.Reset()
+            templ.Execute(&buf, "World")
+        }
+    })
+}
+```
+
+### TestMain
+
+```go
+func TestMain(m *testing.M) {
+    // Setup code here
+    flag.Parse()
+    
+    code := m.Run()
+    
+    // Teardown code here
+    os.Exit(code)
+}
+```
+
+### Helper Function
+
+```go
+func assertEqual(t *testing.T, got, want int) {
+    t.Helper() // This line will be skipped in error messages
+    if got != want {
+        t.Errorf("got %d; want %d", got, want)
+    }
+}
+
+func TestWithHelper(t *testing.T) {
+    assertEqual(t, Sum(1, 2), 3)
+}
+```
+
+## Running Tests
+
+```bash
+# Run all tests
+go test
+
+# Run tests with verbose output
+go test -v
+
+# Run specific test
+go test -run TestAbs
+
+# Run tests in short mode
+go test -short
+
+# Run benchmarks
+go test -bench .
+
+# Run benchmarks with memory stats
+go test -bench . -benchmem
+```

@@ -1,0 +1,493 @@
+---
+title: "net/rpc"
+description: "Package rpc provides access to the exported methods of an object across a network or other I/O connection."
+---
+
+## Overview
+
+Package rpc provides access to the exported methods of an object across a network or other I/O connection. A server registers an object, making it visible as a service with the name of the type of the object.
+
+<Note>
+The net/rpc package is frozen and is not accepting new features. Consider using gRPC or other modern RPC frameworks for new projects.
+</Note>
+
+## Server
+
+### Registering Services
+
+To register a service, the methods must satisfy these criteria:
+
+- The method's type is exported
+- The method is exported
+- The method has two arguments, both exported (or builtin) types
+- The method's second argument is a pointer
+- The method has return type error
+
+Method signature:
+```go
+func (t *T) MethodName(argType T1, replyType *T2) error
+```
+
+### Server Type
+
+Server represents an RPC Server.
+
+```go
+type Server struct {
+    // contains filtered or unexported fields
+}
+```
+
+### Register
+
+Registers an object, making its exported methods available for remote calls.
+
+```go
+type Arith struct{}
+
+type Args struct {
+    A, B int
+}
+
+func (t *Arith) Multiply(args *Args, reply *int) error {
+    *reply = args.A * args.B
+    return nil
+}
+
+func (t *Arith) Divide(args *Args, reply *int) error {
+    if args.B == 0 {
+        return errors.New("divide by zero")
+    }
+    *reply = args.A / args.B
+    return nil
+}
+
+arith := new(Arith)
+rpc.Register(arith)
+```
+
+<ParamField path="rcvr" type="any" required>
+  The service object to register. Its type name becomes the service name
+</ParamField>
+
+<ResponseField name="err" type="error">
+  Error if registration failed
+</ResponseField>
+
+### RegisterName
+
+Like Register but uses the provided name for the service.
+
+```go
+rpc.RegisterName("Calculator", new(Arith))
+```
+
+<ParamField path="name" type="string" required>
+  The service name
+</ParamField>
+
+<ParamField path="rcvr" type="any" required>
+  The service object to register
+</ParamField>
+
+<ResponseField name="err" type="error">
+  Error if registration failed
+</ResponseField>
+
+### ServeConn
+
+Runs the server on a single connection.
+
+```go
+conn, err := net.Dial("tcp", "localhost:1234")
+if err != nil {
+    log.Fatal(err)
+}
+rpc.ServeConn(conn)
+```
+
+<ParamField path="conn" type="io.ReadWriteCloser" required>
+  The connection to serve
+</ParamField>
+
+### HandleHTTP
+
+Registers an HTTP handler for RPC messages on rpcPath.
+
+```go
+rpc.HandleHTTP()
+l, err := net.Listen("tcp", ":1234")
+if err != nil {
+    log.Fatal(err)
+}
+go http.Serve(l, nil)
+```
+
+## Client
+
+### Client Type
+
+Client represents an RPC Client. There may be multiple outstanding Calls associated with a single Client.
+
+```go
+type Client struct {
+    // contains filtered or unexported fields
+}
+```
+
+### Dial
+
+Connects to an RPC server at the specified network address.
+
+```go
+client, err := rpc.Dial("tcp", "localhost:1234")
+if err != nil {
+    log.Fatal(err)
+}
+defer client.Close()
+```
+
+<ParamField path="network" type="string" required>
+  The network type ("tcp", "tcp4", "tcp6", "unix", "unixpacket")
+</ParamField>
+
+<ParamField path="address" type="string" required>
+  The server address
+</ParamField>
+
+<ResponseField name="client" type="*Client">
+  The RPC client
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Error if connection failed
+</ResponseField>
+
+### DialHTTP
+
+Connects to an HTTP RPC server at the specified network address.
+
+```go
+client, err := rpc.DialHTTP("tcp", "localhost:1234")
+if err != nil {
+    log.Fatal(err)
+}
+defer client.Close()
+```
+
+<ParamField path="network" type="string" required>
+  The network type
+</ParamField>
+
+<ParamField path="address" type="string" required>
+  The server address
+</ParamField>
+
+<ResponseField name="client" type="*Client">
+  The RPC client
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Error if connection failed
+</ResponseField>
+
+### Call
+
+Invokes the named function, waits for it to complete, and returns its error status.
+
+```go
+args := &Args{A: 7, B: 8}
+var reply int
+err := client.Call("Arith.Multiply", args, &reply)
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("7 * 8 = %d\n", reply)
+```
+
+<ParamField path="serviceMethod" type="string" required>
+  The service and method name in the form "Service.Method"
+</ParamField>
+
+<ParamField path="args" type="any" required>
+  The arguments to pass to the method
+</ParamField>
+
+<ParamField path="reply" type="any" required>
+  Pointer to store the result
+</ParamField>
+
+<ResponseField name="err" type="error">
+  Error if the call failed
+</ResponseField>
+
+### Go
+
+Invokes the function asynchronously and returns a Call object.
+
+```go
+args := &Args{A: 7, B: 8}
+var reply int
+call := client.Go("Arith.Multiply", args, &reply, nil)
+
+// Do other work...
+
+// Wait for completion
+<-call.Done
+if call.Error != nil {
+    log.Fatal(call.Error)
+}
+fmt.Printf("7 * 8 = %d\n", reply)
+```
+
+<ParamField path="serviceMethod" type="string" required>
+  The service and method name
+</ParamField>
+
+<ParamField path="args" type="any" required>
+  The arguments to pass to the method
+</ParamField>
+
+<ParamField path="reply" type="any" required>
+  Pointer to store the result
+</ParamField>
+
+<ParamField path="done" type="chan *Call">
+  Channel that will signal when call is complete. If nil, a new channel is allocated
+</ParamField>
+
+<ResponseField name="call" type="*Call">
+  The Call object representing the asynchronous RPC
+</ResponseField>
+
+### Call Type
+
+Call represents an active RPC.
+
+```go
+type Call struct {
+    ServiceMethod string     // The name of the service and method
+    Args          any        // The argument to the function
+    Reply         any        // The reply from the function
+    Error         error      // After completion, the error status
+    Done          chan *Call // Receives *Call when complete
+}
+```
+
+<ResponseField name="ServiceMethod" type="string">
+  The name of the service and method to call
+</ResponseField>
+
+<ResponseField name="Args" type="any">
+  The argument to the function
+</ResponseField>
+
+<ResponseField name="Reply" type="any">
+  The reply from the function
+</ResponseField>
+
+<ResponseField name="Error" type="error">
+  The error status after completion
+</ResponseField>
+
+<ResponseField name="Done" type="chan *Call">
+  Channel that receives the Call when Go is complete
+</ResponseField>
+
+## Examples
+
+### Complete RPC Server
+
+```go
+package main
+
+import (
+    "errors"
+    "log"
+    "net"
+    "net/http"
+    "net/rpc"
+)
+
+type Args struct {
+    A, B int
+}
+
+type Quotient struct {
+    Quo, Rem int
+}
+
+type Arith int
+
+func (t *Arith) Multiply(args *Args, reply *int) error {
+    *reply = args.A * args.B
+    return nil
+}
+
+func (t *Arith) Divide(args *Args, quo *Quotient) error {
+    if args.B == 0 {
+        return errors.New("divide by zero")
+    }
+    quo.Quo = args.A / args.B
+    quo.Rem = args.A % args.B
+    return nil
+}
+
+func main() {
+    arith := new(Arith)
+    rpc.Register(arith)
+    rpc.HandleHTTP()
+    
+    l, err := net.Listen("tcp", ":1234")
+    if err != nil {
+        log.Fatal("listen error:", err)
+    }
+    
+    log.Println("RPC server listening on :1234")
+    http.Serve(l, nil)
+}
+```
+
+### RPC Client
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    "net/rpc"
+)
+
+type Args struct {
+    A, B int
+}
+
+type Quotient struct {
+    Quo, Rem int
+}
+
+func main() {
+    // Connect to the RPC server
+    client, err := rpc.DialHTTP("tcp", "localhost:1234")
+    if err != nil {
+        log.Fatal("dialing:", err)
+    }
+    defer client.Close()
+    
+    // Synchronous call
+    args := &Args{7, 8}
+    var reply int
+    err = client.Call("Arith.Multiply", args, &reply)
+    if err != nil {
+        log.Fatal("arith error:", err)
+    }
+    fmt.Printf("Arith: %d*%d=%d\n", args.A, args.B, reply)
+    
+    // Synchronous call for division
+    divArgs := &Args{15, 4}
+    var quot Quotient
+    err = client.Call("Arith.Divide", divArgs, &quot)
+    if err != nil {
+        log.Fatal("arith error:", err)
+    }
+    fmt.Printf("Arith: %d/%d=%d remainder %d\n", 
+        divArgs.A, divArgs.B, quot.Quo, quot.Rem)
+}
+```
+
+### Asynchronous RPC Calls
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    "net/rpc"
+)
+
+type Args struct {
+    A, B int
+}
+
+func main() {
+    client, err := rpc.DialHTTP("tcp", "localhost:1234")
+    if err != nil {
+        log.Fatal("dialing:", err)
+    }
+    defer client.Close()
+    
+    // Make multiple asynchronous calls
+    calls := make([]*rpc.Call, 3)
+    replies := make([]int, 3)
+    
+    calls[0] = client.Go("Arith.Multiply", &Args{2, 3}, &replies[0], nil)
+    calls[1] = client.Go("Arith.Multiply", &Args{4, 5}, &replies[1], nil)
+    calls[2] = client.Go("Arith.Multiply", &Args{6, 7}, &replies[2], nil)
+    
+    // Wait for all calls to complete
+    for i, call := range calls {
+        <-call.Done
+        if call.Error != nil {
+            log.Printf("Call %d error: %v", i, call.Error)
+        } else {
+            fmt.Printf("Result %d: %d\n", i, replies[i])
+        }
+    }
+}
+```
+
+## Error Handling
+
+### ServerError
+
+ServerError represents an error that has been returned from the remote side.
+
+```go
+type ServerError string
+
+func (e ServerError) Error() string {
+    return string(e)
+}
+```
+
+### ErrShutdown
+
+ErrShutdown is returned when the connection is shut down.
+
+```go
+var ErrShutdown = errors.New("connection is shut down")
+```
+
+## Custom Codecs
+
+The package supports custom codecs for encoding/decoding RPC messages.
+
+### ServerCodec
+
+```go
+type ServerCodec interface {
+    ReadRequestHeader(*Request) error
+    ReadRequestBody(any) error
+    WriteResponse(*Response, any) error
+    Close() error
+}
+```
+
+### ClientCodec
+
+```go
+type ClientCodec interface {
+    WriteRequest(*Request, any) error
+    ReadResponseHeader(*Response) error
+    ReadResponseBody(any) error
+    Close() error
+}
+```
+
+## See Also
+
+- [net](/api/net) - Low-level networking primitives
+- [net/http](/api/net-http) - HTTP protocol support
+- [encoding/gob](/api/encoding-gob) - Default encoding for RPC

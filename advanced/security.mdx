@@ -1,0 +1,780 @@
+---
+title: 'Security Considerations'
+description: 'Security best practices and considerations for Go applications'
+---
+
+## Overview
+
+Writing secure Go applications requires understanding potential vulnerabilities, following security best practices, and leveraging Go's built-in safety features. This guide covers common security concerns and how to address them in Go programs.
+
+<Warning>
+Security is an ongoing process, not a one-time checklist. Stay updated on security advisories and best practices.
+</Warning>
+
+## Memory Safety
+
+### Go's Memory Safety Features
+
+Go provides strong memory safety guarantees:
+
+**Automatic memory management**
+- Garbage collection prevents use-after-free
+- No manual memory management errors
+- Bounds checking on slices and arrays
+
+**Type safety**
+- Strong static typing
+- No implicit conversions
+- Type checking at compile time
+
+```go
+// Go prevents common C/C++ vulnerabilities
+func safe() {
+    arr := make([]int, 10)
+    
+    // Bounds checking - panics instead of buffer overflow
+    // arr[10] = 42  // Runtime panic: index out of range
+    
+    // Safe slice operations
+    if len(arr) > 10 {
+        arr[10] = 42
+    }
+}
+```
+
+### Unsafe Package
+
+The `unsafe` package bypasses Go's type safety:
+
+```go
+import "unsafe"
+
+// Use with extreme caution
+func unsafeExample() {
+    var x int64 = 42
+    ptr := unsafe.Pointer(&x)
+    
+    // Cast to different type - can cause crashes/corruption
+    floatPtr := (*float64)(ptr)
+    _ = *floatPtr  // Undefined behavior
+}
+```
+
+<Warning>
+Avoid `unsafe` unless absolutely necessary. Code using `unsafe` can:
+- Cause memory corruption
+- Break on Go version updates
+- Violate memory safety guarantees
+- Create security vulnerabilities
+</Warning>
+
+When `unsafe` is necessary:
+- Document why it's needed
+- Add safety comments and assertions
+- Test thoroughly
+- Consider alternatives first
+
+## Input Validation
+
+### Validating User Input
+
+Always validate and sanitize user input:
+
+```go
+import (
+    "errors"
+    "net/mail"
+    "regexp"
+)
+
+// Validate email addresses
+func validateEmail(email string) error {
+    _, err := mail.ParseAddress(email)
+    return err
+}
+
+// Validate usernames (alphanumeric + underscore)
+var usernameRegex = regexp.MustCompile(`^[a-zA-Z0-9_]{3,20}$`)
+
+func validateUsername(username string) error {
+    if !usernameRegex.MatchString(username) {
+        return errors.New("invalid username format")
+    }
+    return nil
+}
+
+// Validate positive integers
+func validatePositiveInt(value int) error {
+    if value <= 0 {
+        return errors.New("value must be positive")
+    }
+    return nil
+}
+```
+
+### Path Traversal Prevention
+
+Prevent directory traversal attacks:
+
+```go
+import (
+    "errors"
+    "path/filepath"
+    "strings"
+)
+
+func safePath(baseDir, userPath string) (string, error) {
+    // Clean the path
+    cleanPath := filepath.Clean(userPath)
+    
+    // Join with base directory
+    fullPath := filepath.Join(baseDir, cleanPath)
+    
+    // Ensure result is within baseDir
+    if !strings.HasPrefix(fullPath, baseDir) {
+        return "", errors.New("path traversal attempt detected")
+    }
+    
+    return fullPath, nil
+}
+
+// Usage
+func serveFile(userPath string) error {
+    const baseDir = "/var/www/files"
+    
+    safePath, err := safePath(baseDir, userPath)
+    if err != nil {
+        return err
+    }
+    
+    // Now safe to use safePath
+    return serveFileFromPath(safePath)
+}
+```
+
+### SQL Injection Prevention
+
+Use parameterized queries:
+
+```go
+import "database/sql"
+
+// BAD: Vulnerable to SQL injection
+func getUserBad(db *sql.DB, username string) error {
+    query := "SELECT * FROM users WHERE username = '" + username + "'"
+    _, err := db.Exec(query)
+    return err
+}
+
+// GOOD: Safe parameterized query
+func getUserGood(db *sql.DB, username string) error {
+    query := "SELECT * FROM users WHERE username = ?"
+    _, err := db.Exec(query, username)
+    return err
+}
+
+// GOOD: Named parameters
+func getUserNamed(db *sql.DB, username string) error {
+    query := "SELECT * FROM users WHERE username = :username"
+    _, err := db.Exec(query, sql.Named("username", username))
+    return err
+}
+```
+
+<Note>
+Never concatenate user input into SQL queries. Always use parameterized queries or prepared statements.
+</Note>
+
+### Command Injection Prevention
+
+Avoid passing user input to shell commands:
+
+```go
+import "os/exec"
+
+// BAD: Vulnerable to command injection
+func runCommandBad(userInput string) error {
+    cmd := exec.Command("sh", "-c", "echo "+userInput)
+    return cmd.Run()
+}
+
+// GOOD: Use argument array
+func runCommandGood(userInput string) error {
+    cmd := exec.Command("echo", userInput)
+    return cmd.Run()
+}
+
+// BETTER: Validate input first
+func runCommandBetter(userInput string) error {
+    if !isValidInput(userInput) {
+        return errors.New("invalid input")
+    }
+    
+    cmd := exec.Command("echo", userInput)
+    return cmd.Run()
+}
+
+func isValidInput(input string) bool {
+    // Whitelist validation
+    matched, _ := regexp.MatchString(`^[a-zA-Z0-9\s]+$`, input)
+    return matched
+}
+```
+
+## Cryptography
+
+### Using crypto/rand
+
+Always use `crypto/rand` for security-sensitive random data:
+
+```go
+import (
+    "crypto/rand"
+    "encoding/hex"
+    "math/big"
+)
+
+// Generate random bytes
+func generateToken(length int) (string, error) {
+    bytes := make([]byte, length)
+    if _, err := rand.Read(bytes); err != nil {
+        return "", err
+    }
+    return hex.EncodeToString(bytes), nil
+}
+
+// Generate random number
+func generateRandomInt(max int64) (int64, error) {
+    n, err := rand.Int(rand.Reader, big.NewInt(max))
+    if err != nil {
+        return 0, err
+    }
+    return n.Int64(), nil
+}
+```
+
+<Warning>
+Never use `math/rand` for security purposes. It's predictable and not cryptographically secure.
+</Warning>
+
+### Password Hashing
+
+Use appropriate hashing algorithms:
+
+```go
+import (
+    "golang.org/x/crypto/bcrypt"
+)
+
+// Hash password
+func hashPassword(password string) (string, error) {
+    // Cost of 12 is a good default (2^12 iterations)
+    bytes, err := bcrypt.GenerateFromPassword([]byte(password), 12)
+    return string(bytes), err
+}
+
+// Verify password
+func checkPassword(password, hash string) bool {
+    err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+    return err == nil
+}
+
+// Example usage
+func registerUser(username, password string) error {
+    hash, err := hashPassword(password)
+    if err != nil {
+        return err
+    }
+    
+    // Store username and hash in database
+    return storeUser(username, hash)
+}
+```
+
+**Don't:**
+- Use MD5, SHA1, or plain SHA256 for passwords
+- Store passwords in plain text
+- Use custom hash functions
+
+**Do:**
+- Use bcrypt, scrypt, or Argon2
+- Use high cost factors
+- Salt automatically (bcrypt does this)
+
+### TLS Configuration
+
+Configure TLS properly:
+
+```go
+import (
+    "crypto/tls"
+    "net/http"
+)
+
+// Secure TLS configuration
+func secureHTTPClient() *http.Client {
+    tlsConfig := &tls.Config{
+        MinVersion:               tls.VersionTLS12,
+        CurvePreferences:         []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
+        PreferServerCipherSuites: true,
+        CipherSuites: []uint16{
+            tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+            tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+            tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+            tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+        },
+    }
+    
+    transport := &http.Transport{
+        TLSClientConfig: tlsConfig,
+    }
+    
+    return &http.Client{Transport: transport}
+}
+
+// Secure server configuration
+func secureHTTPServer() *http.Server {
+    tlsConfig := &tls.Config{
+        MinVersion:               tls.VersionTLS12,
+        CurvePreferences:         []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
+        PreferServerCipherSuites: true,
+        CipherSuites: []uint16{
+            tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+            tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+        },
+    }
+    
+    return &http.Server{
+        Addr:         ":443",
+        TLSConfig:    tlsConfig,
+        TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
+    }
+}
+```
+
+<Note>
+TLS 1.3 is available in Go 1.12+. Consider using `MinVersion: tls.VersionTLS13` for maximum security.
+</Note>
+
+## Web Application Security
+
+### Cross-Site Scripting (XSS) Prevention
+
+Use `html/template` for HTML generation:
+
+```go
+import "html/template"
+
+// Safe: html/template auto-escapes
+func renderTemplate(name string) string {
+    tmpl := template.Must(template.New("page").Parse(`
+        <h1>Hello {{.Name}}</h1>
+        <p>{{.Message}}</p>
+    `))
+    
+    data := struct {
+        Name    string
+        Message string
+    }{
+        Name:    "<script>alert('xss')</script>",  // Auto-escaped
+        Message: "User input here",                 // Auto-escaped
+    }
+    
+    var buf bytes.Buffer
+    tmpl.Execute(&buf, data)
+    return buf.String()
+}
+```
+
+**Don't:**
+- Use `text/template` for HTML (no escaping)
+- Mark user input as `template.HTML` (disables escaping)
+- Concatenate strings to build HTML
+
+### CSRF Protection
+
+Implement CSRF tokens:
+
+```go
+import (
+    "crypto/rand"
+    "encoding/base64"
+    "net/http"
+)
+
+// Generate CSRF token
+func generateCSRFToken() (string, error) {
+    b := make([]byte, 32)
+    _, err := rand.Read(b)
+    if err != nil {
+        return "", err
+    }
+    return base64.URLEncoding.EncodeToString(b), nil
+}
+
+// Middleware to check CSRF
+func csrfMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        if r.Method == "POST" || r.Method == "PUT" || r.Method == "DELETE" {
+            // Get token from session
+            session, _ := getSession(r)
+            expectedToken := session.CSRFToken
+            
+            // Get token from request
+            actualToken := r.FormValue("csrf_token")
+            
+            if actualToken != expectedToken {
+                http.Error(w, "Invalid CSRF token", http.StatusForbidden)
+                return
+            }
+        }
+        
+        next.ServeHTTP(w, r)
+    })
+}
+```
+
+Or use a library:
+```go
+import "github.com/gorilla/csrf"
+
+// Using gorilla/csrf
+func main() {
+    CSRF := csrf.Protect(
+        []byte("32-byte-long-auth-key"),
+        csrf.Secure(true),  // HTTPS only
+    )
+    
+    http.ListenAndServe(":8000", CSRF(handler))
+}
+```
+
+### Security Headers
+
+Set appropriate security headers:
+
+```go
+func securityHeaders(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // Prevent MIME type sniffing
+        w.Header().Set("X-Content-Type-Options", "nosniff")
+        
+        // Prevent clickjacking
+        w.Header().Set("X-Frame-Options", "DENY")
+        
+        // Enable XSS protection
+        w.Header().Set("X-XSS-Protection", "1; mode=block")
+        
+        // Content Security Policy
+        w.Header().Set("Content-Security-Policy", 
+            "default-src 'self'; script-src 'self'; style-src 'self'")
+        
+        // HSTS (HTTPS only)
+        w.Header().Set("Strict-Transport-Security", 
+            "max-age=63072000; includeSubDomains")
+        
+        // Referrer policy
+        w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+        
+        next.ServeHTTP(w, r)
+    })
+}
+```
+
+### Rate Limiting
+
+Implement rate limiting:
+
+```go
+import (
+    "golang.org/x/time/rate"
+    "sync"
+)
+
+// Simple rate limiter
+type RateLimiter struct {
+    limiters map[string]*rate.Limiter
+    mu       sync.RWMutex
+    r        rate.Limit
+    b        int
+}
+
+func NewRateLimiter(r rate.Limit, b int) *RateLimiter {
+    return &RateLimiter{
+        limiters: make(map[string]*rate.Limiter),
+        r:        r,
+        b:        b,
+    }
+}
+
+func (rl *RateLimiter) getLimiter(key string) *rate.Limiter {
+    rl.mu.Lock()
+    defer rl.mu.Unlock()
+    
+    limiter, exists := rl.limiters[key]
+    if !exists {
+        limiter = rate.NewLimiter(rl.r, rl.b)
+        rl.limiters[key] = limiter
+    }
+    
+    return limiter
+}
+
+// Middleware
+func (rl *RateLimiter) Middleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // Use IP address as key
+        key := r.RemoteAddr
+        
+        limiter := rl.getLimiter(key)
+        
+        if !limiter.Allow() {
+            http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
+            return
+        }
+        
+        next.ServeHTTP(w, r)
+    })
+}
+```
+
+## Secrets Management
+
+### Environment Variables
+
+Use environment variables for secrets:
+
+```go
+import "os"
+
+func getSecret() string {
+    secret := os.Getenv("API_SECRET")
+    if secret == "" {
+        log.Fatal("API_SECRET not set")
+    }
+    return secret
+}
+```
+
+**Don't:**
+- Hard-code secrets in source code
+- Commit secrets to version control
+- Log secrets
+
+**Do:**
+- Use environment variables
+- Use secret management services (Vault, AWS Secrets Manager)
+- Rotate secrets regularly
+
+### Secure Configuration
+
+```go
+type Config struct {
+    DatabaseURL string
+    APIKey      string
+    JWTSecret   string
+}
+
+func loadConfig() (*Config, error) {
+    return &Config{
+        DatabaseURL: mustGetEnv("DATABASE_URL"),
+        APIKey:      mustGetEnv("API_KEY"),
+        JWTSecret:   mustGetEnv("JWT_SECRET"),
+    }, nil
+}
+
+func mustGetEnv(key string) string {
+    value := os.Getenv(key)
+    if value == "" {
+        log.Fatalf("%s environment variable not set", key)
+    }
+    return value
+}
+
+// Prevent accidental logging
+func (c *Config) String() string {
+    return fmt.Sprintf("Config{DatabaseURL: [REDACTED], APIKey: [REDACTED], JWTSecret: [REDACTED]}")
+}
+```
+
+## Dependency Security
+
+### Vulnerability Scanning
+
+Use `govulncheck` to scan for vulnerabilities:
+
+```bash
+# Install
+go install golang.org/x/vuln/cmd/govulncheck@latest
+
+# Scan your code
+govulncheck ./...
+
+# Scan specific package
+govulncheck github.com/yourorg/yourpkg
+```
+
+### Dependency Management
+
+Keep dependencies up to date:
+
+```bash
+# List outdated dependencies
+go list -u -m all
+
+# Update specific dependency
+go get -u github.com/some/package@latest
+
+# Update all dependencies
+go get -u ./...
+
+# Tidy up
+go mod tidy
+```
+
+### Verify Dependencies
+
+```bash
+# Verify checksums
+go mod verify
+
+# Download with verification
+go mod download
+```
+
+## Error Handling
+
+### Avoid Information Disclosure
+
+Don't expose internal errors to users:
+
+```go
+// BAD: Exposes internal details
+func handleRequest(w http.ResponseWriter, r *http.Request) {
+    user, err := db.GetUser(id)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+}
+
+// GOOD: Generic error to user, detailed log internally
+func handleRequest(w http.ResponseWriter, r *http.Request) {
+    user, err := db.GetUser(id)
+    if err != nil {
+        log.Printf("Failed to get user %d: %v", id, err)
+        http.Error(w, "Internal server error", http.StatusInternalServerError)
+        return
+    }
+}
+```
+
+### Timing Attacks
+
+Use constant-time comparison for sensitive data:
+
+```go
+import "crypto/subtle"
+
+// BAD: Vulnerable to timing attacks
+func verifyTokenBad(expected, actual string) bool {
+    return expected == actual
+}
+
+// GOOD: Constant-time comparison
+func verifyTokenGood(expected, actual string) bool {
+    return subtle.ConstantTimeCompare([]byte(expected), []byte(actual)) == 1
+}
+```
+
+## Concurrency Safety
+
+### Race Conditions
+
+Use the race detector:
+
+```bash
+go test -race ./...
+go build -race
+go run -race main.go
+```
+
+Protect shared state:
+```go
+import "sync"
+
+type SafeCounter struct {
+    mu    sync.Mutex
+    count int
+}
+
+func (c *SafeCounter) Inc() {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    c.count++
+}
+
+func (c *SafeCounter) Value() int {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    return c.count
+}
+```
+
+## Best Practices Checklist
+
+### Code Security
+- [ ] No `unsafe` usage without justification
+- [ ] Input validation on all user input
+- [ ] Parameterized database queries
+- [ ] No command injection vulnerabilities
+- [ ] Proper error handling without information leakage
+
+### Cryptography
+- [ ] Using `crypto/rand` for random data
+- [ ] Passwords hashed with bcrypt/scrypt/Argon2
+- [ ] TLS 1.2+ configured properly
+- [ ] Secrets not in source code
+- [ ] Constant-time comparisons for secrets
+
+### Web Security
+- [ ] XSS prevention with `html/template`
+- [ ] CSRF protection implemented
+- [ ] Security headers configured
+- [ ] Rate limiting in place
+- [ ] HTTPS enforced
+
+### Dependencies
+- [ ] Regular vulnerability scanning
+- [ ] Dependencies up to date
+- [ ] Minimal dependency surface
+- [ ] Dependency checksums verified
+
+### Testing
+- [ ] Security tests written
+- [ ] Race detector used
+- [ ] Fuzzing for critical paths
+- [ ] Penetration testing performed
+
+## Security Resources
+
+### Official Resources
+- [Go Security Policy](https://golang.org/security)
+- [Go Vulnerability Database](https://vuln.go.dev/)
+- [crypto package docs](/pkg/crypto/)
+
+### Tools
+- [govulncheck](https://golang.org/x/vuln/cmd/govulncheck) - Vulnerability scanner
+- [gosec](https://github.com/securego/gosec) - Security linter
+- [nancy](https://github.com/sonatype-nexus-community/nancy) - Dependency scanner
+
+### Learning
+- [OWASP Top 10](https://owasp.org/www-project-top-ten/)
+- [Go Security Best Practices](https://golang.org/doc/security/best-practices)
+
+## Related Topics
+
+- [C Interoperability (cgo)](/advanced/cgo)
+- [Error Handling](/guides/error-handling)
+- [Testing](/guides/testing)
+- [Web Development](/guides/web)

@@ -1,0 +1,549 @@
+---
+title: 'Built-in Functions'
+description: 'Complete reference for Go built-in functions including make, new, append, copy, and more'
+keywords: ['builtin', 'functions', 'make', 'new', 'append', 'copy', 'len', 'cap', 'delete', 'close', 'panic', 'recover']
+---
+
+Go provides a set of predeclared functions that are available in all packages without import. These functions provide essential operations for working with slices, maps, channels, and managing program flow.
+
+## Memory Allocation
+
+### make
+
+Allocates and initializes an object of type slice, map, or channel.
+
+<ParamField path="t" type="Type" required>
+  The type to allocate. Must be a slice, map, or channel type.
+</ParamField>
+
+<ParamField path="size" type="IntegerType">
+  Size specification. Meaning varies by type:
+  - **Slice**: Length (required). Capacity defaults to length.
+  - **Map**: Initial capacity hint (optional).
+  - **Channel**: Buffer capacity (optional). Zero creates unbuffered channel.
+</ParamField>
+
+<ResponseField name="result" type="Type" required>
+  Returns the initialized object. Unlike `new`, returns the same type as the argument, not a pointer.
+</ResponseField>
+
+<CodeGroup>
+
+```go Slice
+// Create slice with length 5, capacity 5
+s := make([]int, 5)
+
+// Create slice with length 0, capacity 10
+s := make([]int, 0, 10)
+```
+
+```go Map
+// Create empty map
+m := make(map[string]int)
+
+// Create map with capacity hint
+m := make(map[string]int, 100)
+```
+
+```go Channel
+// Create unbuffered channel
+ch := make(chan int)
+
+// Create buffered channel with capacity 10
+ch := make(chan int, 10)
+```
+
+</CodeGroup>
+
+<Note>
+  The `make` function only works with slices, maps, and channels. For other types, use `new`.
+</Note>
+
+### new
+
+Allocates memory for a new variable and returns a pointer to it.
+
+<ParamField path="TypeOrExpr" type="TypeOrExpr" required>
+  Either a type or an expression:
+  - **Type T**: Allocates variable of type T initialized to zero value
+  - **Expression x**: Allocates variable of x's type initialized to x's value
+</ParamField>
+
+<ResponseField name="result" type="*Type" required>
+  Pointer to the newly allocated variable.
+</ResponseField>
+
+<CodeGroup>
+
+```go Type argument
+// Allocate int initialized to 0
+p := new(int)
+fmt.Println(*p) // 0
+
+// Allocate struct initialized to zero values
+type Point struct { X, Y int }
+p := new(Point)
+fmt.Println(*p) // {0 0}
+```
+
+```go Expression argument
+// Allocate int initialized to 42
+p := new(42)
+fmt.Println(*p) // 42
+```
+
+</CodeGroup>
+
+## Slice Operations
+
+### append
+
+Appends elements to the end of a slice and returns the updated slice.
+
+<ParamField path="slice" type="[]Type" required>
+  The slice to append to.
+</ParamField>
+
+<ParamField path="elems" type="...Type" required>
+  Elements to append. Can also use `...` to append another slice.
+</ParamField>
+
+<ResponseField name="result" type="[]Type" required>
+  The updated slice. May have a new underlying array if capacity was exceeded.
+</ResponseField>
+
+<CodeGroup>
+
+```go Basic usage
+slice := []int{1, 2, 3}
+slice = append(slice, 4, 5)
+fmt.Println(slice) // [1 2 3 4 5]
+```
+
+```go Append slice
+s1 := []int{1, 2, 3}
+s2 := []int{4, 5, 6}
+s1 = append(s1, s2...)
+fmt.Println(s1) // [1 2 3 4 5 6]
+```
+
+```go Append string to bytes
+slice := append([]byte("hello "), "world"...)
+fmt.Println(string(slice)) // "hello world"
+```
+
+</CodeGroup>
+
+<Warning>
+  Always assign the result of `append` back to a variable. If the slice's capacity is exceeded, `append` allocates a new array and the old slice will be unchanged.
+</Warning>
+
+### copy
+
+Copies elements from a source slice to a destination slice.
+
+<ParamField path="dst" type="[]Type" required>
+  Destination slice.
+</ParamField>
+
+<ParamField path="src" type="[]Type" required>
+  Source slice. Can also be a string when copying to `[]byte`.
+</ParamField>
+
+<ResponseField name="result" type="int" required>
+  Number of elements copied (minimum of `len(src)` and `len(dst)`).
+</ResponseField>
+
+<CodeGroup>
+
+```go Slice to slice
+src := []int{1, 2, 3, 4, 5}
+dst := make([]int, 3)
+n := copy(dst, src)
+fmt.Println(dst) // [1 2 3]
+fmt.Println(n)   // 3
+```
+
+```go String to bytes
+dst := make([]byte, 5)
+n := copy(dst, "hello world")
+fmt.Println(string(dst)) // "hello"
+fmt.Println(n)           // 5
+```
+
+```go Overlapping slices
+slice := []int{1, 2, 3, 4, 5}
+copy(slice[1:], slice[0:]) // Shift elements right
+fmt.Println(slice) // [1 1 2 3 4]
+```
+
+</CodeGroup>
+
+<Tip>
+  The source and destination slices may overlap. `copy` handles overlapping regions correctly.
+</Tip>
+
+### clear
+
+Clears all elements in a map or slice.
+
+<ParamField path="t" type="~[]Type | ~map[Type]Type1" required>
+  The map or slice to clear. If nil, `clear` is a no-op.
+</ParamField>
+
+<CodeGroup>
+
+```go Clear map
+m := map[string]int{"a": 1, "b": 2}
+clear(m)
+fmt.Println(len(m)) // 0
+```
+
+```go Clear slice
+s := []int{1, 2, 3, 4, 5}
+clear(s)
+fmt.Println(s) // [0 0 0 0 0]
+```
+
+</CodeGroup>
+
+<Note>
+  For maps, `clear` deletes all entries. For slices, `clear` sets all elements up to the length to their zero value but does not change the length or capacity.
+</Note>
+
+## Map Operations
+
+### delete
+
+Deletes an element from a map.
+
+<ParamField path="m" type="map[Type]Type1" required>
+  The map to delete from.
+</ParamField>
+
+<ParamField path="key" type="Type" required>
+  The key to delete.
+</ParamField>
+
+```go
+m := map[string]int{"a": 1, "b": 2, "c": 3}
+delete(m, "b")
+fmt.Println(m) // map[a:1 c:3]
+
+// Delete non-existent key is a no-op
+delete(m, "z")
+
+// Delete from nil map is a no-op
+var nilMap map[string]int
+delete(nilMap, "key") // No panic
+```
+
+## Size and Capacity
+
+### len
+
+Returns the length of various types.
+
+<ParamField path="v" type="Type" required>
+  Value to measure. Supported types:
+  - Array: number of elements
+  - Pointer to array: number of elements in *v (even if v is nil)
+  - Slice or map: number of elements; zero if v is nil
+  - String: number of bytes
+  - Channel: number of queued elements; zero if v is nil
+</ParamField>
+
+<ResponseField name="result" type="int" required>
+  The length of v.
+</ResponseField>
+
+```go
+// Array
+arr := [3]int{1, 2, 3}
+fmt.Println(len(arr)) // 3
+
+// Slice
+slice := []int{1, 2, 3, 4, 5}
+fmt.Println(len(slice)) // 5
+
+// Map
+m := map[string]int{"a": 1, "b": 2}
+fmt.Println(len(m)) // 2
+
+// String
+s := "hello"
+fmt.Println(len(s)) // 5
+
+// Channel
+ch := make(chan int, 3)
+ch <- 1
+ch <- 2
+fmt.Println(len(ch)) // 2
+```
+
+<Tip>
+  For some arguments like string literals or simple array expressions, `len` can be evaluated as a compile-time constant.
+</Tip>
+
+### cap
+
+Returns the capacity of various types.
+
+<ParamField path="v" type="Type" required>
+  Value to measure. Supported types:
+  - Array: number of elements (same as len)
+  - Pointer to array: number of elements (same as len)
+  - Slice: maximum length when resliced; zero if v is nil
+  - Channel: buffer capacity; zero if v is nil
+</ParamField>
+
+<ResponseField name="result" type="int" required>
+  The capacity of v.
+</ResponseField>
+
+```go
+// Slice
+slice := make([]int, 5, 10)
+fmt.Println(len(slice)) // 5
+fmt.Println(cap(slice)) // 10
+
+// Array
+arr := [5]int{}
+fmt.Println(cap(arr)) // 5
+
+// Channel
+ch := make(chan int, 100)
+fmt.Println(cap(ch)) // 100
+```
+
+## Channel Operations
+
+### close
+
+Closes a channel.
+
+<ParamField path="c" type="chan<- Type" required>
+  The channel to close. Must be bidirectional or send-only.
+</ParamField>
+
+```go
+ch := make(chan int)
+
+go func() {
+    ch <- 1
+    ch <- 2
+    ch <- 3
+    close(ch) // Signal no more values
+}()
+
+for v := range ch {
+    fmt.Println(v) // 1, 2, 3
+}
+
+// Receiving from closed channel returns zero value
+v, ok := <-ch
+fmt.Println(v, ok) // 0 false
+```
+
+<Warning>
+  Only the sender should close a channel, never the receiver. Sending to a closed channel causes a panic.
+</Warning>
+
+## Numeric Operations
+
+### min
+
+Returns the smallest value from a set of ordered values.
+
+<ParamField path="x" type="T" required>
+  First value. Type must implement `cmp.Ordered`.
+</ParamField>
+
+<ParamField path="y" type="...T">
+  Additional values to compare.
+</ParamField>
+
+<ResponseField name="result" type="T" required>
+  The smallest value. Returns NaN if any floating-point argument is NaN.
+</ResponseField>
+
+```go
+fmt.Println(min(1, 2, 3))           // 1
+fmt.Println(min(3.14, 2.71, 1.41))  // 1.41
+fmt.Println(min("apple", "banana")) // "apple"
+```
+
+### max
+
+Returns the largest value from a set of ordered values.
+
+<ParamField path="x" type="T" required>
+  First value. Type must implement `cmp.Ordered`.
+</ParamField>
+
+<ParamField path="y" type="...T">
+  Additional values to compare.
+</ParamField>
+
+<ResponseField name="result" type="T" required>
+  The largest value. Returns NaN if any floating-point argument is NaN.
+</ResponseField>
+
+```go
+fmt.Println(max(1, 2, 3))           // 3
+fmt.Println(max(3.14, 2.71, 1.41))  // 3.14
+fmt.Println(max("apple", "banana")) // "banana"
+```
+
+## Complex Number Operations
+
+### complex
+
+Constructs a complex number from real and imaginary parts.
+
+<ParamField path="r" type="FloatType" required>
+  Real part (float32 or float64).
+</ParamField>
+
+<ParamField path="i" type="FloatType" required>
+  Imaginary part (must be same type as real part).
+</ParamField>
+
+<ResponseField name="result" type="ComplexType" required>
+  Complex number (complex64 for float32, complex128 for float64).
+</ResponseField>
+
+```go
+c := complex(3.0, 4.0)
+fmt.Println(c) // (3+4i)
+```
+
+### real
+
+Returns the real part of a complex number.
+
+<ParamField path="c" type="ComplexType" required>
+  Complex number.
+</ParamField>
+
+<ResponseField name="result" type="FloatType" required>
+  Real part of the complex number.
+</ResponseField>
+
+```go
+c := complex(3.0, 4.0)
+fmt.Println(real(c)) // 3.0
+```
+
+### imag
+
+Returns the imaginary part of a complex number.
+
+<ParamField path="c" type="ComplexType" required>
+  Complex number.
+</ParamField>
+
+<ResponseField name="result" type="FloatType" required>
+  Imaginary part of the complex number.
+</ResponseField>
+
+```go
+c := complex(3.0, 4.0)
+fmt.Println(imag(c)) // 4.0
+```
+
+## Error Handling
+
+### panic
+
+Stops normal execution and begins panicking.
+
+<ParamField path="v" type="any" required>
+  The panic value. Starting in Go 1.21, passing nil causes a run-time error.
+</ParamField>
+
+```go
+func validateAge(age int) {
+    if age < 0 {
+        panic("age cannot be negative")
+    }
+}
+
+func main() {
+    defer func() {
+        if r := recover(); r != nil {
+            fmt.Println("Recovered:", r)
+        }
+    }()
+    
+    validateAge(-5) // Panics
+    fmt.Println("This won't execute")
+}
+```
+
+<Warning>
+  Panicking should be reserved for truly exceptional situations. For normal error handling, use error values.
+</Warning>
+
+### recover
+
+Regains control of a panicking goroutine.
+
+<ResponseField name="result" type="any" required>
+  The value passed to `panic`, or nil if not panicking or if called outside a deferred function.
+</ResponseField>
+
+```go
+func safeDivide(a, b int) (result int, err error) {
+    defer func() {
+        if r := recover(); r != nil {
+            err = fmt.Errorf("panic: %v", r)
+        }
+    }()
+    
+    return a / b, nil
+}
+
+result, err := safeDivide(10, 0)
+if err != nil {
+    fmt.Println(err) // panic: runtime error: integer divide by zero
+}
+```
+
+<Note>
+  `recover` only works when called directly from a deferred function. Calling it from functions called by the deferred function will not stop the panic.
+</Note>
+
+## Debugging
+
+### print
+
+Formats and writes arguments to standard error.
+
+<ParamField path="args" type="...Type">
+  Values to print.
+</ParamField>
+
+```go
+print("Debug: ", 42, "\n")
+```
+
+<Warning>
+  `print` is for bootstrapping and debugging only. It is not guaranteed to remain in the language. Use `fmt.Print` for production code.
+</Warning>
+
+### println
+
+Formats and writes arguments to standard error with spaces between arguments and a trailing newline.
+
+<ParamField path="args" type="...Type">
+  Values to print.
+</ParamField>
+
+```go
+println("Debug:", 42)
+```
+
+<Warning>
+  `println` is for bootstrapping and debugging only. It is not guaranteed to remain in the language. Use `fmt.Println` for production code.
+</Warning>

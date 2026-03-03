@@ -1,0 +1,148 @@
+---
+title: sort
+description: Sorting slices and user-defined collections
+---
+
+The `sort` package provides primitives for sorting slices and user-defined collections.
+
+## Basic Sorting
+
+```go
+import "sort"
+
+// Sort int slice
+nums := []int{3, 1, 4, 1, 5, 9}
+sort.Ints(nums)
+// [1, 1, 3, 4, 5, 9]
+
+// Sort strings
+words := []string{"banana", "apple", "cherry"}
+sort.Strings(words)
+// ["apple", "banana", "cherry"]
+
+// Sort floats
+values := []float64{3.14, 1.41, 2.71}
+sort.Float64s(values)
+```
+
+## Reverse Sort
+
+```go
+// Reverse order
+nums := []int{3, 1, 4, 1, 5}
+sort.Sort(sort.Reverse(sort.IntSlice(nums)))
+// [5, 4, 3, 1, 1]
+```
+
+## Custom Sort
+
+```go
+type Person struct {
+    Name string
+    Age  int
+}
+
+type ByAge []Person
+
+func (a ByAge) Len() int           { return len(a) }
+func (a ByAge) Less(i, j int) bool { return a[i].Age < a[j].Age }
+func (a ByAge) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+
+func sortPeople() {
+    people := []Person{
+        {"Alice", 30},
+        {"Bob", 25},
+        {"Charlie", 35},
+    }
+    
+    sort.Sort(ByAge(people))
+}
+```
+
+## Slice Sort (Go 1.8+)
+
+```go
+// Sort with custom function
+people := []Person{{"Alice", 30}, {"Bob", 25}}
+
+sort.Slice(people, func(i, j int) bool {
+    return people[i].Age < people[j].Age
+})
+
+// Stable sort
+sort.SliceStable(people, func(i, j int) bool {
+    return people[i].Name < people[j].Name
+})
+```
+
+## Searching
+
+```go
+// Binary search (requires sorted slice)
+nums := []int{1, 3, 5, 7, 9}
+index := sort.SearchInts(nums, 5) // 2
+
+// Search with custom function
+index = sort.Search(len(nums), func(i int) bool {
+    return nums[i] >= 6
+})
+// Returns index where 6 would be inserted
+```
+
+## Check if Sorted
+
+```go
+nums := []int{1, 2, 3}
+isSorted := sort.IntsAreSorted(nums) // true
+
+words := []string{"a", "c", "b"}
+isSorted = sort.StringsAreSorted(words) // false
+
+// Custom check
+isSorted = sort.SliceIsSorted(people, func(i, j int) bool {
+    return people[i].Age < people[j].Age
+})
+```
+
+## Practical Examples
+
+### Sort Map Keys
+
+```go
+func sortedMapKeys(m map[string]int) []string {
+    keys := make([]string, 0, len(m))
+    for k := range m {
+        keys = append(keys, k)
+    }
+    sort.Strings(keys)
+    return keys
+}
+```
+
+### Multi-field Sort
+
+```go
+sort.Slice(people, func(i, j int) bool {
+    if people[i].Age != people[j].Age {
+        return people[i].Age < people[j].Age
+    }
+    return people[i].Name < people[j].Name
+})
+```
+
+### Top K Elements
+
+```go
+func topK(nums []int, k int) []int {
+    sort.Sort(sort.Reverse(sort.IntSlice(nums)))
+    return nums[:k]
+}
+```
+
+## Best Practices
+
+1. **Use Slice functions** - Simpler than implementing sort.Interface
+2. **Use stable sort** - When order of equal elements matters
+3. **Sort before search** - Binary search requires sorted data
+4. **Check if sorted** - Avoid unnecessary sorting
+5. **Consider performance** - Slice sort has overhead

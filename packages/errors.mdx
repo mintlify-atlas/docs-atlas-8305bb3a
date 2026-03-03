@@ -1,0 +1,481 @@
+---
+title: errors
+description: Error creation and handling in Go
+---
+
+The `errors` package implements functions to manipulate errors. It provides functionality for creating, wrapping, and inspecting errors.
+
+## Creating Errors
+
+### Basic Error Creation
+
+```go
+import "errors"
+
+// Create a simple error
+var ErrNotFound = errors.New("resource not found")
+
+func findUser(id int) error {
+    if id < 0 {
+        return errors.New("invalid user ID")
+    }
+    return nil
+}
+```
+
+### Formatted Errors with fmt.Errorf
+
+```go
+import "fmt"
+
+func validateAge(age int) error {
+    if age < 0 {
+        return fmt.Errorf("invalid age: %d", age)
+    }
+    return nil
+}
+```
+
+## Error Wrapping
+
+### Wrapping with %w
+
+```go
+func readConfig(filename string) error {
+    data, err := os.ReadFile(filename)
+    if err != nil {
+        return fmt.Errorf("failed to read config: %w", err)
+    }
+    // Process data...
+    return nil
+}
+```
+
+### Multiple Error Wrapping (Go 1.20+)
+
+```go
+func multipleErrors() error {
+    err1 := errors.New("first error")
+    err2 := errors.New("second error")
+    
+    return fmt.Errorf("multiple failures: %w, %w", err1, err2)
+}
+```
+
+## Error Inspection
+
+### errors.Is
+
+Check if an error matches a target error.
+
+```go
+import (
+    "errors"
+    "io/fs"
+)
+
+func handleError(err error) {
+    if errors.Is(err, fs.ErrNotExist) {
+        fmt.Println("File does not exist")
+    } else if errors.Is(err, fs.ErrPermission) {
+        fmt.Println("Permission denied")
+    } else {
+        fmt.Printf("Other error: %v\n", err)
+    }
+}
+
+func example() {
+    _, err := os.Open("nonexistent.txt")
+    if err != nil {
+        handleError(err)
+    }
+}
+```
+
+### errors.As
+
+Extract a specific error type from an error chain.
+
+```go
+import "os"
+
+func examineError(err error) {
+    var pathErr *os.PathError
+    if errors.As(err, &pathErr) {
+        fmt.Printf("Operation: %s\n", pathErr.Op)
+        fmt.Printf("Path: %s\n", pathErr.Path)
+        fmt.Printf("Error: %v\n", pathErr.Err)
+    }
+}
+```
+
+### errors.Unwrap
+
+Unwrap a wrapped error.
+
+```go
+func unwrapExample(err error) {
+    unwrapped := errors.Unwrap(err)
+    if unwrapped != nil {
+        fmt.Printf("Unwrapped: %v\n", unwrapped)
+    }
+}
+```
+
+## Custom Error Types
+
+### Simple Custom Error
+
+```go
+type ValidationError struct {
+    Field string
+    Value interface{}
+    Msg   string
+}
+
+func (e *ValidationError) Error() string {
+    return fmt.Sprintf("%s validation failed: %s (value: %v)", e.Field, e.Msg, e.Value)
+}
+
+func validateEmail(email string) error {
+    if !strings.Contains(email, "@") {
+        return &ValidationError{
+            Field: "email",
+            Value: email,
+            Msg:   "must contain @",
+        }
+    }
+    return nil
+}
+```
+
+### Custom Error with Wrapping
+
+```go
+type DatabaseError struct {
+    Query string
+    Err   error
+}
+
+func (e *DatabaseError) Error() string {
+    return fmt.Sprintf("database query failed: %s", e.Query)
+}
+
+func (e *DatabaseError) Unwrap() error {
+    return e.Err
+}
+
+func executeQuery(query string) error {
+    err := errors.New("connection timeout")
+    if err != nil {
+        return &DatabaseError{
+            Query: query,
+            Err:   err,
+        }
+    }
+    return nil
+}
+```
+
+### Error with Is Support
+
+```go
+type NotFoundError struct {
+    Resource string
+    ID       int
+}
+
+func (e *NotFoundError) Error() string {
+    return fmt.Sprintf("%s with ID %d not found", e.Resource, e.ID)
+}
+
+var ErrNotFound = errors.New("not found")
+
+func (e *NotFoundError) Is(target error) bool {
+    return target == ErrNotFound
+}
+
+func findResource(id int) error {
+    return &NotFoundError{Resource: "user", ID: id}
+}
+
+func handleNotFound() {
+    err := findResource(123)
+    if errors.Is(err, ErrNotFound) {
+        fmt.Println("Resource not found")
+    }
+}
+```
+
+## Practical Examples
+
+### Multi-Error Accumulation
+
+```go
+type MultiError struct {
+    Errors []error
+}
+
+func (m *MultiError) Error() string {
+    var messages []string
+    for _, err := range m.Errors {
+        messages = append(messages, err.Error())
+    }
+    return strings.Join(messages, "; ")
+}
+
+func (m *MultiError) Add(err error) {
+    if err != nil {
+        m.Errors = append(m.Errors, err)
+    }
+}
+
+func (m *MultiError) HasErrors() bool {
+    return len(m.Errors) > 0
+}
+
+func validateUser(user User) error {
+    var errs MultiError
+    
+    if user.Name == "" {
+        errs.Add(errors.New("name is required"))
+    }
+    if user.Email == "" {
+        errs.Add(errors.New("email is required"))
+    }
+    if user.Age < 0 {
+        errs.Add(errors.New("age must be positive"))
+    }
+    
+    if errs.HasErrors() {
+        return &errs
+    }
+    return nil
+}
+```
+
+### Error Chain Walking
+
+```go
+func printErrorChain(err error) {
+    for err != nil {
+        fmt.Printf("Error: %v\n", err)
+        err = errors.Unwrap(err)
+    }
+}
+
+func example() {
+    err := fmt.Errorf("outer: %w",
+        fmt.Errorf("middle: %w",
+            errors.New("inner error")))
+    
+    printErrorChain(err)
+    // Output:
+    // Error: outer: middle: inner error
+    // Error: middle: inner error
+    // Error: inner error
+}
+```
+
+### Retry with Error Context
+
+```go
+func retryOperation(op func() error, maxRetries int) error {
+    var lastErr error
+    
+    for i := 0; i < maxRetries; i++ {
+        err := op()
+        if err == nil {
+            return nil
+        }
+        
+        lastErr = fmt.Errorf("attempt %d/%d: %w", i+1, maxRetries, err)
+        time.Sleep(time.Second * time.Duration(i+1))
+    }
+    
+    return fmt.Errorf("operation failed after %d retries: %w", maxRetries, lastErr)
+}
+```
+
+### Sentinel Errors
+
+```go
+var (
+    ErrInvalidInput    = errors.New("invalid input")
+    ErrUnauthorized    = errors.New("unauthorized")
+    ErrResourceExpired = errors.New("resource expired")
+)
+
+func processRequest(req Request) error {
+    if req.Token == "" {
+        return ErrUnauthorized
+    }
+    if req.Data == nil {
+        return ErrInvalidInput
+    }
+    // Process...
+    return nil
+}
+
+func handleRequest(req Request) {
+    err := processRequest(req)
+    
+    switch {
+    case errors.Is(err, ErrUnauthorized):
+        // Handle auth error
+    case errors.Is(err, ErrInvalidInput):
+        // Handle validation error
+    case err != nil:
+        // Handle other errors
+    }
+}
+```
+
+### Error with Context Information
+
+```go
+type HTTPError struct {
+    StatusCode int
+    Message    string
+    Err        error
+}
+
+func (e *HTTPError) Error() string {
+    if e.Err != nil {
+        return fmt.Sprintf("%d %s: %v", e.StatusCode, e.Message, e.Err)
+    }
+    return fmt.Sprintf("%d %s", e.StatusCode, e.Message)
+}
+
+func (e *HTTPError) Unwrap() error {
+    return e.Err
+}
+
+func makeRequest(url string) error {
+    resp, err := http.Get(url)
+    if err != nil {
+        return &HTTPError{
+            StatusCode: 0,
+            Message:    "request failed",
+            Err:        err,
+        }
+    }
+    defer resp.Body.Close()
+    
+    if resp.StatusCode != 200 {
+        return &HTTPError{
+            StatusCode: resp.StatusCode,
+            Message:    "unexpected status",
+        }
+    }
+    
+    return nil
+}
+```
+
+## Error Handling Patterns
+
+### Early Return
+
+```go
+func processData(data []byte) error {
+    if len(data) == 0 {
+        return errors.New("empty data")
+    }
+    
+    parsed, err := parse(data)
+    if err != nil {
+        return fmt.Errorf("parse failed: %w", err)
+    }
+    
+    if err := validate(parsed); err != nil {
+        return fmt.Errorf("validation failed: %w", err)
+    }
+    
+    return save(parsed)
+}
+```
+
+### Error Decoration
+
+```go
+func decorateError(operation string, err error) error {
+    if err == nil {
+        return nil
+    }
+    return fmt.Errorf("%s failed: %w", operation, err)
+}
+
+func workflow() error {
+    if err := step1(); err != nil {
+        return decorateError("step1", err)
+    }
+    if err := step2(); err != nil {
+        return decorateError("step2", err)
+    }
+    return nil
+}
+```
+
+### Panic Recovery with Error
+
+```go
+func safeExecute(fn func() error) (err error) {
+    defer func() {
+        if r := recover(); r != nil {
+            err = fmt.Errorf("panic recovered: %v", r)
+        }
+    }()
+    
+    return fn()
+}
+```
+
+## Best Practices
+
+1. **Use error wrapping** - Preserve error context with `%w`
+2. **Create sentinel errors** - Define package-level error variables for common errors
+3. **Use errors.Is and errors.As** - Don't compare errors with `==` directly
+4. **Provide context** - Add information about what was being done when the error occurred
+5. **Don't ignore errors** - Always handle or explicitly ignore with `_ = err`
+6. **Custom error types** - Create custom types for errors with additional information
+7. **Error messages** - Start with lowercase, no punctuation at end
+8. **Wrap errors once** - Don't wrap the same error multiple times unnecessarily
+
+## Common Patterns
+
+### Error Variable Naming
+
+```go
+var (
+    ErrNotFound      = errors.New("not found")
+    ErrAlreadyExists = errors.New("already exists")
+    ErrInvalidFormat = errors.New("invalid format")
+)
+```
+
+### Error Type Naming
+
+```go
+type ValidationError struct { /* ... */ }
+type NetworkError struct { /* ... */ }
+type ConfigError struct { /* ... */ }
+```
+
+## errors.Join (Go 1.20+)
+
+Combine multiple errors into one.
+
+```go
+func processAll(items []Item) error {
+    var errs []error
+    
+    for _, item := range items {
+        if err := process(item); err != nil {
+            errs = append(errs, err)
+        }
+    }
+    
+    return errors.Join(errs...)
+}
+```

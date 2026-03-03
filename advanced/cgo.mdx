@@ -1,0 +1,578 @@
+---
+title: 'C Interoperability (cgo)'
+description: 'Complete guide to using cgo for calling C code from Go'
+---
+
+## Overview
+
+Cgo enables Go packages to call C code and vice versa. It's a powerful tool for integrating with existing C libraries, accessing system APIs, and interfacing with legacy code. However, it comes with complexity and performance implications that should be carefully considered.
+
+<Warning>
+Using cgo disables cross-compilation by default and introduces dependencies on C toolchains. Consider alternatives before using cgo.
+</Warning>
+
+## Basic Usage
+
+### Simple Example
+
+```go
+package main
+
+// #include <stdio.h>
+// #include <stdlib.h>
+import "C"
+import "unsafe"
+
+func main() {
+    cs := C.CString("Hello from Go!")
+    defer C.free(unsafe.Pointer(cs))
+    
+    C.puts(cs)
+}
+```
+
+The comment before `import "C"` is the **preamble** - it contains C code that's compiled with the package.
+
+### Build Configuration
+
+Use `#cgo` directives in the preamble to configure compilation:
+
+```go
+// #cgo CFLAGS: -DPNG_DEBUG=1
+// #cgo amd64 386 CFLAGS: -DX86=1
+// #cgo LDFLAGS: -lpng
+// #include <png.h>
+import "C"
+```
+
+Or use pkg-config:
+```go
+// #cgo pkg-config: png cairo
+// #include <png.h>
+import "C"
+```
+
+#### Security Restrictions
+
+For security, only certain flags are allowed:
+- Allowed: `-D`, `-U`, `-I`, `-l`
+- Override with: `CGO_CFLAGS_ALLOW` (regex to allow)
+- Block with: `CGO_CFLAGS_DISALLOW` (regex to block)
+
+Similarly: `CGO_LDFLAGS_ALLOW`, `CGO_LDFLAGS_DISALLOW`, etc.
+
+#### SRCDIR Variable
+
+Use `${SRCDIR}` for package-relative paths:
+
+```go
+// #cgo LDFLAGS: -L${SRCDIR}/libs -lfoo
+import "C"
+```
+
+Expands to absolute path of the package directory.
+
+## Go to C
+
+### Accessing C Types
+
+C types are accessible with the `C.` prefix:
+
+```go
+var x C.int = 42
+var y C.size_t = 100
+var z C.char = 'A'
+
+// Standard numeric types
+var a C.short
+var b C.long
+var c C.longlong
+var d C.float
+var e C.double
+
+// Special types
+var ptr unsafe.Pointer  // Equivalent to void*
+```
+
+### Accessing C Structs and Unions
+
+```go
+// C struct
+var s C.struct_stat
+size := C.sizeof_struct_stat
+
+// Union (represented as byte array)
+var u C.union_data
+
+// Enum
+var e C.enum_color
+```
+
+Accessing fields:
+```go
+var stat C.struct_stat
+mode := stat.st_mode
+
+// If field name is Go keyword, prefix with underscore
+// For "type" field: stat._type
+```
+
+<Note>
+Struct fields that can't be expressed in Go (bit fields, misaligned data) are omitted and replaced with padding.
+</Note>
+
+### Calling C Functions
+
+```go
+// Call C function
+result := C.sqrt(2.0)
+
+// Get errno as second return value
+n, err := C.setenv(key, value, 1)
+if n != 0 {
+    // Check if call failed before using err
+    return err
+}
+
+// Void functions
+_, err := C.voidFunc()
+```
+
+<Warning>
+Unlike Go conventions, check if the C function call succeeded before checking the error value. The errno may be non-zero even on success.
+</Warning>
+
+### Converting Between Go and C
+
+#### Strings
+
+```go
+// Go string to C string (allocated with malloc)
+cs := C.CString("hello")
+defer C.free(unsafe.Pointer(cs))  // Must free!
+
+// C string to Go string
+goStr := C.GoString(cs)
+
+// C string with length to Go string
+goStr := C.GoStringN(cs, C.int(length))
+```
+
+#### Byte Slices
+
+```go
+// Go []byte to C array (allocated with malloc)
+cb := C.CBytes([]byte{1, 2, 3})
+defer C.free(cb)  // Must free!
+
+// C data to Go []byte
+goBytes := C.GoBytes(ptr, C.int(length))
+```
+
+#### Arrays
+
+```go
+// Go arrays must pass pointer to first element
+var arr [10]C.int
+C.processArray(&arr[0])  // Not C.processArray(arr)
+```
+
+### Go Function Pointers
+
+You can pass function pointers between Go and C:
+
+```go
+package main
+
+// typedef int (*intFunc)();
+//
+// int bridge_int_func(intFunc f) {
+//     return f();
+// }
+//
+// int fortytwo() {
+//     return 42;
+// }
+import "C"
+import "fmt"
+
+func main() {
+    f := C.intFunc(C.fortytwo)
+    fmt.Println(int(C.bridge_int_func(f)))
+    // Output: 42
+}
+```
+
+<Note>
+Calling C function pointers from Go is not supported, but C can call function pointers received from Go.
+</Note>
+
+## C to Go
+
+### Exporting Go Functions
+
+```go
+package mylib
+
+import "C"
+
+//export MyFunction
+func MyFunction(arg1, arg2 C.int) C.int {
+    return arg1 + arg2
+}
+
+//export ProcessData  
+func ProcessData(data *C.char, length C.int) {
+    goData := C.GoBytes(unsafe.Pointer(data), length)
+    // Process goData...
+}
+```
+
+These are available in `_cgo_export.h`:
+
+```c
+extern int MyFunction(int arg1, int arg2);
+extern void ProcessData(char* data, int length);
+```
+
+### Restrictions with //export
+
+<Warning>
+When using `//export`, the preamble must contain only declarations, not definitions. Definitions cause duplicate symbols during linking.
+</Warning>
+
+Put definitions in:
+- Preambles of other files (without `//export`)
+- Separate C source files in the same package
+
+### _GoString_ Type
+
+C functions can accept Go strings:
+
+```go
+// In preamble:
+// size_t _GoStringLen(_GoString_ s);
+// const char *_GoStringPtr(_GoString_ s);
+//
+// void processString(_GoString_ s) {
+//     const char* p = _GoStringPtr(s);
+//     size_t len = _GoStringLen(s);
+//     // Use p and len...
+// }
+import "C"
+
+func main() {
+    C.processString("Hello, C!")
+}
+```
+
+<Warning>
+C code must not modify the pointer returned by `_GoStringPtr`. The string may not have a trailing NUL byte.
+</Warning>
+
+## Pointer Passing Rules
+
+### Overview
+
+Go is garbage collected, so the GC must know about all pointers. This creates restrictions on passing pointers between Go and C.
+
+**Definitions:**
+- **Go pointer**: Points to Go-allocated memory (using `&`, `new`, etc.)
+- **C pointer**: Points to C-allocated memory (using `C.malloc`, etc.)
+
+### Rules
+
+1. **Go pointers passed to C must point to pinned memory**
+   - Function arguments are implicitly pinned during the call
+   - Use `runtime.Pinner` for longer-term pinning
+
+2. **Go pointers cannot contain unpinned Go pointers**
+   ```go
+   type Data struct {
+       p *int  // This is a Go pointer
+   }
+   
+   var d Data
+   C.process(&d)  // ERROR: d.p is unpinned Go pointer
+   ```
+
+3. **C code cannot store Go pointers beyond call duration**
+   - Unless memory is pinned with `runtime.Pinner`
+
+4. **Cannot pass string, slice, channel to C for storage**
+   - These cannot be pinned with `runtime.Pinner`
+
+### Pinning Memory
+
+```go
+import "runtime"
+
+type MyData struct {
+    value int
+}
+
+func main() {
+    data := &MyData{value: 42}
+    
+    var pinner runtime.Pinner
+    pinner.Pin(data)
+    
+    // Safe to pass to C and store
+    C.storePointer(unsafe.Pointer(data))
+    
+    // ... later ...
+    
+    pinner.Unpin()  // Must unpin when done
+    C.clearPointer()
+}
+```
+
+### Checking
+
+Controlled by `GODEBUG=cgocheck`:
+- `cgocheck=1` (default): Cheap dynamic checks
+- `cgocheck=0`: Disable checks (unsafe!)
+- `GOEXPERIMENT=cgocheck2`: Complete checking (slower)
+
+<Warning>
+Breaking pointer rules can cause crashes and memory corruption. The checks may not catch all violations.
+</Warning>
+
+## Performance Optimization
+
+### noescape Directive
+
+Tell compiler Go pointers don't escape:
+
+```go
+// #cgo noescape processData
+//
+// void processData(void* data, int len);
+import "C"
+```
+
+Avoids forcing object to heap. Only safe if C doesn't store the pointer.
+
+### nocallback Directive
+
+Tell compiler C function won't call back to Go:
+
+```go
+// #cgo nocallback fastFunction
+//
+// int fastFunction(int x);
+import "C"
+```
+
+Skips callback preparation overhead. Program panics if C calls back to Go.
+
+## Build Configuration
+
+### Enabling/Disabling cgo
+
+```bash
+# Enable cgo
+CGO_ENABLED=1 go build
+
+# Disable cgo  
+CGO_ENABLED=0 go build
+```
+
+Default behavior:
+- Enabled for native builds with C compiler available
+- Disabled for cross-compilation
+- Disabled when `CC` unset and no C compiler found
+
+### Cross-Compilation
+
+Set C cross-compiler:
+
+```bash
+# Generic
+CC_FOR_TARGET=arm-linux-gnueabi-gcc
+
+# Specific
+CC_FOR_linux_arm=arm-linux-gnueabi-gcc
+CXX_FOR_linux_arm=arm-linux-gnueabi-g++
+
+# Or at runtime
+CC=arm-linux-gnueabi-gcc go build
+```
+
+### Build Constraints
+
+Files with `import "C"` imply the `cgo` build constraint:
+
+```go
+//go:build cgo
+
+package mypackage
+
+import "C"
+```
+
+When cgo is disabled, these files are not built.
+
+## Internal Implementation
+
+### Build Process
+
+When `go build` sees `import "C"`:
+
+1. **Parse preamble** - Extract C code and `#cgo` directives
+2. **Invoke gcc** - Determine types and constants
+3. **Generate files**:
+   - `*.cgo1.go` - Modified Go code with C calls replaced
+   - `_cgo_gotypes.go` - Type and function definitions
+   - `*.cgo2.c` - C wrappers for Go-called C functions
+   - `_cgo_export.c` - C wrappers for C-called Go functions
+   - `_cgo_export.h` - Header with exported Go functions
+
+4. **Compile** - Compile Go and C files separately
+5. **Link** - Link Go and C object files together
+
+### Linking Modes
+
+**Internal linking** (default for stdlib cgo packages):
+- `cmd/link` processes object files directly
+- Limited ELF/Mach-O/PE support
+- No external linker needed
+
+**External linking** (default for other cgo):
+- `cmd/link` creates `go.o` with all Go code
+- Invokes host linker (gcc/clang) to combine with C code
+- Supports arbitrary C libraries
+
+Override with:
+```bash
+go build -ldflags='-linkmode=internal'
+go build -ldflags='-linkmode=external'
+```
+
+## Common Patterns
+
+### Wrapping Variadic Functions
+
+C variadic functions aren't directly supported:
+
+```go
+// #include <stdio.h>
+// #include <stdlib.h>
+//
+// static void myprintf(char* fmt, char* s) {
+//     printf(fmt, s);
+// }
+import "C"
+
+func Printf(format, str string) {
+    cfmt := C.CString(format)
+    cstr := C.CString(str)
+    defer C.free(unsafe.Pointer(cfmt))
+    defer C.free(unsafe.Pointer(cstr))
+    
+    C.myprintf(cfmt, cstr)
+}
+```
+
+### Handling Callbacks
+
+```go
+package main
+
+// #include <stdlib.h>
+//
+// extern void goCallback(int);
+//
+// static void callWithValue(int x) {
+//     goCallback(x * 2);
+// }
+import "C"
+
+//export goCallback
+func goCallback(x C.int) {
+    fmt.Printf("Called back with: %d\n", x)
+}
+
+func main() {
+    C.callWithValue(21)
+    // Output: Called back with: 42
+}
+```
+
+### Thread-Local Storage
+
+```go
+// #include <pthread.h>
+// static pthread_key_t key;
+// 
+// static void initKey() {
+//     pthread_key_create(&key, NULL);
+// }
+import "C"
+
+func init() {
+    C.initKey()
+}
+```
+
+## Best Practices
+
+1. **Minimize cgo usage** - Each cgo call has overhead
+2. **Batch C calls** - Reduce crossing Go/C boundary
+3. **Free C memory** - Always `C.free()` allocated memory
+4. **Handle errors properly** - Check C function return before errno
+5. **Document pointer ownership** - Clarify who frees what
+6. **Test thoroughly** - cgo bypasses Go's safety
+7. **Pin when needed** - Use `runtime.Pinner` for stored pointers
+8. **Avoid global state** - Makes concurrent usage tricky
+
+<Note>
+Cgo calls are slower than pure Go function calls. Profile before optimizing, and consider whether cgo is necessary.
+</Note>
+
+## Troubleshooting
+
+### Common Errors
+
+**"undefined reference"**
+- Missing library in `#cgo LDFLAGS`
+- Add `-lmylib` or path with `-L/path/to/lib`
+
+**"undefined: C.SomeType"**
+- Missing `#include` in preamble
+- C header not found - add `-I/path/to/headers`
+
+**"pointer passing rules violated"**
+- Passing unpinned Go pointer containing pointers
+- Pin memory or restructure to avoid nested pointers
+
+**"multiple definition"**
+- Definition in preamble of file with `//export`
+- Move definition to separate .c file
+
+### Debugging
+
+```bash
+# See generated C code
+go build -work -x
+
+# The -work flag prints the work directory
+# Check files in the work directory
+
+# Verbose output
+go build -v -x
+```
+
+## References
+
+- [cgo command documentation](https://golang.org/cmd/cgo/)
+- [C? Go? Cgo!](https://golang.org/doc/articles/c_go_cgo.html)
+- [runtime/cgo package](/pkg/runtime/cgo/)
+- [Go execution modes](https://golang.org/s/execmodes)
+
+## Related Topics
+
+- [Assembly Language](/advanced/assembly)
+- [Runtime Internals](/advanced/runtime)
+- [Building Go Programs](/guides/building)
+- [Security Considerations](/advanced/security)

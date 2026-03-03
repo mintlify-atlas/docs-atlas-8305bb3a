@@ -1,0 +1,459 @@
+---
+title: "go/ast"
+description: "Abstract Syntax Tree representation for Go programs"
+---
+
+## Overview
+
+The `go/ast` package declares the types used to represent syntax trees for Go packages. Syntax trees are typically produced from Go source code by the `go/parser` package.
+
+**Main use cases:**
+- Code analysis and inspection
+- Code transformation and generation
+- Building developer tools (linters, formatters, refactoring tools)
+- Static analysis
+
+## Core Interfaces
+
+### Node Interface
+
+All AST nodes implement the `Node` interface.
+
+```go
+type Node interface {
+    Pos() token.Pos // position of first character
+    End() token.Pos // position of first character immediately after the node
+}
+```
+
+### Specialized Node Types
+
+**Expression nodes:**
+```go
+type Expr interface {
+    Node
+    exprNode()
+}
+```
+
+**Statement nodes:**
+```go
+type Stmt interface {
+    Node
+    stmtNode()
+}
+```
+
+**Declaration nodes:**
+```go
+type Decl interface {
+    Node
+    declNode()
+}
+```
+
+## File Structure Types
+
+### File
+
+Represents a Go source file.
+
+```go
+type File struct {
+    Doc        *CommentGroup   // associated documentation
+    Package    token.Pos       // position of "package" keyword
+    Name       *Ident          // package name
+    Decls      []Decl          // top-level declarations
+    FileStart  token.Pos       // start of entire file
+    FileEnd    token.Pos       // end of entire file
+    Scope      *Scope          // package scope (deprecated)
+    Imports    []*ImportSpec   // imports in this file
+    Unresolved []*Ident        // unresolved identifiers
+    Comments   []*CommentGroup // all comments in source
+}
+```
+
+### Package
+
+Represents a set of source files collectively building a Go package.
+
+```go
+type Package struct {
+    Name    string             // package name
+    Scope   *Scope             // package scope across all files
+    Imports map[string]*Object // map of package id -> package object
+    Files   map[string]*File   // source files by filename
+}
+```
+
+## Comment Types
+
+### Comment
+
+Represents a single // or /* */ comment.
+
+```go
+type Comment struct {
+    Slash token.Pos // position of "/" starting the comment
+    Text  string    // comment text (excluding '\n' for //-style)
+}
+```
+
+### CommentGroup
+
+Represents a sequence of comments with no other tokens between.
+
+```go
+type CommentGroup struct {
+    List []*Comment
+}
+
+func (g *CommentGroup) Text() string
+```
+
+**Example:**
+```go
+// Comment groups are extracted automatically by the parser
+// Multiple consecutive comments form a group
+func example() {}
+```
+
+## Expression Types
+
+### Common Expressions
+
+**Ident** - Identifier
+```go
+type Ident struct {
+    NamePos token.Pos // identifier position
+    Name    string    // identifier name
+    Obj     *Object   // denoted object (deprecated)
+}
+```
+
+**BasicLit** - Basic literal (int, float, string, char)
+```go
+type BasicLit struct {
+    ValuePos token.Pos   // literal position
+    Kind     token.Token // token.INT, token.FLOAT, token.STRING, etc.
+    Value    string      // literal string
+}
+```
+
+**BinaryExpr** - Binary expression
+```go
+type BinaryExpr struct {
+    X     Expr        // left operand
+    OpPos token.Pos   // operator position
+    Op    token.Token // operator (ADD, SUB, MUL, etc.)
+    Y     Expr        // right operand
+}
+```
+
+**CallExpr** - Function call
+```go
+type CallExpr struct {
+    Fun      Expr      // function expression
+    Lparen   token.Pos // position of "("
+    Args     []Expr    // function arguments
+    Ellipsis token.Pos // position of "..." (if any)
+    Rparen   token.Pos // position of ")"
+}
+```
+
+**SelectorExpr** - Selector (e.g., x.Sel)
+```go
+type SelectorExpr struct {
+    X   Expr   // expression
+    Sel *Ident // field or method name
+}
+```
+
+**IndexExpr** - Index expression (e.g., x[i])
+```go
+type IndexExpr struct {
+    X      Expr      // expression
+    Lbrack token.Pos // position of "["
+    Index  Expr      // index expression
+    Rbrack token.Pos // position of "]"
+}
+```
+
+## Statement Types
+
+**AssignStmt** - Assignment
+```go
+type AssignStmt struct {
+    Lhs    []Expr      // left hand side
+    TokPos token.Pos   // position of Tok
+    Tok    token.Token // assignment token (ASSIGN, DEFINE, etc.)
+    Rhs    []Expr      // right hand side
+}
+```
+
+**IfStmt** - If statement
+```go
+type IfStmt struct {
+    If   token.Pos // position of "if" keyword
+    Init Stmt      // initialization statement (may be nil)
+    Cond Expr      // condition
+    Body *BlockStmt // body
+    Else Stmt      // else branch (may be nil)
+}
+```
+
+**ForStmt** - For statement
+```go
+type ForStmt struct {
+    For  token.Pos  // position of "for" keyword
+    Init Stmt       // initialization statement (may be nil)
+    Cond Expr       // condition (may be nil)
+    Post Stmt       // post iteration statement (may be nil)
+    Body *BlockStmt // body
+}
+```
+
+**ReturnStmt** - Return statement
+```go
+type ReturnStmt struct {
+    Return  token.Pos // position of "return" keyword
+    Results []Expr    // result expressions (may be nil)
+}
+```
+
+## Declaration Types
+
+**GenDecl** - Generic declaration (import, const, type, var)
+```go
+type GenDecl struct {
+    Doc    *CommentGroup // associated documentation
+    TokPos token.Pos     // position of Tok
+    Tok    token.Token   // IMPORT, CONST, TYPE, or VAR
+    Lparen token.Pos     // position of '(' (if any)
+    Specs  []Spec        // import/const/type/var specs
+    Rparen token.Pos     // position of ')' (if any)
+}
+```
+
+**FuncDecl** - Function declaration
+```go
+type FuncDecl struct {
+    Doc  *CommentGroup // associated documentation
+    Recv *FieldList    // receiver (for methods)
+    Name *Ident        // function/method name
+    Type *FuncType     // function signature
+    Body *BlockStmt    // function body (may be nil for external)
+}
+```
+
+## Type Types
+
+**StructType** - Struct type
+```go
+type StructType struct {
+    Struct     token.Pos  // position of "struct" keyword
+    Fields     *FieldList // list of field declarations
+    Incomplete bool       // true if fields are missing
+}
+```
+
+**InterfaceType** - Interface type
+```go
+type InterfaceType struct {
+    Interface  token.Pos  // position of "interface" keyword
+    Methods    *FieldList // list of methods
+    Incomplete bool       // true if methods are missing
+}
+```
+
+**FuncType** - Function type
+```go
+type FuncType struct {
+    Func    token.Pos  // position of "func" keyword (if any)
+    TypeParams *FieldList // type parameters (Go 1.18+)
+    Params  *FieldList // parameters
+    Results *FieldList // results (may be nil)
+}
+```
+
+## Traversal Functions
+
+### Walk
+
+Traverses an AST in depth-first order.
+
+```go
+func Walk(v Visitor, node Node)
+
+type Visitor interface {
+    Visit(node Node) (w Visitor)
+}
+```
+
+**Example:**
+```go
+type visitor struct{}
+
+func (v visitor) Visit(n ast.Node) ast.Visitor {
+    if n == nil {
+        return nil
+    }
+    
+    switch d := n.(type) {
+    case *ast.FuncDecl:
+        fmt.Printf("Function: %s\n", d.Name.Name)
+    case *ast.CallExpr:
+        fmt.Println("Found function call")
+    }
+    
+    return v
+}
+
+ast.Walk(visitor{}, file)
+```
+
+### Inspect
+
+Traverses an AST with a simpler callback function.
+
+```go
+func Inspect(node Node, f func(Node) bool)
+```
+
+**Example:**
+```go
+ast.Inspect(file, func(n ast.Node) bool {
+    // Return false to skip children
+    if fn, ok := n.(*ast.FuncDecl); ok {
+        fmt.Printf("Function: %s\n", fn.Name.Name)
+    }
+    return true
+})
+```
+
+## Utility Functions
+
+### Print
+
+Prints the AST node to standard output (useful for debugging).
+
+```go
+func Print(fset *token.FileSet, x any) error
+```
+
+**Example:**
+```go
+ast.Print(fset, file)
+```
+
+### FilterDecl
+
+Filters a generic declaration.
+
+```go
+func FilterDecl(decl Decl, f Filter) bool
+
+type Filter func(string) bool
+```
+
+### FilterFile
+
+Filters the file to include only certain declarations.
+
+```go
+func FilterFile(src *File, f Filter) bool
+```
+
+### FilterPackage
+
+Filters the package to include only certain files and declarations.
+
+```go
+func FilterPackage(pkg *Package, f Filter) bool
+```
+
+## Scope and Object (Deprecated)
+
+<Warning>
+The `Scope` and `Object` types are deprecated. Use the `go/types` package for name resolution and type information instead.
+</Warning>
+
+```go
+type Scope struct {
+    Outer   *Scope
+    Objects map[string]*Object
+}
+
+type Object struct {
+    Kind ObjKind
+    Name string
+    Decl any
+    Data any
+    Type any
+}
+```
+
+## Complete Example
+
+Parsing and analyzing a Go file:
+
+```go
+package main
+
+import (
+    "go/ast"
+    "go/parser"
+    "go/token"
+    "fmt"
+)
+
+func main() {
+    src := `package main
+    
+import "fmt"
+
+func add(x, y int) int {
+    return x + y
+}
+
+func main() {
+    result := add(5, 3)
+    fmt.Println(result)
+}`
+
+    fset := token.NewFileSet()
+    file, err := parser.ParseFile(fset, "example.go", src, 0)
+    if err != nil {
+        panic(err)
+    }
+    
+    // Find all function declarations
+    ast.Inspect(file, func(n ast.Node) bool {
+        fn, ok := n.(*ast.FuncDecl)
+        if !ok {
+            return true
+        }
+        
+        fmt.Printf("Function: %s\n", fn.Name.Name)
+        
+        // Print parameters
+        if fn.Type.Params != nil {
+            for _, param := range fn.Type.Params.List {
+                for _, name := range param.Names {
+                    fmt.Printf("  Param: %s\n", name.Name)
+                }
+            }
+        }
+        
+        return true
+    })
+}
+```
+
+## Related Packages
+
+- `go/parser` - Parses Go source code into AST
+- `go/printer` - Prints AST nodes back to source code
+- `go/token` - Defines tokens and file positions
+- `go/types` - Type checking and name resolution
+- `golang.org/x/tools/go/ast/astutil` - AST manipulation utilities

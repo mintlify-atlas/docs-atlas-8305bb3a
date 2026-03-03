@@ -1,0 +1,386 @@
+---
+title: compress
+description: Data compression algorithms including gzip, bzip2, flate, and zlib
+---
+
+The `compress` package provides implementations of various compression algorithms. It contains subpackages for specific compression formats.
+
+## Subpackages
+
+### compress/gzip
+
+Reading and writing gzip format compressed files (RFC 1952).
+
+```go
+import (
+    "compress/gzip"
+    "io"
+    "os"
+)
+
+// Compress data
+func compressGzip(data []byte, filename string) error {
+    f, err := os.Create(filename)
+    if err != nil {
+        return err
+    }
+    defer f.Close()
+
+    gw := gzip.NewWriter(f)
+    defer gw.Close()
+
+    gw.Name = "original.txt"
+    gw.Comment = "Compressed data"
+
+    _, err = gw.Write(data)
+    return err
+}
+
+// Decompress data
+func decompressGzip(filename string) ([]byte, error) {
+    f, err := os.Open(filename)
+    if err != nil {
+        return nil, err
+    }
+    defer f.Close()
+
+    gr, err := gzip.NewReader(f)
+    if err != nil {
+        return nil, err
+    }
+    defer gr.Close()
+
+    return io.ReadAll(gr)
+}
+```
+
+### compress/zlib
+
+Reading and writing zlib format compressed data (RFC 1950).
+
+```go
+import (
+    "bytes"
+    "compress/zlib"
+    "io"
+)
+
+// Compress with zlib
+func compressZlib(data []byte) ([]byte, error) {
+    var buf bytes.Buffer
+    
+    w := zlib.NewWriter(&buf)
+    _, err := w.Write(data)
+    if err != nil {
+        return nil, err
+    }
+    
+    if err := w.Close(); err != nil {
+        return nil, err
+    }
+    
+    return buf.Bytes(), nil
+}
+
+// Decompress zlib data
+func decompressZlib(data []byte) ([]byte, error) {
+    r, err := zlib.NewReader(bytes.NewReader(data))
+    if err != nil {
+        return nil, err
+    }
+    defer r.Close()
+    
+    return io.ReadAll(r)
+}
+```
+
+### compress/flate
+
+Implements the DEFLATE compressed data format (RFC 1951). Used by gzip and zlib.
+
+```go
+import (
+    "bytes"
+    "compress/flate"
+    "io"
+)
+
+// Compress with flate
+func compressFlate(data []byte, level int) ([]byte, error) {
+    var buf bytes.Buffer
+    
+    w, err := flate.NewWriter(&buf, level)
+    if err != nil {
+        return nil, err
+    }
+    
+    _, err = w.Write(data)
+    if err != nil {
+        return nil, err
+    }
+    
+    if err := w.Close(); err != nil {
+        return nil, err
+    }
+    
+    return buf.Bytes(), nil
+}
+
+// Decompress flate data
+func decompressFlate(data []byte) ([]byte, error) {
+    r := flate.NewReader(bytes.NewReader(data))
+    defer r.Close()
+    
+    return io.ReadAll(r)
+}
+```
+
+### compress/bzip2
+
+Reading bzip2 format compressed data. **Note: bzip2 only supports decompression.**
+
+```go
+import (
+    "compress/bzip2"
+    "io"
+    "os"
+)
+
+// Decompress bzip2 file
+func decompressBzip2(filename string) ([]byte, error) {
+    f, err := os.Open(filename)
+    if err != nil {
+        return nil, err
+    }
+    defer f.Close()
+
+    r := bzip2.NewReader(f)
+    return io.ReadAll(r)
+}
+```
+
+### compress/lzw
+
+Lempel-Ziv-Welch compressed data format. Used in GIF and TIFF files.
+
+```go
+import (
+    "bytes"
+    "compress/lzw"
+    "io"
+)
+
+// Compress with LZW
+func compressLZW(data []byte, order lzw.Order, litWidth int) ([]byte, error) {
+    var buf bytes.Buffer
+    
+    w := lzw.NewWriter(&buf, order, litWidth)
+    _, err := w.Write(data)
+    if err != nil {
+        return nil, err
+    }
+    
+    if err := w.Close(); err != nil {
+        return nil, err
+    }
+    
+    return buf.Bytes(), nil
+}
+
+// Decompress LZW data
+func decompressLZW(data []byte, order lzw.Order, litWidth int) ([]byte, error) {
+    r := lzw.NewReader(bytes.NewReader(data), order, litWidth)
+    defer r.Close()
+    
+    return io.ReadAll(r)
+}
+```
+
+## Compression Levels
+
+Most compression formats support different compression levels:
+
+```go
+const (
+    NoCompression      = 0  // No compression
+    BestSpeed          = 1  // Fastest compression
+    BestCompression    = 9  // Best compression ratio
+    DefaultCompression = -1 // Default compression level
+    HuffmanOnly        = -2 // Huffman encoding only (flate)
+)
+```
+
+**Example - Setting compression level:**
+
+```go
+import "compress/gzip"
+
+func compressWithLevel(data []byte, level int) ([]byte, error) {
+    var buf bytes.Buffer
+    
+    w, err := gzip.NewWriterLevel(&buf, level)
+    if err != nil {
+        return nil, err
+    }
+    defer w.Close()
+    
+    _, err = w.Write(data)
+    if err != nil {
+        return nil, err
+    }
+    
+    return buf.Bytes(), nil
+}
+```
+
+## Practical Examples
+
+### HTTP Response Compression
+
+```go
+import (
+    "compress/gzip"
+    "net/http"
+)
+
+type gzipResponseWriter struct {
+    io.Writer
+    http.ResponseWriter
+}
+
+func (w gzipResponseWriter) Write(b []byte) (int, error) {
+    return w.Writer.Write(b)
+}
+
+func gzipHandler(fn http.HandlerFunc) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+            fn(w, r)
+            return
+        }
+        
+        w.Header().Set("Content-Encoding", "gzip")
+        gz := gzip.NewWriter(w)
+        defer gz.Close()
+        
+        gzr := gzipResponseWriter{Writer: gz, ResponseWriter: w}
+        fn(gzr, r)
+    }
+}
+```
+
+### Compress Files in Archive
+
+```go
+import (
+    "archive/tar"
+    "compress/gzip"
+    "io"
+    "os"
+)
+
+func createTarGz(files []string, output string) error {
+    f, err := os.Create(output)
+    if err != nil {
+        return err
+    }
+    defer f.Close()
+
+    gw := gzip.NewWriter(f)
+    defer gw.Close()
+
+    tw := tar.NewWriter(gw)
+    defer tw.Close()
+
+    for _, file := range files {
+        if err := addToTar(tw, file); err != nil {
+            return err
+        }
+    }
+
+    return nil
+}
+
+func addToTar(tw *tar.Writer, filename string) error {
+    file, err := os.Open(filename)
+    if err != nil {
+        return err
+    }
+    defer file.Close()
+
+    info, err := file.Stat()
+    if err != nil {
+        return err
+    }
+
+    header := &tar.Header{
+        Name:    filename,
+        Size:    info.Size(),
+        Mode:    int64(info.Mode()),
+        ModTime: info.ModTime(),
+    }
+
+    if err := tw.WriteHeader(header); err != nil {
+        return err
+    }
+
+    _, err = io.Copy(tw, file)
+    return err
+}
+```
+
+### Stream Compression
+
+```go
+import (
+    "compress/gzip"
+    "io"
+)
+
+// Compress data from reader to writer
+func streamCompress(r io.Reader, w io.Writer) error {
+    gw := gzip.NewWriter(w)
+    defer gw.Close()
+    
+    _, err := io.Copy(gw, r)
+    return err
+}
+
+// Decompress data from reader to writer
+func streamDecompress(r io.Reader, w io.Writer) error {
+    gr, err := gzip.NewReader(r)
+    if err != nil {
+        return err
+    }
+    defer gr.Close()
+    
+    _, err = io.Copy(w, gr)
+    return err
+}
+```
+
+## Format Comparison
+
+| Format | Compression | Decompression | Use Case |
+|--------|-------------|---------------|----------|
+| **gzip** | Yes | Yes | General-purpose, HTTP, archives |
+| **zlib** | Yes | Yes | PNG images, lower overhead than gzip |
+| **flate** | Yes | Yes | Low-level DEFLATE, basis for gzip/zlib |
+| **bzip2** | No | Yes | High compression ratio |
+| **lzw** | Yes | Yes | GIF and TIFF images |
+
+## Performance Tips
+
+1. **Choose appropriate compression level** - Balance between speed and compression ratio
+2. **Reuse writers** - Use `Reset()` method to reuse compression writers
+3. **Stream when possible** - Avoid loading entire file into memory
+4. **Always close writers** - Ensures all data is flushed and trailers are written
+5. **Buffer I/O** - Combine with `bufio` for better performance on small writes
+
+## Common Use Cases
+
+- Compressing HTTP responses to reduce bandwidth
+- Creating compressed archives (.tar.gz, .zip)
+- Storing log files with compression
+- Reducing database backup sizes
+- Compressing data before network transmission

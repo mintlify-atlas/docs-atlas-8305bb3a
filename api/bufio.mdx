@@ -1,0 +1,512 @@
+---
+title: 'bufio'
+description: 'Buffered I/O for efficient reading and writing'
+---
+
+## Overview
+
+Package bufio implements buffered I/O. It wraps an io.Reader or io.Writer object, creating another object (Reader or Writer) that also implements the interface but provides buffering and some help for textual I/O.
+
+## Buffered Reading
+
+### NewReader
+
+Returns a new Reader whose buffer has the default size (4096 bytes).
+
+```go
+func NewReader(rd io.Reader) *Reader
+```
+
+<ParamField path="rd" type="io.Reader" required>
+  Underlying reader to buffer
+</ParamField>
+
+<ResponseField name="reader" type="*Reader">
+  Buffered reader
+</ResponseField>
+
+**Example:**
+```go
+file, _ := os.Open("data.txt")
+defer file.Close()
+
+reader := bufio.NewReader(file)
+line, _ := reader.ReadString('\n')
+fmt.Print(line)
+```
+
+### NewReaderSize
+
+Returns a new Reader whose buffer has at least the specified size.
+
+```go
+func NewReaderSize(rd io.Reader, size int) *Reader
+```
+
+<ParamField path="rd" type="io.Reader" required>
+  Underlying reader
+</ParamField>
+
+<ParamField path="size" type="int" required>
+  Buffer size in bytes
+</ParamField>
+
+**Example:**
+```go
+reader := bufio.NewReaderSize(file, 8192) // 8KB buffer
+```
+
+### Reader.Read
+
+Reads data into p.
+
+```go
+func (b *Reader) Read(p []byte) (n int, err error)
+```
+
+<ParamField path="p" type="[]byte" required>
+  Buffer to read into
+</ParamField>
+
+<ResponseField name="n" type="int">
+  Number of bytes read
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Error encountered
+</ResponseField>
+
+### Reader.ReadByte
+
+Reads and returns a single byte.
+
+```go
+func (b *Reader) ReadByte() (byte, error)
+```
+
+**Example:**
+```go
+b, err := reader.ReadByte()
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("Read byte: %c\n", b)
+```
+
+### Reader.ReadString
+
+Reads until the first occurrence of delim in the input.
+
+```go
+func (b *Reader) ReadString(delim byte) (string, error)
+```
+
+<ParamField path="delim" type="byte" required>
+  Delimiter byte to read until
+</ParamField>
+
+<ResponseField name="line" type="string">
+  String containing data up to and including the delimiter
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Error (often io.EOF)
+</ResponseField>
+
+**Example:**
+```go
+line, err := reader.ReadString('\n')
+if err != nil && err != io.EOF {
+    log.Fatal(err)
+}
+fmt.Print(line)
+```
+
+### Reader.ReadBytes
+
+Reads until the first occurrence of delim, returning a byte slice.
+
+```go
+func (b *Reader) ReadBytes(delim byte) ([]byte, error)
+```
+
+**Example:**
+```go
+data, err := reader.ReadBytes('\n')
+```
+
+### Reader.ReadLine
+
+Low-level line-reading primitive. Most callers should use ReadBytes('\n') or ReadString('\n') instead.
+
+```go
+func (b *Reader) ReadLine() (line []byte, isPrefix bool, err error)
+```
+
+<ResponseField name="line" type="[]byte">
+  Line data (without newline)
+</ResponseField>
+
+<ResponseField name="isPrefix" type="bool">
+  True if line was too long for buffer
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Error encountered
+</ResponseField>
+
+### Reader.Peek
+
+Returns the next n bytes without advancing the reader.
+
+```go
+func (b *Reader) Peek(n int) ([]byte, error)
+```
+
+<ParamField path="n" type="int" required>
+  Number of bytes to peek
+</ParamField>
+
+**Example:**
+```go
+data, err := reader.Peek(10)
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("Next 10 bytes: %s\n", data)
+```
+
+### Reader.Buffered
+
+Returns the number of bytes that can be read from the current buffer.
+
+```go
+func (b *Reader) Buffered() int
+```
+
+**Example:**
+```go
+n := reader.Buffered()
+fmt.Printf("%d bytes buffered\n", n)
+```
+
+## Buffered Writing
+
+### NewWriter
+
+Returns a new Writer whose buffer has the default size.
+
+```go
+func NewWriter(w io.Writer) *Writer
+```
+
+<ParamField path="w" type="io.Writer" required>
+  Underlying writer to buffer
+</ParamField>
+
+**Example:**
+```go
+file, _ := os.Create("output.txt")
+defer file.Close()
+
+writer := bufio.NewWriter(file)
+writer.WriteString("Hello, World!\n")
+writer.Flush() // Important: flush to write buffered data
+```
+
+### NewWriterSize
+
+Returns a new Writer whose buffer has at least the specified size.
+
+```go
+func NewWriterSize(w io.Writer, size int) *Writer
+```
+
+<ParamField path="w" type="io.Writer" required>
+  Underlying writer
+</ParamField>
+
+<ParamField path="size" type="int" required>
+  Buffer size in bytes
+</ParamField>
+
+### Writer.Write
+
+Writes the contents of p into the buffer.
+
+```go
+func (b *Writer) Write(p []byte) (nn int, err error)
+```
+
+<ParamField path="p" type="[]byte" required>
+  Data to write
+</ParamField>
+
+<ResponseField name="nn" type="int">
+  Number of bytes written
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Error if write is short
+</ResponseField>
+
+### Writer.WriteByte
+
+Writes a single byte.
+
+```go
+func (b *Writer) WriteByte(c byte) error
+```
+
+**Example:**
+```go
+err := writer.WriteByte('A')
+```
+
+### Writer.WriteString
+
+Writes a string.
+
+```go
+func (b *Writer) WriteString(s string) (int, error)
+```
+
+<ParamField path="s" type="string" required>
+  String to write
+</ParamField>
+
+**Example:**
+```go
+n, err := writer.WriteString("Hello, World!\n")
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### Writer.WriteRune
+
+Writes a single Unicode code point.
+
+```go
+func (b *Writer) WriteRune(r rune) (size int, err error)
+```
+
+<ParamField path="r" type="rune" required>
+  Rune to write
+</ParamField>
+
+**Example:**
+```go
+size, err := writer.WriteRune('世')
+```
+
+### Writer.Flush
+
+Writes any buffered data to the underlying io.Writer.
+
+```go
+func (b *Writer) Flush() error
+```
+
+**Example:**
+```go
+writer.WriteString("data")
+err := writer.Flush() // Ensure data is written
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### Writer.Available
+
+Returns how many bytes are unused in the buffer.
+
+```go
+func (b *Writer) Available() int
+```
+
+### Writer.Buffered
+
+Returns the number of bytes that have been written into the current buffer.
+
+```go
+func (b *Writer) Buffered() int
+```
+
+## Scanner
+
+### NewScanner
+
+Returns a new Scanner to read from r.
+
+```go
+func NewScanner(r io.Reader) *Scanner
+```
+
+<ParamField path="r" type="io.Reader" required>
+  Reader to scan
+</ParamField>
+
+**Example:**
+```go
+file, _ := os.Open("data.txt")
+defer file.Close()
+
+scanner := bufio.NewScanner(file)
+for scanner.Scan() {
+    fmt.Println(scanner.Text())
+}
+
+if err := scanner.Err(); err != nil {
+    log.Fatal(err)
+}
+```
+
+### Scanner.Scan
+
+Advances the Scanner to the next token.
+
+```go
+func (s *Scanner) Scan() bool
+```
+
+<ResponseField name="hasNext" type="bool">
+  True if there is a token to read
+</ResponseField>
+
+### Scanner.Text
+
+Returns the most recent token as a string.
+
+```go
+func (s *Scanner) Text() string
+```
+
+**Example:**
+```go
+for scanner.Scan() {
+    line := scanner.Text()
+    fmt.Println(line)
+}
+```
+
+### Scanner.Bytes
+
+Returns the most recent token as a byte slice.
+
+```go
+func (s *Scanner) Bytes() []byte
+```
+
+### Scanner.Err
+
+Returns the first non-EOF error encountered by the Scanner.
+
+```go
+func (s *Scanner) Err() error
+```
+
+**Example:**
+```go
+for scanner.Scan() {
+    // process
+}
+if err := scanner.Err(); err != nil {
+    log.Fatal(err)
+}
+```
+
+### Scanner.Split
+
+Sets the split function for the Scanner.
+
+```go
+func (s *Scanner) Split(split SplitFunc)
+```
+
+<ParamField path="split" type="SplitFunc" required>
+  Function to tokenize input. Default is ScanLines.
+</ParamField>
+
+**Example:**
+```go
+scanner := bufio.NewScanner(reader)
+scanner.Split(bufio.ScanWords) // Split on words instead of lines
+
+for scanner.Scan() {
+    word := scanner.Text()
+    fmt.Println(word)
+}
+```
+
+## Split Functions
+
+Predefined split functions for Scanner:
+
+- **ScanBytes** - Returns each byte as a token
+- **ScanRunes** - Returns each UTF-8 encoded rune as a token
+- **ScanWords** - Returns each space-separated word as a token
+- **ScanLines** - Returns each newline-terminated line as a token (default)
+
+## Complete Example
+
+```go
+package main
+
+import (
+    "bufio"
+    "fmt"
+    "log"
+    "os"
+    "strings"
+)
+
+func main() {
+    // Writing with bufio
+    file, err := os.Create("output.txt")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer file.Close()
+    
+    writer := bufio.NewWriter(file)
+    writer.WriteString("Line 1\n")
+    writer.WriteString("Line 2\n")
+    writer.WriteString("Line 3\n")
+    writer.Flush() // Important!
+    
+    // Reading line by line
+    file, _ = os.Open("output.txt")
+    defer file.Close()
+    
+    reader := bufio.NewReader(file)
+    for {
+        line, err := reader.ReadString('\n')
+        if err != nil {
+            break
+        }
+        fmt.Print(line)
+    }
+    
+    // Using Scanner
+    input := "word1 word2 word3"
+    scanner := bufio.NewScanner(strings.NewReader(input))
+    scanner.Split(bufio.ScanWords)
+    
+    for scanner.Scan() {
+        fmt.Println(scanner.Text())
+    }
+    
+    if err := scanner.Err(); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
+## Performance Tips
+
+- Always call `Flush()` on Writer before closing the underlying writer
+- Use Scanner for simple line-by-line or word-by-word reading
+- Use Reader methods for more control over buffering
+- Adjust buffer size with NewReaderSize/NewWriterSize for optimal performance
+- Scanner is more convenient but Reader gives more control

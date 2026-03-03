@@ -1,0 +1,408 @@
+---
+title: database
+description: Database interfaces and SQL database drivers
+---
+
+The `database` package provides generic interfaces around SQL (and SQL-like) databases. The primary subpackage is `database/sql`, which defines the interface for database operations.
+
+## database/sql
+
+Provides a generic interface for SQL databases. The actual database drivers are implemented separately.
+
+### Key Types
+
+```go
+type DB struct {
+    // Database handle representing a pool of connections
+}
+
+type Rows struct {
+    // Result set from a query
+}
+
+type Row struct {
+    // Result of QueryRow
+}
+
+type Stmt struct {
+    // Prepared statement
+}
+```
+
+### Opening a Database
+
+```go
+import (
+    "database/sql"
+    _ "github.com/lib/pq" // PostgreSQL driver
+)
+
+func openDatabase() (*sql.DB, error) {
+    db, err := sql.Open("postgres", "user=postgres dbname=mydb sslmode=disable")
+    if err != nil {
+        return nil, err
+    }
+    
+    // Verify connection
+    if err := db.Ping(); err != nil {
+        return nil, err
+    }
+    
+    return db, nil
+}
+```
+
+### Query Operations
+
+#### Single Row Query
+
+```go
+func getUserByID(db *sql.DB, userID int) (string, error) {
+    var name string
+    err := db.QueryRow("SELECT name FROM users WHERE id = $1", userID).Scan(&name)
+    if err == sql.ErrNoRows {
+        return "", fmt.Errorf("user not found")
+    }
+    return name, err
+}
+```
+
+#### Multiple Row Query
+
+```go
+type User struct {
+    ID    int
+    Name  string
+    Email string
+}
+
+func getAllUsers(db *sql.DB) ([]User, error) {
+    rows, err := db.Query("SELECT id, name, email FROM users")
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+    
+    var users []User
+    for rows.Next() {
+        var u User
+        if err := rows.Scan(&u.ID, &u.Name, &u.Email); err != nil {
+            return nil, err
+        }
+        users = append(users, u)
+    }
+    
+    return users, rows.Err()
+}
+```
+
+### Insert, Update, Delete
+
+```go
+// Insert
+func createUser(db *sql.DB, name, email string) (int64, error) {
+    result, err := db.Exec(
+        "INSERT INTO users (name, email) VALUES ($1, $2)",
+        name, email,
+    )
+    if err != nil {
+        return 0, err
+    }
+    
+    return result.LastInsertId()
+}
+
+// Update
+func updateUser(db *sql.DB, id int, name string) error {
+    result, err := db.Exec(
+        "UPDATE users SET name = $1 WHERE id = $2",
+        name, id,
+    )
+    if err != nil {
+        return err
+    }
+    
+    rowsAffected, err := result.RowsAffected()
+    if err != nil {
+        return err
+    }
+    
+    if rowsAffected == 0 {
+        return fmt.Errorf("user not found")
+    }
+    
+    return nil
+}
+
+// Delete
+func deleteUser(db *sql.DB, id int) error {
+    _, err := db.Exec("DELETE FROM users WHERE id = $1", id)
+    return err
+}
+```
+
+### Prepared Statements
+
+```go
+func usesPreparedStatement(db *sql.DB) error {
+    stmt, err := db.Prepare("SELECT name FROM users WHERE id = $1")
+    if err != nil {
+        return err
+    }
+    defer stmt.Close()
+    
+    var name string
+    
+    // Use statement multiple times
+    err = stmt.QueryRow(1).Scan(&name)
+    if err != nil {
+        return err
+    }
+    
+    err = stmt.QueryRow(2).Scan(&name)
+    return err
+}
+```
+
+### Transactions
+
+```go
+func transferMoney(db *sql.DB, fromID, toID int, amount float64) error {
+    tx, err := db.Begin()
+    if err != nil {
+        return err
+    }
+    defer tx.Rollback() // Rollback if not committed
+    
+    // Deduct from sender
+    _, err = tx.Exec(
+        "UPDATE accounts SET balance = balance - $1 WHERE id = $2",
+        amount, fromID,
+    )
+    if err != nil {
+        return err
+    }
+    
+    // Add to receiver
+    _, err = tx.Exec(
+        "UPDATE accounts SET balance = balance + $1 WHERE id = $2",
+        amount, toID,
+    )
+    if err != nil {
+        return err
+    }
+    
+    return tx.Commit()
+}
+```
+
+### Context Support
+
+```go
+import "context"
+
+func queryWithContext(db *sql.DB, ctx context.Context, userID int) (string, error) {
+    var name string
+    err := db.QueryRowContext(ctx, "SELECT name FROM users WHERE id = $1", userID).Scan(&name)
+    return name, err
+}
+
+func queryWithTimeout(db *sql.DB, userID int) (string, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+    
+    return queryWithContext(db, ctx, userID)
+}
+```
+
+### Connection Pool Configuration
+
+```go
+func configureDB(db *sql.DB) {
+    // Maximum number of open connections
+    db.SetMaxOpenConns(25)
+    
+    // Maximum number of idle connections
+    db.SetMaxIdleConns(5)
+    
+    // Maximum lifetime of a connection
+    db.SetConnMaxLifetime(5 * time.Minute)
+    
+    // Maximum idle time for a connection
+    db.SetConnMaxIdleTime(10 * time.Minute)
+}
+```
+
+### Null Values
+
+```go
+import "database/sql"
+
+type User struct {
+    ID    int
+    Name  string
+    Email sql.NullString // May be NULL in database
+    Age   sql.NullInt64  // May be NULL in database
+}
+
+func queryUserWithNulls(db *sql.DB, id int) (*User, error) {
+    var u User
+    err := db.QueryRow(
+        "SELECT id, name, email, age FROM users WHERE id = $1",
+        id,
+    ).Scan(&u.ID, &u.Name, &u.Email, &u.Age)
+    
+    if err != nil {
+        return nil, err
+    }
+    
+    // Check if email is valid
+    if u.Email.Valid {
+        fmt.Printf("Email: %s\n", u.Email.String)
+    }
+    
+    return &u, nil
+}
+```
+
+## Practical Examples
+
+### Repository Pattern
+
+```go
+type UserRepository struct {
+    db *sql.DB
+}
+
+func NewUserRepository(db *sql.DB) *UserRepository {
+    return &UserRepository{db: db}
+}
+
+func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
+    var u User
+    err := r.db.QueryRowContext(
+        ctx,
+        "SELECT id, name, email FROM users WHERE id = $1",
+        id,
+    ).Scan(&u.ID, &u.Name, &u.Email)
+    
+    if err == sql.ErrNoRows {
+        return nil, fmt.Errorf("user not found")
+    }
+    return &u, err
+}
+
+func (r *UserRepository) Create(ctx context.Context, u *User) error {
+    return r.db.QueryRowContext(
+        ctx,
+        "INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id",
+        u.Name, u.Email,
+    ).Scan(&u.ID)
+}
+
+func (r *UserRepository) Update(ctx context.Context, u *User) error {
+    _, err := r.db.ExecContext(
+        ctx,
+        "UPDATE users SET name = $1, email = $2 WHERE id = $3",
+        u.Name, u.Email, u.ID,
+    )
+    return err
+}
+
+func (r *UserRepository) Delete(ctx context.Context, id int) error {
+    _, err := r.db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", id)
+    return err
+}
+```
+
+### Bulk Insert
+
+```go
+func bulkInsert(db *sql.DB, users []User) error {
+    tx, err := db.Begin()
+    if err != nil {
+        return err
+    }
+    defer tx.Rollback()
+    
+    stmt, err := tx.Prepare("INSERT INTO users (name, email) VALUES ($1, $2)")
+    if err != nil {
+        return err
+    }
+    defer stmt.Close()
+    
+    for _, u := range users {
+        _, err := stmt.Exec(u.Name, u.Email)
+        if err != nil {
+            return err
+        }
+    }
+    
+    return tx.Commit()
+}
+```
+
+### Pagination
+
+```go
+func getUsersPaginated(db *sql.DB, page, pageSize int) ([]User, error) {
+    offset := (page - 1) * pageSize
+    
+    rows, err := db.Query(
+        "SELECT id, name, email FROM users ORDER BY id LIMIT $1 OFFSET $2",
+        pageSize, offset,
+    )
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+    
+    var users []User
+    for rows.Next() {
+        var u User
+        if err := rows.Scan(&u.ID, &u.Name, &u.Email); err != nil {
+            return nil, err
+        }
+        users = append(users, u)
+    }
+    
+    return users, rows.Err()
+}
+```
+
+## Common Database Drivers
+
+| Database | Driver Import |
+|----------|---------------|
+| **PostgreSQL** | `_ "github.com/lib/pq"` |
+| **MySQL** | `_ "github.com/go-sql-driver/mysql"` |
+| **SQLite** | `_ "github.com/mattn/go-sqlite3"` |
+| **SQL Server** | `_ "github.com/denisenkom/go-mssqldb"` |
+| **Oracle** | `_ "github.com/godror/godror"` |
+
+## Best Practices
+
+1. **Always close resources** - Use `defer rows.Close()` and `defer stmt.Close()`
+2. **Check rows.Err()** - Check for errors after iterating rows
+3. **Use context** - Use `*Context` methods for timeouts and cancellation
+4. **Handle sql.ErrNoRows** - Distinguish between "not found" and actual errors
+5. **Use prepared statements** - For queries executed multiple times
+6. **Configure connection pool** - Set appropriate limits for your workload
+7. **Use transactions** - For operations that must be atomic
+8. **Avoid SQL injection** - Always use parameterized queries
+
+## Error Handling
+
+```go
+var ErrNoRows = errors.New("sql: no rows in result set")
+
+func handleQueryError(err error) {
+    if err == sql.ErrNoRows {
+        // Handle "not found" case
+        fmt.Println("Record not found")
+    } else if err != nil {
+        // Handle other errors
+        fmt.Printf("Database error: %v\n", err)
+    }
+}
+```

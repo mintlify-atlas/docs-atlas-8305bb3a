@@ -1,0 +1,147 @@
+---
+title: Code Review Process
+description: Understanding the Go code review process and best practices
+---
+
+All code contributions to Go go through a rigorous code review process to maintain code quality and consistency.
+
+## Code Review Configuration
+
+The Go project uses Gerrit for code reviews. The default review branch is `master`.
+
+## Code Review Workflow
+
+<Steps>
+  <Step title="Prepare Your Change">
+    Make your changes in a local branch based on the latest master:
+    
+    ```bash
+    git checkout master
+    git pull
+    git checkout -b my-feature
+    ```
+  </Step>
+  
+  <Step title="Write Tests">
+    Ensure your changes include appropriate tests. Go has a strong testing culture:
+    
+    ```bash
+    go test ./...
+    ```
+  </Step>
+  
+  <Step title="Run Checks">
+    Run all pre-submission checks:
+    
+    ```bash
+    go fmt ./...
+    go vet ./...
+    go test -race ./...
+    ```
+  </Step>
+  
+  <Step title="Commit Your Changes">
+    Write a clear commit message following Go conventions:
+    
+    ```bash
+    git commit -m "package: brief description
+    
+    Longer explanation of the change and why it's needed.
+    
+    Fixes #12345"
+    ```
+  </Step>
+  
+  <Step title="Submit for Review">
+    Push your change to Gerrit for review:
+    
+    ```bash
+    git codereview mail
+    ```
+  </Step>
+  
+  <Step title="Address Feedback">
+    Respond to reviewer comments and update your change as needed:
+    
+    ```bash
+    # Make changes based on feedback
+    git commit --amend
+    git codereview mail
+    ```
+  </Step>
+  
+  <Step title="Approval and Submission">
+    Once approved by reviewers, your change will be submitted to the master branch.
+  </Step>
+</Steps>
+
+## Review Guidelines
+
+### For Contributors
+
+- **Be responsive**: Reply to review comments promptly
+- **Be open to feedback**: Reviewers are helping improve the code
+- **Keep changes focused**: Each change should address one issue or feature
+- **Write clear descriptions**: Explain what and why, not just how
+
+### For Reviewers
+
+- **Be constructive**: Provide helpful suggestions, not just criticism
+- **Be thorough**: Check for correctness, style, and test coverage
+- **Be timely**: Try to review changes within a reasonable timeframe
+- **Be respectful**: Remember there's a person behind the code
+
+## Code Style
+
+Go has strong conventions for code style:
+
+<CardGroup cols={2}>
+  <Card title="Formatting" icon="code">
+    Use `go fmt` to format all code automatically
+  </Card>
+  
+  <Card title="Documentation" icon="book">
+    Document all exported functions, types, and packages
+  </Card>
+  
+  <Card title="Naming" icon="tag">
+    Follow Go naming conventions (MixedCaps, not underscores)
+  </Card>
+  
+  <Card title="Testing" icon="vial">
+    Write tests for all new functionality
+  </Card>
+</CardGroup>
+
+## Common Review Comments
+
+### Error Handling
+
+```go
+// Good
+if err != nil {
+    return fmt.Errorf("failed to process: %w", err)
+}
+
+// Avoid
+if err != nil {
+    panic(err)
+}
+```
+
+### Documentation
+
+```go
+// Good: Complete sentence starting with function name
+// ProcessData analyzes the input data and returns results.
+func ProcessData(data []byte) (Result, error) {
+
+// Avoid: Incomplete or missing documentation
+func ProcessData(data []byte) (Result, error) {
+```
+
+## Additional Resources
+
+- [Go Code Review Comments](https://go.dev/wiki/CodeReviewComments)
+- [Effective Go](https://go.dev/doc/effective_go)
+- [Contribution Guidelines](https://golang.org/doc/contribute.html)

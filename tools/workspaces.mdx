@@ -1,0 +1,646 @@
+---
+title: 'Go Workspaces'
+description: 'Multi-module development with Go workspaces'
+---
+
+Go workspaces enable working with multiple modules simultaneously. Introduced in Go 1.18, workspaces simplify development when you need to make changes across multiple modules.
+
+## Overview
+
+Workspaces allow you to:
+- Work on multiple modules at once
+- Make coordinated changes across modules
+- Test changes before publishing
+- Avoid manual replace directives
+
+<Note>
+Workspaces are configured via a `go.work` file and are intended for local development. The `go.work` file should **not** be committed to version control.
+</Note>
+
+## Creating a Workspace
+
+<Steps>
+  <Step title="Initialize Workspace">
+    Create a workspace in a parent directory:
+    
+    ```bash
+    go work init ./module1 ./module2
+    ```
+    
+    This creates a `go.work` file:
+    
+    ```go
+    go 1.21
+    
+    use (
+        ./module1
+        ./module2
+    )
+    ```
+  </Step>
+  
+  <Step title="Verify Workspace">
+    Check which workspace file is being used:
+    
+    ```bash
+    go env GOWORK
+    ```
+  </Step>
+  
+  <Step title="Work Across Modules">
+    Changes in one module are immediately visible to others:
+    
+    ```bash
+    cd module1
+    go build  # Uses local module2 if imported
+    ```
+  </Step>
+</Steps>
+
+## The go.work File
+
+### Structure
+
+```go go.work
+go 1.21
+
+use (
+    ./module1
+    ./module2
+    ./apps/webapp
+)
+
+replace example.com/old => example.com/new v1.0.0
+```
+
+### Directives
+
+<AccordionGroup>
+  <Accordion title="go">
+    Specifies the Go version:
+    
+    ```go
+    go 1.21
+    ```
+  </Accordion>
+  
+  <Accordion title="use">
+    Lists modules in the workspace:
+    
+    ```go
+    use ./module1
+    use ./module2
+    
+    // Or as a block
+    use (
+        ./module1
+        ./module2
+    )
+    ```
+  </Accordion>
+  
+  <Accordion title="replace">
+    Replaces module paths (same as in go.mod):
+    
+    ```go
+    replace example.com/pkg => ../other-pkg
+    replace example.com/old v1.0.0 => example.com/new v1.1.0
+    ```
+    
+    Workspace replaces take precedence over go.mod replaces.
+  </Accordion>
+</AccordionGroup>
+
+## Workspace Commands
+
+### go work init
+
+Initialize a new workspace:
+
+```bash
+# Create empty workspace
+go work init
+
+# Create with modules
+go work init ./module1 ./module2
+
+# Create in specific directory
+cd ~/projects/myworkspace
+go work init ./api ./lib ./cmd
+```
+
+### go work use
+
+Add or update modules in workspace:
+
+<CodeGroup>
+```bash Add Modules
+# Add single module
+go work use ./module3
+
+# Add multiple modules
+go work use ./module1 ./module2
+
+# Add all modules in directory recursively
+go work use -r ./packages
+```
+
+```bash Remove Modules
+# Remove module (delete its directory first)
+rm -rf ./module1
+go work use ./module1  # Removes from go.work
+
+# Or edit go.work manually
+```
+</CodeGroup>
+
+### go work edit
+
+Edit go.work file programmatically:
+
+<CodeGroup>
+```bash Add/Drop Use Directives
+# Add use directive
+go work edit -use=./newmodule
+
+# Drop use directive  
+go work edit -dropuse=./oldmodule
+```
+
+```bash Replace Directives
+# Add replace
+go work edit -replace=old@v1.0.0=new@v1.1.0
+
+# Drop replace
+go work edit -dropreplace=old@v1.0.0
+```
+
+```bash Set Go Version
+# Update Go version
+go work edit -go=1.21
+```
+
+```bash Format and Print
+# Format go.work
+go work edit -fmt
+
+# Print go.work
+go work edit -print
+
+# Print as JSON
+go work edit -json
+```
+</CodeGroup>
+
+### go work sync
+
+Sync workspace dependencies:
+
+```bash
+go work sync
+```
+
+This updates go.mod files in all workspace modules to match the workspace's build list.
+
+<Tip>
+Run `go work sync` after adding dependencies to ensure all modules use consistent versions.
+</Tip>
+
+### go work vendor
+
+Create vendor directory for workspace:
+
+```bash
+# Create vendor directory
+go work vendor
+
+# Verbose output
+go work vendor -v
+
+# Custom output directory
+go work vendor -o ./vendor-dir
+```
+
+## Example Workspace Setup
+
+### Project Structure
+
+```
+myproject/
+├── go.work
+├── api/
+│   ├── go.mod
+│   └── main.go
+├── lib/
+│   ├── go.mod
+│   └── lib.go
+└── cmd/
+    ├── go.mod
+    └── main.go
+```
+
+### Setting Up
+
+<Steps>
+  <Step title="Create Modules">
+    ```bash
+    mkdir -p myproject/{api,lib,cmd}
+    cd myproject
+    
+    # Initialize each module
+    cd api && go mod init example.com/api && cd ..
+    cd lib && go mod init example.com/lib && cd ..
+    cd cmd && go mod init example.com/cmd && cd ..
+    ```
+  </Step>
+  
+  <Step title="Create Workspace">
+    ```bash
+    cd myproject
+    go work init ./api ./lib ./cmd
+    ```
+    
+    Creates `go.work`:
+    ```go
+    go 1.21
+    
+    use (
+        ./api
+        ./cmd
+        ./lib
+    )
+    ```
+  </Step>
+  
+  <Step title="Import Local Modules">
+    In `api/main.go`:
+    ```go
+    package main
+    
+    import "example.com/lib"
+    
+    func main() {
+        lib.DoSomething()
+    }
+    ```
+    
+    No replace directives needed!
+  </Step>
+</Steps>
+
+## Working with Workspaces
+
+### Building and Testing
+
+```bash
+# Build from any workspace module
+cd api
+go build  # Automatically uses local ./lib
+
+# Test all workspace modules
+go test ./...
+
+# Build specific module
+go build -C ./api
+
+# Run from workspace root
+go run ./api
+```
+
+### Adding Dependencies
+
+```bash
+# Add dependency to specific module
+cd api
+go get github.com/gorilla/mux
+
+# Sync workspace
+go work sync
+```
+
+### Checking Workspace Status
+
+```bash
+# Show active workspace
+go env GOWORK
+
+# List workspace modules
+go list -m
+
+# Show all modules in workspace
+go work edit -print
+```
+
+## Workspace vs Replace Directives
+
+### Before Workspaces (go.mod)
+
+```go api/go.mod
+module example.com/api
+
+replace example.com/lib => ../lib
+
+require example.com/lib v0.0.0
+```
+
+### With Workspaces (go.work)
+
+```go go.work
+use (
+    ./api
+    ./lib
+)
+```
+
+```go api/go.mod
+module example.com/api
+
+require example.com/lib v0.0.0
+```
+
+<CardGroup cols={2}>
+  <Card title="Replace Directives">
+    - Requires manual editing
+    - Per-module configuration
+    - Often committed by accident
+    - Can be confusing
+  </Card>
+  <Card title="Workspaces">
+    - Centralized configuration
+    - Automatic module discovery
+    - Not committed to VCS
+    - Cleaner go.mod files
+  </Card>
+</CardGroup>
+
+## Disabling Workspaces
+
+### Temporary Disable
+
+```bash
+# Disable workspace for single command
+GOWORK=off go build
+
+# Unset GOWORK
+export GOWORK=off
+go build
+```
+
+### Using Different Workspace
+
+```bash
+# Use specific workspace file
+GOWORK=/path/to/other.work go build
+
+# Or set default
+go env -w GOWORK=/path/to/other.work
+```
+
+## Multi-Repository Workflows
+
+### Cloning Multiple Repositories
+
+```bash
+# Clone repositories
+mkdir workspace
+cd workspace
+git clone https://github.com/user/module1
+git clone https://github.com/user/module2
+git clone https://github.com/user/app
+
+# Create workspace
+go work init ./module1 ./module2 ./app
+```
+
+### Making Changes Across Repos
+
+<Steps>
+  <Step title="Make Changes">
+    ```bash
+    # Edit module1
+    cd module1
+    # make changes...
+    
+    # Edit app to use new module1 features
+    cd ../app
+    # make changes...
+    ```
+  </Step>
+  
+  <Step title="Test Together">
+    ```bash
+    # Test from workspace root
+    go test ./...
+    ```
+  </Step>
+  
+  <Step title="Commit and Publish">
+    ```bash
+    # Commit module1 changes
+    cd module1
+    git add -A
+    git commit -m "Add new feature"
+    git push
+    git tag v1.2.0
+    git push --tags
+    
+    # Update app to use published version
+    cd ../app
+    go get github.com/user/module1@v1.2.0
+    git add -A
+    git commit -m "Use module1 v1.2.0"
+    git push
+    ```
+  </Step>
+</Steps>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Don't Commit go.work" icon="ban">
+    Add to .gitignore - it's for local development only
+  </Card>
+  <Card title="Use work sync" icon="refresh">
+    Keep module versions consistent across workspace
+  </Card>
+  <Card title="One Workspace Per Project" icon="folder">
+    Avoid overlapping or nested workspaces
+  </Card>
+  <Card title="Clean go.mod" icon="broom">
+    Remove replace directives when using workspaces
+  </Card>
+</CardGroup>
+
+### .gitignore
+
+```gitignore
+# Don't commit workspace file
+go.work
+go.work.sum
+```
+
+### CI/CD Considerations
+
+Workspaces are disabled in CI by default (no `go.work` file):
+
+```yaml .github/workflows/ci.yml
+name: CI
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      
+      # Each module tested independently
+      - run: cd api && go test ./...
+      - run: cd lib && go test ./...
+      - run: cd cmd && go test ./...
+```
+
+## Use Cases
+
+### Developing a Library and Its Consumers
+
+```
+workspace/
+├── go.work
+├── mylib/          # Library being developed
+│   └── go.mod
+├── example1/       # Example application
+│   └── go.mod
+└── example2/       # Another application
+    └── go.mod
+```
+
+### Monorepo Development
+
+```
+monorepo/
+├── go.work
+├── services/
+│   ├── api/
+│   ├── worker/
+│   └── scheduler/
+├── pkg/
+│   ├── common/
+│   ├── database/
+│   └── auth/
+└── tools/
+    └── migrator/
+```
+
+### Testing Unreleased Changes
+
+```bash
+# Clone your fork
+git clone https://github.com/you/upstream-fork lib
+
+# Your application
+cd myapp
+go work init . ../lib
+
+# Test with unreleased changes
+go test ./...
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Module not found in workspace">
+    ```bash
+    # Check workspace modules
+    go work edit -print
+    
+    # Add missing module
+    go work use ./missing-module
+    
+    # Verify
+    go list -m
+    ```
+  </Accordion>
+  
+  <Accordion title="Workspace not detected">
+    ```bash
+    # Check GOWORK setting
+    go env GOWORK
+    
+    # Should show path to go.work file
+    # If empty, create workspace:
+    go work init ./module1 ./module2
+    ```
+  </Accordion>
+  
+  <Accordion title="Version conflicts between modules">
+    ```bash
+    # Sync workspace build list
+    go work sync
+    
+    # Check dependency versions
+    go list -m all
+    
+    # View dependency graph
+    go mod graph
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Migration from Replace Directives
+
+<Steps>
+  <Step title="Create Workspace">
+    ```bash
+    go work init ./module1 ./module2
+    ```
+  </Step>
+  
+  <Step title="Remove Replace Directives">
+    Edit each module's `go.mod` and remove local replace directives:
+    
+    ```diff go.mod
+     module example.com/app
+     
+     require example.com/lib v1.0.0
+     
+    -replace example.com/lib => ../lib
+    ```
+  </Step>
+  
+  <Step title="Verify">
+    ```bash
+    go build ./...
+    go test ./...
+    ```
+  </Step>
+  
+  <Step title="Update .gitignore">
+    ```bash
+    echo "go.work" >> .gitignore
+    echo "go.work.sum" >> .gitignore
+    ```
+  </Step>
+</Steps>
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="Modules" href="/tools/modules">
+    Go modules fundamentals
+  </Card>
+  <Card title="go Command" href="/tools/go-command">
+    Overview of go command
+  </Card>
+  <Card title="Building" href="/tools/build">
+    Building Go programs
+  </Card>
+</CardGroup>
+
+## References
+
+- [Go Workspaces Tutorial](https://go.dev/doc/tutorial/workspaces)
+- [Workspaces Reference](https://go.dev/ref/mod#workspaces)
+- [Go 1.18 Release Notes](https://go.dev/doc/go1.18#workspaces)

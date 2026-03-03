@@ -1,0 +1,579 @@
+---
+title: Garbage Collection
+description: Understanding Go's concurrent garbage collector and memory management
+---
+
+## Overview
+
+Go features a concurrent, tri-color, mark-and-sweep garbage collector that runs alongside your program. It's designed to minimize pause times while efficiently reclaiming unused memory. Understanding how the GC works helps you write more efficient Go programs.
+
+<Note>
+The Go GC is non-generational and non-compacting. It uses size-segregated allocation and runs concurrently with minimal stop-the-world pauses.
+</Note>
+
+## GC Algorithm
+
+### High-Level Overview
+
+The GC is **type-accurate** (precise), **concurrent** (runs alongside mutators), and supports **parallel** marking with multiple GC threads. The algorithm builds on Dijkstra's on-the-fly garbage collection.
+
+### Four Phases
+
+#### 1. Sweep Termination
+
+Stop-the-world phase:
+- All Ps reach a GC safe-point
+- Sweep any unswept spans (if GC was forced early)
+
+#### 2. Mark Phase
+
+**Preparation** (stop-the-world):
+- Set `gcphase` to `_GCmark`
+- Enable write barrier on all Ps
+- Enable mutator assists
+- Enqueue root mark jobs
+
+**Concurrent marking** (world running):
+- Mark workers (scheduled by runtime) scan objects
+- Write barrier shades pointers during mutation
+- Newly allocated objects are immediately marked black
+- All stacks are scanned, shading found pointers
+- Grey objects are drained, turning them black
+
+**Termination detection**:
+- Uses distributed termination algorithm
+- Detects when no root jobs or grey objects remain
+- Transitions to mark termination
+
+#### 3. Mark Termination
+
+Stop-the-world phase:
+- Set `gcphase` to `_GCmarktermination`
+- Disable workers and assists
+- Flush mcaches and perform housekeeping
+
+#### 4. Sweep Phase
+
+**Preparation**:
+- Set `gcphase` to `_GCoff`
+- Set up sweep state
+- Disable write barrier
+
+**Concurrent sweeping** (world running):
+- Spans swept lazily when needed
+- Background goroutine sweeps proactively
+- Sweeping happens before allocation to avoid requesting more OS memory
+
+### Concurrent Sweep Details
+
+Sweeping happens in two ways:
+
+1. **Background sweeper** - Goroutine that sweeps spans one-by-one
+2. **Lazy sweeping** - When a goroutine needs a span, it sweeps to reclaim memory
+
+```
+All spans marked "needs sweeping" at STW mark termination
+    ↓
+Background sweeper + Lazy sweeping during allocation
+    ↓
+Finalizers run after all spans swept
+```
+
+## Write Barrier
+
+The write barrier is critical for maintaining GC correctness during concurrent marking.
+
+### Purpose
+
+When the mutator (your code) writes a pointer while GC is marking:
+- Both the overwritten pointer and new pointer are shaded
+- Ensures all reachable objects are marked
+- Prevents lost objects during concurrent marking
+
+### When Active
+
+- Enabled during mark phase
+- Disabled during sweep and off phases
+- Checked at compile time with `//go:nowritebarrier` directives
+
+```go
+// Compiler-generated pseudocode
+func pointerWrite(dst *unsafe.Pointer, src unsafe.Pointer) {
+    if gcphase == _GCmark {
+        shade(*dst)  // Old value
+        shade(src)   // New value
+    }
+    *dst = src
+}
+```
+
+<Note>
+The write barrier adds overhead but is necessary for correctness. The compiler optimizes it out when proven safe.
+</Note>
+
+## GC Pacing
+
+### Trigger Mechanism
+
+GC starts when the heap reaches a target size. The target is calculated as:
+
+```
+heapGoal = live_data * (1 + GOGC/100)
+```
+
+Default `GOGC=100` means GC triggers when heap reaches 2× live data.
+
+**Example:**
+- Live data: 4MB
+- `GOGC=100`: GC triggers at 8MB
+- `GOGC=200`: GC triggers at 12MB
+- `GOGC=50`: GC triggers at 6MB
+
+### Pacer
+
+The GC pacer manages when to start GC and how much assist work to require:
+
+```go
+// Environment variables
+GOGC=100          // Target percentage (default)
+GOMEMLIMIT=4GiB   // Soft memory limit
+```
+
+The pacer balances:
+- CPU overhead of GC
+- Memory overhead of unused objects
+- Responsiveness (pause times)
+
+### GC Rate
+
+Keeps GC cost proportional to allocation cost:
+- More allocation → more frequent GC
+- Less allocation → less frequent GC
+- Linear relationship maintains predictable overhead
+
+## Mutator Assists
+
+When allocation outpaces marking, the allocating goroutine must help:
+
+```
+Allocating goroutine
+    ↓
+Check: Is allocation ahead of marking?
+    ↓ Yes
+Perform marking work (assist)
+    ↓
+Continue with allocation
+```
+
+This ensures GC completes before running out of memory.
+
+### Controlling Assists
+
+- Assist amount proportional to allocation
+- GC credit system tracks work done
+- Background workers reduce need for assists
+
+## Tuning the GC
+
+### GOGC Environment Variable
+
+Controls GC frequency:
+
+```bash
+# More frequent GC (lower memory, more CPU)
+GOGC=50 ./myprogram
+
+# Less frequent GC (more memory, less CPU)
+GOGC=200 ./myprogram
+
+# Disable GC (not recommended for production)
+GOGC=off ./myprogram
+```
+
+Trade-offs:
+- **Low GOGC**: Less memory, more GC CPU overhead, shorter pauses
+- **High GOGC**: More memory, less GC CPU overhead, potentially longer pauses
+
+### GOMEMLIMIT
+
+Set soft memory limit:
+
+```bash
+# Limit to 4GiB
+GOMEMLIMIT=4GiB ./myprogram
+
+# Limit to 512MiB
+GOMEMLIMIT=512MiB ./myprogram
+```
+
+The GC will try to stay under this limit by:
+- Running GC more frequently
+- Adjusting target heap size
+- Still respecting `GOGC` for minimum frequency
+
+<Warning>
+`GOMEMLIMIT` is a soft limit. The program may temporarily exceed it. It doesn't prevent OOM if the live data is larger than the limit.
+</Warning>
+
+### Runtime Control
+
+```go
+import "runtime"
+
+// Force GC to run
+runtime.GC()
+
+// Set GOGC percentage programmatically
+oldGOGC := runtime.SetGCPercent(200)
+
+// Read memory stats
+var m runtime.MemStats
+runtime.ReadMemStats(&m)
+fmt.Printf("Alloc = %v MiB\n", m.Alloc / 1024 / 1024)
+fmt.Printf("TotalAlloc = %v MiB\n", m.TotalAlloc / 1024 / 1024)
+fmt.Printf("Sys = %v MiB\n", m.Sys / 1024 / 1024)
+fmt.Printf("NumGC = %v\n", m.NumGC)
+```
+
+## Memory Statistics
+
+### Key MemStats Fields
+
+```go
+type MemStats struct {
+    // General
+    Alloc      uint64  // Bytes allocated and in use
+    TotalAlloc uint64  // Cumulative bytes allocated
+    Sys        uint64  // Bytes obtained from OS
+    Lookups    uint64  // Number of pointer lookups
+    Mallocs    uint64  // Cumulative malloc count
+    Frees      uint64  // Cumulative free count
+    
+    // Heap
+    HeapAlloc    uint64  // Bytes allocated in heap
+    HeapSys      uint64  // Bytes obtained for heap
+    HeapIdle     uint64  // Bytes in idle spans
+    HeapInuse    uint64  // Bytes in in-use spans
+    HeapReleased uint64  // Bytes released to OS
+    HeapObjects  uint64  // Total objects allocated
+    
+    // GC
+    NumGC       uint32    // Number of completed GCs
+    PauseNs     [256]uint64  // Recent GC pause durations
+    PauseEnd    [256]uint64  // Recent GC pause end times
+    LastGC      uint64    // Time of last GC (UnixNano)
+    GCCPUFraction float64 // Fraction of CPU time in GC
+}
+```
+
+### Monitoring GC
+
+```go
+func printGCStats() {
+    var m runtime.MemStats
+    runtime.ReadMemStats(&m)
+    
+    fmt.Printf("GC runs: %d\n", m.NumGC)
+    fmt.Printf("GC CPU%%: %.2f\n", m.GCCPUFraction * 100)
+    
+    if m.NumGC > 0 {
+        // Last pause in milliseconds
+        lastPause := m.PauseNs[(m.NumGC+255)%256]
+        fmt.Printf("Last pause: %.2f ms\n", float64(lastPause)/1e6)
+    }
+}
+```
+
+## Optimization Strategies
+
+### 1. Reduce Allocations
+
+Fewer allocations mean less GC work:
+
+```go
+// Bad: Allocates on each call
+func process() {
+    buf := make([]byte, 1024)
+    // Use buf...
+}
+
+// Good: Reuse buffer
+var bufPool = sync.Pool{
+    New: func() any { return make([]byte, 1024) },
+}
+
+func process() {
+    buf := bufPool.Get().([]byte)
+    defer bufPool.Put(buf)
+    // Use buf...
+}
+```
+
+### 2. Use Pointers Judiciously
+
+Large values passed by value trigger copies:
+
+```go
+// Bad: Copies entire struct
+func process(data BigStruct) { ... }
+
+// Good: Passes pointer
+func process(data *BigStruct) { ... }
+```
+
+But avoid pointer-heavy structures that increase scan work:
+
+```go
+// Many pointers = more GC scan work
+type Heavy struct {
+    p1, p2, p3, p4 *int
+    p5, p6, p7, p8 *string
+}
+
+// Fewer pointers = less GC scan work
+type Light struct {
+    values [8]int
+    name   string
+}
+```
+
+### 3. Use sync.Pool
+
+Reuse objects instead of reallocating:
+
+```go
+var requestPool = sync.Pool{
+    New: func() any {
+        return &Request{}
+    },
+}
+
+func handleRequest() {
+    req := requestPool.Get().(*Request)
+    defer requestPool.Put(req)
+    
+    // Reset and use req...
+}
+```
+
+<Note>
+`sync.Pool` objects may be cleared at any GC. Don't rely on pooled objects persisting across GCs.
+</Note>
+
+### 4. Preallocate Slices
+
+```go
+// Bad: Multiple allocations as slice grows
+items := []Item{}
+for i := 0; i < 1000; i++ {
+    items = append(items, Item{})
+}
+
+// Good: Single allocation
+items := make([]Item, 0, 1000)
+for i := 0; i < 1000; i++ {
+    items = append(items, Item{})
+}
+```
+
+### 5. Consider Value Types
+
+Using value types instead of pointers can reduce GC scan time:
+
+```go
+// Pointer-based: GC must scan every element
+type NodePtr struct {
+    left, right *NodePtr
+    value       int
+}
+
+// Value-based with indices: GC scans array, not individual nodes
+type NodeVal struct {
+    left, right int  // Indices into nodes slice
+    value       int
+}
+var nodes []NodeVal
+```
+
+## GC Debugging
+
+### GODEBUG gctrace
+
+See GC activity:
+
+```bash
+GODEBUG=gctrace=1 ./myprogram
+```
+
+Output:
+```
+gc 1 @0.004s 0%: 0.018+0.46+0.003 ms clock, 0.14+0.25/0.38/0.11+0.027 ms cpu, 4->4->2 MB, 5 MB goal, 8 P
+```
+
+Fields:
+- `gc 1`: GC number
+- `@0.004s`: Time since program start
+- `0%`: Percentage of time in GC since start
+- `4->4->2 MB`: Heap size at start, end, and live data
+- `5 MB goal`: Target heap size
+- `8 P`: Number of processors
+
+### Trace GC Events
+
+```go
+import "runtime/trace"
+
+func main() {
+    f, _ := os.Create("trace.out")
+    defer f.Close()
+    
+    trace.Start(f)
+    defer trace.Stop()
+    
+    // Your code...
+}
+```
+
+View with:
+```bash
+go tool trace trace.out
+```
+
+### GC Metrics
+
+```go
+import "runtime/metrics"
+
+func readGCMetrics() {
+    samples := []metrics.Sample{
+        {Name: "/gc/cycles/total:gc-cycles"},
+        {Name: "/gc/heap/goal:bytes"},
+        {Name: "/gc/heap/live:bytes"},
+    }
+    
+    metrics.Read(samples)
+    
+    for _, sample := range samples {
+        fmt.Printf("%s: %v\n", sample.Name, sample.Value)
+    }
+}
+```
+
+## Advanced Topics
+
+### Finalizers
+
+Run code when object is garbage collected:
+
+```go
+type Resource struct {
+    handle uintptr
+}
+
+func NewResource() *Resource {
+    r := &Resource{handle: openHandle()}
+    runtime.SetFinalizer(r, func(r *Resource) {
+        closeHandle(r.handle)
+    })
+    return r
+}
+```
+
+<Warning>
+Finalizers are not guaranteed to run. They add overhead and can delay object reclamation. Use them sparingly, prefer explicit cleanup.
+</Warning>
+
+### Oblets
+
+For large objects (>128KB), GC breaks scanning into "oblets":
+- Scan object in chunks
+- Improves parallelism
+- Reduces pause time spikes
+- Each oblet is a separate work unit
+
+### Heap Profiling
+
+Profile memory allocations:
+
+```bash
+# Run with memory profiling
+go test -memprofile mem.prof
+
+# Analyze
+go tool pprof mem.prof
+```
+
+Or programmatically:
+```go
+f, _ := os.Create("mem.prof")
+pprof.WriteHeapProfile(f)
+f.Close()
+```
+
+## Common Issues
+
+### Excessive GC
+
+**Symptoms:** High `GCCPUFraction`, frequent GC cycles
+
+**Solutions:**
+- Increase `GOGC` to reduce frequency
+- Reduce allocation rate
+- Use object pooling
+- Preallocate slices/maps
+
+### Memory Leaks
+
+**Symptoms:** Growing memory, GC doesn't help
+
+**Causes:**
+- Global variables holding references
+- Goroutine leaks (goroutines stuck with references)
+- Unclosed resources with finalizers
+- Large slice retaining backing array
+
+**Debug:**
+```go
+import _ "net/http/pprof"
+
+// Visit http://localhost:6060/debug/pprof/heap
+go http.ListenAndServe(":6060", nil)
+```
+
+### GC Pauses
+
+**Symptoms:** Application freezes/latency spikes
+
+**Solutions:**
+- Lower `GOGC` for more frequent, shorter GCs
+- Reduce pointer-heavy structures
+- Reduce heap size
+- Use value types where possible
+
+## Best Practices
+
+1. **Profile before optimizing** - Use `pprof` and `trace`
+2. **Reduce allocations** - Reuse objects, preallocate
+3. **Set appropriate GOGC** - Balance memory vs CPU
+4. **Use GOMEMLIMIT** - In containerized environments
+5. **Avoid finalizers** - Use explicit cleanup
+6. **Monitor GC metrics** - Track `GCCPUFraction` in production
+7. **Test with realistic load** - GC behavior depends on allocation patterns
+
+<Note>
+The default GC settings work well for most applications. Only tune if profiling shows GC is a bottleneck.
+</Note>
+
+## References
+
+- [Go GC Guide](https://go.dev/doc/gc-guide)
+- [runtime package](/pkg/runtime/)
+- [runtime/debug package](/pkg/runtime/debug/)
+- [GC Handbook](https://gchandbook.org/) by Richard Jones
+
+## Related Topics
+
+- [Runtime Internals](/advanced/runtime)
+- [Profiling and Diagnostics](/advanced/diagnostics)
+- [Memory Management](/guides/memory)
+- [Performance Optimization](/guides/performance)

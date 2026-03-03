@@ -1,0 +1,232 @@
+---
+title: sync
+description: Synchronization primitives for concurrent programming
+---
+
+The `sync` package provides basic synchronization primitives such as mutual exclusion locks.
+
+## Mutex
+
+```go
+import "sync"
+
+type Counter struct {
+    mu    sync.Mutex
+    value int
+}
+
+func (c *Counter) Increment() {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    c.value++
+}
+
+func (c *Counter) Value() int {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    return c.value
+}
+```
+
+## RWMutex
+
+```go
+type Cache struct {
+    mu   sync.RWMutex
+    data map[string]string
+}
+
+func (c *Cache) Get(key string) string {
+    c.mu.RLock()
+    defer c.mu.RUnlock()
+    return c.data[key]
+}
+
+func (c *Cache) Set(key, value string) {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    c.data[key] = value
+}
+```
+
+## WaitGroup
+
+```go
+func processItems(items []int) {
+    var wg sync.WaitGroup
+    
+    for _, item := range items {
+        wg.Add(1)
+        go func(n int) {
+            defer wg.Done()
+            process(n)
+        }(item)
+    }
+    
+    wg.Wait()
+}
+```
+
+## Once
+
+```go
+var (
+    instance *Singleton
+    once     sync.Once
+)
+
+func GetInstance() *Singleton {
+    once.Do(func() {
+        instance = &Singleton{}
+    })
+    return instance
+}
+```
+
+## Map (Concurrent Map)
+
+```go
+var cache sync.Map
+
+// Store
+cache.Store("key", "value")
+
+// Load
+value, ok := cache.Load("key")
+
+// LoadOrStore
+actual, loaded := cache.LoadOrStore("key", "value")
+
+// Delete
+cache.Delete("key")
+
+// Range
+cache.Range(func(key, value interface{}) bool {
+    fmt.Printf("%v: %v\n", key, value)
+    return true // continue iteration
+})
+```
+
+## Cond (Condition Variable)
+
+```go
+type Queue struct {
+    mu    sync.Mutex
+    cond  *sync.Cond
+    items []int
+}
+
+func NewQueue() *Queue {
+    q := &Queue{}
+    q.cond = sync.NewCond(&q.mu)
+    return q
+}
+
+func (q *Queue) Enqueue(item int) {
+    q.mu.Lock()
+    defer q.mu.Unlock()
+    
+    q.items = append(q.items, item)
+    q.cond.Signal()
+}
+
+func (q *Queue) Dequeue() int {
+    q.mu.Lock()
+    defer q.mu.Unlock()
+    
+    for len(q.items) == 0 {
+        q.cond.Wait()
+    }
+    
+    item := q.items[0]
+    q.items = q.items[1:]
+    return item
+}
+```
+
+## Pool
+
+```go
+var bufferPool = sync.Pool{
+    New: func() interface{} {
+        return new(bytes.Buffer)
+    },
+}
+
+func useBuffer() {
+    buf := bufferPool.Get().(*bytes.Buffer)
+    defer bufferPool.Put(buf)
+    
+    buf.Reset()
+    buf.WriteString("data")
+    // Use buffer
+}
+```
+
+## Practical Examples
+
+### Thread-Safe Counter
+
+```go
+type SafeCounter struct {
+    mu sync.Mutex
+    v  map[string]int
+}
+
+func (c *SafeCounter) Inc(key string) {
+    c.mu.Lock()
+    c.v[key]++
+    c.mu.Unlock()
+}
+
+func (c *SafeCounter) Value(key string) int {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    return c.v[key]
+}
+```
+
+### Worker Pool
+
+```go
+func workerPool(jobs <-chan int, results chan<- int) {
+    var wg sync.WaitGroup
+    
+    for i := 0; i < 3; i++ {
+        wg.Add(1)
+        go func() {
+            defer wg.Done()
+            for job := range jobs {
+                results <- job * 2
+            }
+        }()
+    }
+    
+    wg.Wait()
+    close(results)
+}
+```
+
+### Lazy Initialization
+
+```go
+type Config struct {
+    data map[string]string
+    once sync.Once
+}
+
+func (c *Config) Load() {
+    c.once.Do(func() {
+        c.data = loadFromFile()
+    })
+}
+```
+
+## Best Practices
+
+1. **Use defer for unlocking** - Prevents deadlocks
+2. **Keep critical sections small** - Hold locks briefly
+3. **Prefer channels** - For communication between goroutines
+4. **Use RWMutex** - When reads >> writes
+5. **Don't copy mutexes** - Pass by pointer
+6. **Avoid nested locks** - Can cause deadlocks

@@ -1,0 +1,169 @@
+---
+title: text
+description: Text processing including templates and Unicode
+---
+
+The `text` package provides text processing utilities. It contains subpackages for templates, scanning, and tabular data.
+
+## text/template
+
+Data-driven text templates.
+
+```go
+import "text/template"
+
+func basicTemplate() error {
+    tmpl := template.Must(template.New("greeting").Parse(
+        "Hello, {{.Name}}! You are {{.Age}} years old.",
+    ))
+    
+    data := struct {
+        Name string
+        Age  int
+    }{"Alice", 30}
+    
+    return tmpl.Execute(os.Stdout, data)
+}
+```
+
+### Template Syntax
+
+```go
+const tmpl = `
+{{/* Comment */}}
+{{.Field}}           {{/* Access field */}}
+{{if .Condition}}    {{/* Conditional */}}
+{{range .Items}}     {{/* Loop */}}
+{{with .Value}}      {{/* Set context */}}
+{{template "name"}}  {{/* Include template */}}
+`
+```
+
+### Custom Functions
+
+```go
+funcMap := template.FuncMap{
+    "upper": strings.ToUpper,
+    "add": func(a, b int) int {
+        return a + b
+    },
+}
+
+tmpl := template.New("test").Funcs(funcMap)
+tmpl.Parse(`{{upper .Name}} - {{add 1 2}}`)
+```
+
+## text/scanner
+
+Text tokenization.
+
+```go
+import "text/scanner"
+
+func scanText(src string) {
+    var s scanner.Scanner
+    s.Init(strings.NewReader(src))
+    
+    for tok := s.Scan(); tok != scanner.EOF; tok = s.Scan() {
+        fmt.Printf("%s: %s\n", s.Position, s.TokenText())
+    }
+}
+```
+
+## text/tabwriter
+
+Aligned text output.
+
+```go
+import "text/tabwriter"
+
+func tableOutput() {
+    w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+    defer w.Flush()
+    
+    fmt.Fprintln(w, "Name\tAge\tCity")
+    fmt.Fprintln(w, "Alice\t30\tNew York")
+    fmt.Fprintln(w, "Bob\t25\tLondon")
+    fmt.Fprintln(w, "Charlie\t35\tTokyo")
+}
+```
+
+## Practical Examples
+
+### Generate Report
+
+```go
+func generateReport(data interface{}) (string, error) {
+    tmpl := template.Must(template.New("report").Parse(`
+Report: {{.Title}}
+Date: {{.Date}}
+
+Items:
+{{range .Items}}
+- {{.Name}}: {{.Value}}
+{{end}}
+    `))
+    
+    var buf bytes.Buffer
+    err := tmpl.Execute(&buf, data)
+    return buf.String(), err
+}
+```
+
+### Email Template
+
+```go
+func emailTemplate(recipient, subject, body string) string {
+    tmpl := template.Must(template.New("email").Parse(`
+To: {{.Recipient}}
+Subject: {{.Subject}}
+
+{{.Body}}
+    `))
+    
+    var buf bytes.Buffer
+    tmpl.Execute(&buf, map[string]string{
+        "Recipient": recipient,
+        "Subject":   subject,
+        "Body":      body,
+    })
+    
+    return buf.String()
+}
+```
+
+### Format Table
+
+```go
+func formatTable(headers []string, rows [][]string) string {
+    var buf bytes.Buffer
+    w := tabwriter.NewWriter(&buf, 0, 0, 2, ' ', 0)
+    
+    // Headers
+    fmt.Fprintln(w, strings.Join(headers, "\t"))
+    
+    // Separator
+    seps := make([]string, len(headers))
+    for i := range seps {
+        seps[i] = strings.Repeat("-", 10)
+    }
+    fmt.Fprintln(w, strings.Join(seps, "\t"))
+    
+    // Rows
+    for _, row := range rows {
+        fmt.Fprintln(w, strings.Join(row, "\t"))
+    }
+    
+    w.Flush()
+    return buf.String()
+}
+```
+
+## Best Practices
+
+1. **Cache templates** - Parse once, execute many times
+2. **Validate data** - Check template data before rendering
+3. **Use Must carefully** - Only for templates that must parse
+4. **Handle errors** - Check Execute errors
+5. **Use tabwriter** - For aligned output
+6. **Escape when needed** - For HTML, use html/template

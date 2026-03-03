@@ -1,0 +1,392 @@
+---
+title: sync
+description: Package sync provides basic synchronization primitives
+---
+
+Package sync provides basic synchronization primitives such as mutual exclusion locks. Other than the Once and WaitGroup types, most are intended for use by low-level library routines. Higher-level synchronization is better done via channels and communication.
+
+<Note>
+Values containing the types defined in this package should not be copied after first use.
+</Note>
+
+## Core Types
+
+### Mutex
+
+A Mutex is a mutual exclusion lock. The zero value for a Mutex is an unlocked mutex.
+
+```go
+var mu sync.Mutex
+
+mu.Lock()
+defer mu.Unlock()
+// critical section
+```
+
+<ParamField path="Lock" type="func()">
+  Locks the mutex. If the lock is already in use, the calling goroutine blocks until the mutex is available.
+</ParamField>
+
+<ParamField path="Unlock" type="func()">
+  Unlocks the mutex. It is a run-time error if the mutex is not locked on entry to Unlock.
+</ParamField>
+
+<ParamField path="TryLock" type="func() bool">
+  Tries to lock the mutex and reports whether it succeeded. Note that while correct uses of TryLock exist, they are rare.
+</ParamField>
+
+<Note>
+A locked Mutex is not associated with a particular goroutine. It is allowed for one goroutine to lock a Mutex and then arrange for another goroutine to unlock it.
+</Note>
+
+### RWMutex
+
+A RWMutex is a reader/writer mutual exclusion lock. The lock can be held by an arbitrary number of readers or a single writer.
+
+```go
+var rw sync.RWMutex
+
+// Multiple readers can hold the lock simultaneously
+rw.RLock()
+defer rw.RUnlock()
+// read operations
+
+// Only one writer can hold the lock
+rw.Lock()
+defer rw.Unlock()
+// write operations
+```
+
+<ParamField path="RLock" type="func()">
+  Locks rw for reading. Should not be used for recursive read locking.
+</ParamField>
+
+<ParamField path="RUnlock" type="func()">
+  Undoes a single RLock call.
+</ParamField>
+
+<ParamField path="Lock" type="func()">
+  Locks rw for writing. If the lock is already locked for reading or writing, Lock blocks until the lock is available.
+</ParamField>
+
+<ParamField path="Unlock" type="func()">
+  Unlocks rw for writing.
+</ParamField>
+
+<ParamField path="TryRLock" type="func() bool">
+  Tries to lock rw for reading and reports whether it succeeded.
+</ParamField>
+
+<ParamField path="TryLock" type="func() bool">
+  Tries to lock rw for writing and reports whether it succeeded.
+</ParamField>
+
+<ParamField path="RLocker" type="func() Locker">
+  Returns a Locker interface that implements Lock and Unlock by calling rw.RLock and rw.RUnlock.
+</ParamField>
+
+### WaitGroup
+
+A WaitGroup is a counting semaphore typically used to wait for a group of goroutines or tasks to finish.
+
+```go
+var wg sync.WaitGroup
+
+// Using the Go method (recommended)
+wg.Go(task1)
+wg.Go(task2)
+wg.Wait()
+
+// Using Add/Done (traditional pattern)
+wg.Add(1)
+go func() {
+    defer wg.Done()
+    // task work
+}()
+wg.Wait()
+```
+
+<ParamField path="Add" type="func(delta int)">
+  Adds delta to the WaitGroup counter. If the counter becomes zero, all goroutines blocked on Wait are released. Callers should prefer WaitGroup.Go.
+</ParamField>
+
+<ParamField path="Done" type="func()">
+  Decrements the WaitGroup counter by one. Equivalent to Add(-1). Callers should prefer WaitGroup.Go.
+</ParamField>
+
+<ParamField path="Wait" type="func()">
+  Blocks until the WaitGroup counter is zero.
+</ParamField>
+
+<ParamField path="Go" type="func(f func())">
+  Calls f in a new goroutine and adds that task to the WaitGroup. When f returns, the task is removed from the WaitGroup. The function f must not panic.
+</ParamField>
+
+### Once
+
+Once is an object that will perform exactly one action.
+
+```go
+var once sync.Once
+
+once.Do(func() {
+    // initialization code
+    // will only run once
+})
+```
+
+<ParamField path="Do" type="func(f func())">
+  Calls the function f if and only if Do is being called for the first time for this instance of Once. Multiple calls will only invoke f once.
+</ParamField>
+
+### Cond
+
+Cond implements a condition variable, a rendezvous point for goroutines waiting for or announcing the occurrence of an event.
+
+```go
+var mu sync.Mutex
+c := sync.NewCond(&mu)
+
+// Waiter goroutine
+c.L.Lock()
+for !condition() {
+    c.Wait()
+}
+// make use of condition
+c.L.Unlock()
+
+// Signaler goroutine
+c.L.Lock()
+// change condition
+c.Signal() // or c.Broadcast()
+c.L.Unlock()
+```
+
+<ParamField path="NewCond" type="func(l Locker) *Cond">
+  Returns a new Cond with Locker l.
+</ParamField>
+
+<ParamField path="Wait" type="func()">
+  Atomically unlocks c.L and suspends execution of the calling goroutine. After later resuming execution, Wait locks c.L before returning.
+</ParamField>
+
+<ParamField path="Signal" type="func()">
+  Wakes one goroutine waiting on c, if there is any.
+</ParamField>
+
+<ParamField path="Broadcast" type="func()">
+  Wakes all goroutines waiting on c.
+</ParamField>
+
+<Note>
+For many simple use cases, users will be better off using channels than a Cond (Broadcast corresponds to closing a channel, and Signal corresponds to sending on a channel).
+</Note>
+
+### Pool
+
+A Pool is a set of temporary objects that may be individually saved and retrieved. A Pool is safe for use by multiple goroutines simultaneously.
+
+```go
+var bufferPool = sync.Pool{
+    New: func() any {
+        return new(bytes.Buffer)
+    },
+}
+
+// Get a buffer from the pool
+buf := bufferPool.Get().(*bytes.Buffer)
+buf.Reset()
+defer bufferPool.Put(buf)
+
+// use buffer
+```
+
+<ParamField path="Get" type="func() any">
+  Selects an arbitrary item from the Pool, removes it from the Pool, and returns it to the caller. If Get would otherwise return nil and p.New is non-nil, Get returns the result of calling p.New.
+</ParamField>
+
+<ParamField path="Put" type="func(x any)">
+  Adds x to the pool.
+</ParamField>
+
+<ParamField path="New" type="func() any">
+  Optionally specifies a function to generate a value when Get would otherwise return nil.
+</ParamField>
+
+### Map
+
+Map is like a Go map[any]any but is safe for concurrent use by multiple goroutines without additional locking or coordination.
+
+```go
+var m sync.Map
+
+// Store a value
+m.Store("key", "value")
+
+// Load a value
+if value, ok := m.Load("key"); ok {
+    fmt.Println(value)
+}
+
+// Delete a value
+m.Delete("key")
+
+// Iterate over all key-value pairs
+m.Range(func(key, value any) bool {
+    fmt.Printf("%v: %v\n", key, value)
+    return true // continue iteration
+})
+```
+
+<ParamField path="Load" type="func(key any) (value any, ok bool)">
+  Returns the value stored in the map for a key, or nil if no value is present.
+</ParamField>
+
+<ParamField path="Store" type="func(key, value any)">
+  Sets the value for a key.
+</ParamField>
+
+<ParamField path="LoadOrStore" type="func(key, value any) (actual any, loaded bool)">
+  Returns the existing value for the key if present. Otherwise, it stores and returns the given value.
+</ParamField>
+
+<ParamField path="LoadAndDelete" type="func(key any) (value any, loaded bool)">
+  Deletes the value for a key, returning the previous value if any.
+</ParamField>
+
+<ParamField path="Delete" type="func(key any)">
+  Deletes the value for a key.
+</ParamField>
+
+<ParamField path="Swap" type="func(key, value any) (previous any, loaded bool)">
+  Swaps the value for a key and returns the previous value if any.
+</ParamField>
+
+<ParamField path="CompareAndSwap" type="func(key, old, new any) bool">
+  Swaps the old and new values for key if the value stored in the map is equal to old.
+</ParamField>
+
+<ParamField path="CompareAndDelete" type="func(key, old any) bool">
+  Deletes the entry for key if its value is equal to old.
+</ParamField>
+
+<ParamField path="Range" type="func(f func(key, value any) bool)">
+  Calls f sequentially for each key and value present in the map. If f returns false, Range stops the iteration.
+</ParamField>
+
+<ParamField path="Clear" type="func()">
+  Deletes all the entries, resulting in an empty Map.
+</ParamField>
+
+## Interfaces
+
+### Locker
+
+```go
+type Locker interface {
+    Lock()
+    Unlock()
+}
+```
+
+A Locker represents an object that can be locked and unlocked.
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use channels for higher-level synchronization">
+    For most synchronization needs, channels provide better composability and are easier to reason about than low-level primitives like Mutex and Cond.
+  </Accordion>
+
+  <Accordion title="Prefer WaitGroup.Go over Add/Done">
+    The Go method is simpler and less error-prone than manually managing Add/Done calls. It automatically handles the counter and ensures Done is called even if the function panics.
+  </Accordion>
+
+  <Accordion title="Never copy sync types after first use">
+    All sync types contain internal state that must not be copied. Always pass pointers to these types.
+  </Accordion>
+
+  <Accordion title="Use defer for Unlock calls">
+    Always defer Unlock calls immediately after Lock to ensure the lock is released even if the function panics.
+    
+    ```go
+    mu.Lock()
+    defer mu.Unlock()
+    // critical section
+    ```
+  </Accordion>
+
+  <Accordion title="Pool is for performance optimization only">
+    Use Pool to cache allocated but unused items for later reuse, reducing GC pressure. Don't use Pool for managing shared state or as a general cache.
+  </Accordion>
+</AccordionGroup>
+
+## Common Patterns
+
+### Protecting shared state with Mutex
+
+```go
+type Counter struct {
+    mu    sync.Mutex
+    count int
+}
+
+func (c *Counter) Inc() {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    c.count++
+}
+
+func (c *Counter) Value() int {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    return c.count
+}
+```
+
+### Concurrent workers with WaitGroup
+
+```go
+var wg sync.WaitGroup
+tasks := []func(){task1, task2, task3}
+
+for _, task := range tasks {
+    wg.Go(task)
+}
+
+wg.Wait() // Wait for all tasks to complete
+```
+
+### Lazy initialization with Once
+
+```go
+var (
+    config *Config
+    once   sync.Once
+)
+
+func GetConfig() *Config {
+    once.Do(func() {
+        config = loadConfig()
+    })
+    return config
+}
+```
+
+### Object pooling for performance
+
+```go
+var jsonEncoderPool = sync.Pool{
+    New: func() any {
+        return json.NewEncoder(nil)
+    },
+}
+
+func EncodeJSON(w io.Writer, v any) error {
+    enc := jsonEncoderPool.Get().(*json.Encoder)
+    defer jsonEncoderPool.Put(enc)
+    
+    enc.Reset(w)
+    return enc.Encode(v)
+}
+```

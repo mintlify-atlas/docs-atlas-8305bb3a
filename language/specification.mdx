@@ -1,0 +1,239 @@
+---
+title: 'Go Language Specification'
+description: 'Reference manual for the Go programming language, including syntax, types, expressions, and statements'
+keywords: ['go', 'specification', 'language', 'reference', 'syntax', 'types']
+icon: 'file-code'
+---
+
+## Introduction
+
+This is the reference manual for the Go programming language. Go is a general-purpose language designed with systems programming in mind. It is strongly typed and garbage-collected and has explicit support for concurrent programming. Programs are constructed from packages, whose properties allow efficient management of dependencies.
+
+The syntax is compact and simple to parse, allowing for easy analysis by automatic tools such as integrated development environments.
+
+<Note>
+  The Go language specification covers language version go1.26 (January 12, 2026). For the complete specification, see [go.dev/ref/spec](https://go.dev/ref/spec).
+</Note>
+
+## Notation
+
+The syntax is specified using a variant of Extended Backus-Naur Form (EBNF):
+
+```ebnf
+Syntax      = { Production } .
+Production  = production_name "=" [ Expression ] "." .
+Expression  = Term { "|" Term } .
+Term        = Factor { Factor } .
+Factor      = production_name | token [ "…" token ] | Group | Option | Repetition .
+Group       = "(" Expression ")" .
+Option      = "[" Expression "]" .
+Repetition  = "{" Expression "}" .
+```
+
+Productions are expressions constructed from terms and the following operators, in increasing precedence:
+
+```ebnf
+|   alternation
+()  grouping
+[]  option (0 or 1 times)
+{}  repetition (0 to n times)
+```
+
+<Info>
+  Lowercase production names are used to identify lexical (terminal) tokens. Non-terminals are in CamelCase. Lexical tokens are enclosed in double quotes `""` or back quotes `` `` ``.
+</Info>
+
+## Source Code Representation
+
+Source code is Unicode text encoded in UTF-8. The text is not canonicalized, so a single accented code point is distinct from the same character constructed from combining an accent and a letter; those are treated as two code points.
+
+Each code point is distinct; for instance, uppercase and lowercase letters are different characters.
+
+### Characters
+
+The following terms denote specific Unicode character categories:
+
+```ebnf
+newline        = /* the Unicode code point U+000A */ .
+unicode_char   = /* an arbitrary Unicode code point except newline */ .
+unicode_letter = /* a Unicode code point categorized as "Letter" */ .
+unicode_digit  = /* a Unicode code point categorized as "Number, decimal digit" */ .
+```
+
+### Letters and Digits
+
+The underscore character `_` (U+005F) is considered a lowercase letter.
+
+```ebnf
+letter        = unicode_letter | "_" .
+decimal_digit = "0" … "9" .
+binary_digit  = "0" | "1" .
+octal_digit   = "0" … "7" .
+hex_digit     = "0" … "9" | "A" … "F" | "a" … "f" .
+```
+
+## Lexical Elements
+
+### Comments
+
+Comments serve as program documentation. There are two forms:
+
+<Steps>
+  <Step title="Line comments">
+    Line comments start with the character sequence `//` and stop at the end of the line.
+  </Step>
+  <Step title="General comments">
+    General comments start with the character sequence `/*` and stop with the first subsequent character sequence `*/`.
+  </Step>
+</Steps>
+
+A comment cannot start inside a rune or string literal, or inside a comment. A general comment containing no newlines acts like a space. Any other comment acts like a newline.
+
+### Semicolons
+
+The formal syntax uses semicolons `;` as terminators in a number of productions. Go programs may omit most of these semicolons using automatic insertion rules:
+
+1. When the input is broken into tokens, a semicolon is automatically inserted into the token stream immediately after a line's final token if that token is:
+   - An identifier
+   - An integer, floating-point, imaginary, rune, or string literal
+   - One of the keywords `break`, `continue`, `fallthrough`, or `return`
+   - One of the operators and punctuation `++`, `--`, `)`, `]`, or `}`
+
+2. To allow complex statements to occupy a single line, a semicolon may be omitted before a closing `)` or `}`.
+
+### Keywords
+
+The following keywords are reserved and may not be used as identifiers:
+
+```go
+break        default      func         interface    select
+case         defer        go           map          struct
+chan         else         goto         package      switch
+const        fallthrough  if           range        type
+continue     for          import       return       var
+```
+
+## Types
+
+A type determines a set of values together with operations and methods specific to those values. A type may be denoted by a type name, if it has one, which must be followed by type arguments if the type is generic. A type may also be specified using a type literal, which composes a type from existing types.
+
+```ebnf
+Type     = TypeName [ TypeArgs ] | TypeLit | "(" Type ")" .
+TypeName = identifier | QualifiedIdent .
+TypeArgs = "[" TypeList [ "," ] "]" .
+TypeList = Type { "," Type } .
+TypeLit  = ArrayType | StructType | PointerType | FunctionType | InterfaceType |
+           SliceType | MapType | ChannelType .
+```
+
+### Boolean Types
+
+A boolean type represents the set of Boolean truth values denoted by the predeclared constants `true` and `false`. The predeclared boolean type is `bool`.
+
+### Numeric Types
+
+Go provides several predeclared architecture-independent numeric types:
+
+<Tabs>
+  <Tab title="Unsigned integers">
+    ```go
+    uint8       // 0 to 255
+    uint16      // 0 to 65535
+    uint32      // 0 to 4294967295
+    uint64      // 0 to 18446744073709551615
+    ```
+  </Tab>
+  <Tab title="Signed integers">
+    ```go
+    int8        // -128 to 127
+    int16       // -32768 to 32767
+    int32       // -2147483648 to 2147483647
+    int64       // -9223372036854775808 to 9223372036854775807
+    ```
+  </Tab>
+  <Tab title="Floating-point">
+    ```go
+    float32     // IEEE 754 32-bit floating-point
+    float64     // IEEE 754 64-bit floating-point
+    ```
+  </Tab>
+  <Tab title="Complex">
+    ```go
+    complex64   // complex with float32 real and imaginary parts
+    complex128  // complex with float64 real and imaginary parts
+    ```
+  </Tab>
+</Tabs>
+
+<Info>
+  The `byte` type is an alias for `uint8`, and `rune` is an alias for `int32`.
+</Info>
+
+There are also predeclared integer types with implementation-specific sizes:
+
+```go
+uint     // either 32 or 64 bits
+int      // same size as uint
+uintptr  // an unsigned integer large enough to store pointer bits
+```
+
+<Warning>
+  To avoid portability issues, explicit conversions are required when different numeric types are mixed in an expression or assignment. For instance, `int32` and `int` are not the same type even though they may have the same size on a particular architecture.
+</Warning>
+
+### String Types
+
+A string type represents the set of string values. A string value is a (possibly empty) sequence of bytes. Strings are immutable: once created, it is impossible to change the contents of a string.
+
+## Key Language Features
+
+<CardGroup cols={2}>
+  <Card title="Packages" icon="box">
+    Programs are constructed from packages, which offer dependency management and encapsulation.
+  </Card>
+  <Card title="Goroutines" icon="arrows-split-up-and-left">
+    Lightweight concurrent execution with explicit support for concurrent programming.
+  </Card>
+  <Card title="Channels" icon="pipe">
+    Type-safe message passing for synchronization between goroutines.
+  </Card>
+  <Card title="Interfaces" icon="plug">
+    Implicit satisfaction enabling flexible polymorphism.
+  </Card>
+</CardGroup>
+
+## Main Specification Sections
+
+The complete Go language specification covers these major topics:
+
+<AccordionGroup>
+  <Accordion title="Constants and Variables">
+    Defines constant and variable declarations, including typed and untyped constants, and variable initialization.
+  </Accordion>
+  <Accordion title="Expressions">
+    Covers operands, operators, conversions, method calls, and evaluation order.
+  </Accordion>
+  <Accordion title="Statements">
+    Documents control flow statements including if, for, switch, select, and defer.
+  </Accordion>
+  <Accordion title="Built-in Functions">
+    Describes predeclared functions like `make`, `new`, `len`, `cap`, `append`, and `panic`.
+  </Accordion>
+  <Accordion title="Program Initialization">
+    Explains package initialization, import statements, and the execution of `init` functions.
+  </Accordion>
+</AccordionGroup>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Effective Go" href="/language/effective-go" icon="book">
+    Best practices and idiomatic Go programming patterns
+  </Card>
+  <Card title="Memory Model" href="/language/memory-model" icon="brain">
+    Understanding Go's memory consistency guarantees
+  </Card>
+  <Card title="GODEBUG" href="/language/godebug" icon="bug">
+    Backwards compatibility and GODEBUG settings
+  </Card>
+</CardGroup>

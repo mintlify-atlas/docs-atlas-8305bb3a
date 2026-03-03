@@ -1,0 +1,301 @@
+---
+title: runtime
+description: Package runtime provides operations that interact with Go's runtime system for goroutines and concurrency control
+---
+
+Package runtime contains operations that interact with Go's runtime system, such as functions to control goroutines, manage concurrency, and query runtime information.
+
+<Note>
+This page focuses on concurrency-related runtime functions. For complete runtime documentation, see the [official Go runtime package](https://pkg.go.dev/runtime).
+</Note>
+
+## Goroutine Management
+
+### Gosched
+
+Yields the processor to allow other goroutines to run.
+
+```go
+runtime.Gosched()
+```
+
+<ParamField path="Gosched" type="func()">
+  Yields the processor, allowing other goroutines to run. It does not suspend the current goroutine, so execution resumes automatically.
+</ParamField>
+
+<Info>
+Gosched is useful in tight loops when you want to be cooperative with the scheduler, but in most cases, the Go scheduler handles this automatically.
+</Info>
+
+### Goexit
+
+Terminates the goroutine that calls it.
+
+```go
+go func() {
+    defer fmt.Println("cleanup")
+    // do some work
+    if shouldExit {
+        runtime.Goexit() // Terminates this goroutine
+    }
+}()
+```
+
+<ParamField path="Goexit" type="func()">
+  Terminates the goroutine that calls it. No other goroutine is affected. Goexit runs all deferred calls before the goroutine exits. Calling Goexit from the main goroutine terminates that goroutine without func main returning.
+</ParamField>
+
+<Warning>
+Calling Goexit from the main goroutine will terminate the program. It crashes if called from a thread not created by the Go runtime.
+</Warning>
+
+### NumGoroutine
+
+Returns the number of goroutines that currently exist.
+
+```go
+count := runtime.NumGoroutine()
+fmt.Printf("Current goroutines: %d\n", count)
+```
+
+<ParamField path="NumGoroutine" type="func() int">
+  Returns the number of goroutines that currently exist. This includes all goroutines, whether running, blocked, or ready to run.
+</ParamField>
+
+## Concurrency Configuration
+
+### GOMAXPROCS
+
+Sets the maximum number of CPUs that can execute simultaneously.
+
+```go
+// Get current value
+current := runtime.GOMAXPROCS(0)
+
+// Set to use 4 CPUs
+previous := runtime.GOMAXPROCS(4)
+
+// Set to use all available CPUs
+runtime.GOMAXPROCS(runtime.NumCPU())
+```
+
+<ParamField path="GOMAXPROCS" type="func(n int) int">
+  Sets the maximum number of CPUs that can be executing simultaneously and returns the previous setting. If n < 1, it does not change the current setting. The number of logical CPUs on the machine can be queried with NumCPU.
+</ParamField>
+
+<Info>
+By default, GOMAXPROCS is set to the value of NumCPU. Starting in Go 1.5, the runtime automatically sets GOMAXPROCS to match the number of available CPUs.
+</Info>
+
+### NumCPU
+
+Returns the number of logical CPUs usable by the current process.
+
+```go
+cpus := runtime.NumCPU()
+fmt.Printf("Available CPUs: %d\n", cpus)
+```
+
+<ParamField path="NumCPU" type="func() int">
+  Returns the number of logical CPUs usable by the current process. The set of available CPUs is checked by querying the operating system at process startup. Changes to operating system CPU allocation after process startup are not reflected.
+</ParamField>
+
+## Runtime Information
+
+### NumCgoCall
+
+Returns the number of cgo calls made by the current process.
+
+```go
+calls := runtime.NumCgoCall()
+fmt.Printf("CGO calls: %d\n", calls)
+```
+
+<ParamField path="NumCgoCall" type="func() int64">
+  Returns the number of cgo calls made by the current process.
+</ParamField>
+
+## Goroutine Scheduler
+
+The Go runtime uses a work-stealing scheduler to distribute goroutines across available processors (P). Understanding these concepts can help you write more efficient concurrent programs.
+
+### Key Concepts
+
+<AccordionGroup>
+  <Accordion title="G - Goroutine">
+    A goroutine represents a lightweight thread of execution. Goroutines are multiplexed onto OS threads by the Go runtime.
+  </Accordion>
+
+  <Accordion title="M - Machine (OS Thread)">
+    An M represents an OS thread. The runtime creates and manages a pool of OS threads to execute goroutines.
+  </Accordion>
+
+  <Accordion title="P - Processor">
+    A P represents a resource required to execute Go code. The number of Ps is set by GOMAXPROCS. Each M must have an associated P to execute Go code.
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Let the runtime manage GOMAXPROCS">
+    In most cases, you don't need to set GOMAXPROCS manually. The runtime automatically sets it to match the number of available CPUs, which is optimal for most workloads.
+  </Accordion>
+
+  <Accordion title="Avoid calling Gosched in normal code">
+    The Go scheduler is cooperative and preemptive. You rarely need to call Gosched explicitly. Let the runtime handle scheduling automatically.
+  </Accordion>
+
+  <Accordion title="Use Goexit carefully">
+    Goexit should only be used in specific scenarios where you need to terminate a goroutine early while still running deferred functions. Consider using context cancellation instead.
+  </Accordion>
+
+  <Accordion title="Monitor goroutine count in production">
+    Use NumGoroutine() to monitor for goroutine leaks. A steadily increasing goroutine count often indicates a leak.
+    
+    ```go
+    ticker := time.NewTicker(10 * time.Second)
+    go func() {
+        for range ticker.C {
+            count := runtime.NumGoroutine()
+            if count > threshold {
+                log.Printf("Warning: %d goroutines running\n", count)
+            }
+        }
+    }()
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Common Patterns
+
+### Setting Concurrency Limits
+
+```go
+// Limit concurrent operations
+func processConcurrently(items []Item) {
+    maxConcurrent := runtime.GOMAXPROCS(0)
+    sem := make(chan struct{}, maxConcurrent)
+    
+    var wg sync.WaitGroup
+    for _, item := range items {
+        wg.Add(1)
+        go func(item Item) {
+            defer wg.Done()
+            sem <- struct{}{} // Acquire
+            defer func() { <-sem }() // Release
+            
+            processItem(item)
+        }(item)
+    }
+    wg.Wait()
+}
+```
+
+### Monitoring Goroutine Health
+
+```go
+func monitorGoroutines(ctx context.Context) {
+    ticker := time.NewTicker(30 * time.Second)
+    defer ticker.Stop()
+    
+    baseline := runtime.NumGoroutine()
+    
+    for {
+        select {
+        case <-ctx.Done():
+            return
+        case <-ticker.C:
+            current := runtime.NumGoroutine()
+            growth := current - baseline
+            
+            if growth > 100 {
+                log.Printf("Goroutine count increased by %d (baseline: %d, current: %d)\n",
+                    growth, baseline, current)
+            }
+        }
+    }
+}
+```
+
+### CPU-Intensive Task Configuration
+
+```go
+func runCPUIntensiveTask() {
+    // For CPU-bound tasks, set GOMAXPROCS to number of CPUs
+    numCPU := runtime.NumCPU()
+    runtime.GOMAXPROCS(numCPU)
+    
+    fmt.Printf("Using %d CPUs for processing\n", numCPU)
+    
+    // Split work across CPUs
+    workers := numCPU
+    workChan := make(chan Work, workers*2)
+    resultChan := make(chan Result, workers*2)
+    
+    // Start workers
+    var wg sync.WaitGroup
+    for i := 0; i < workers; i++ {
+        wg.Add(1)
+        go func() {
+            defer wg.Done()
+            for work := range workChan {
+                result := processWork(work)
+                resultChan <- result
+            }
+        }()
+    }
+    
+    // Send work and collect results
+    go func() {
+        wg.Wait()
+        close(resultChan)
+    }()
+}
+```
+
+### Graceful Goroutine Termination
+
+```go
+func worker(ctx context.Context) {
+    defer func() {
+        if r := recover(); r != nil {
+            log.Printf("Worker recovered from panic: %v\n", r)
+        }
+    }()
+    
+    for {
+        select {
+        case <-ctx.Done():
+            // Cleanup and exit gracefully
+            log.Println("Worker shutting down")
+            return
+        default:
+            // Do work
+            doWork()
+            runtime.Gosched() // Be cooperative if work is CPU-intensive
+        }
+    }
+}
+```
+
+## Performance Considerations
+
+<Card title="Goroutine Creation Cost">
+  Goroutines are cheap (about 2KB initial stack), but not free. Creating millions of goroutines can consume significant memory. Use worker pools for bounded concurrency.
+</Card>
+
+<Card title="Context Switching">
+  The Go scheduler performs context switches between goroutines. Too many active goroutines can increase context switching overhead. Monitor with NumGoroutine().
+</Card>
+
+<Card title="P Allocation">
+  Each P maintains a local run queue of goroutines. Setting GOMAXPROCS too high (beyond available CPUs) doesn't improve performance and can increase overhead.
+</Card>
+
+## Related Packages
+
+- **sync**: Provides synchronization primitives like Mutex, WaitGroup, and Once
+- **context**: Manages goroutine lifecycles with cancellation and deadlines
+- **runtime/debug**: Provides debugging and introspection capabilities
+- **runtime/trace**: Provides execution tracing for program analysis

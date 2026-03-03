@@ -1,0 +1,332 @@
+---
+title: builtin
+description: Built-in types, constants, and functions in Go
+---
+
+Package builtin provides documentation for Go's predeclared identifiers. The items documented here are not actually in package builtin but their descriptions allow godoc to present documentation for the language's special identifiers.
+
+## Basic Types
+
+### Boolean Type
+
+<ParamField path="bool" type="type">
+  The set of boolean values: `true` and `false`
+</ParamField>
+
+### Integer Types
+
+<ParamField path="int" type="type">
+  Signed integer type that is at least 32 bits in size
+</ParamField>
+
+<ParamField path="int8" type="type">
+  Signed 8-bit integers. Range: -128 through 127
+</ParamField>
+
+<ParamField path="int16" type="type">
+  Signed 16-bit integers. Range: -32768 through 32767
+</ParamField>
+
+<ParamField path="int32" type="type">
+  Signed 32-bit integers. Range: -2147483648 through 2147483647
+</ParamField>
+
+<ParamField path="int64" type="type">
+  Signed 64-bit integers. Range: -9223372036854775808 through 9223372036854775807
+</ParamField>
+
+<ParamField path="uint" type="type">
+  Unsigned integer type that is at least 32 bits in size
+</ParamField>
+
+<ParamField path="uint8" type="type">
+  Unsigned 8-bit integers. Range: 0 through 255
+</ParamField>
+
+<ParamField path="uint16" type="type">
+  Unsigned 16-bit integers. Range: 0 through 65535
+</ParamField>
+
+<ParamField path="uint32" type="type">
+  Unsigned 32-bit integers. Range: 0 through 4294967295
+</ParamField>
+
+<ParamField path="uint64" type="type">
+  Unsigned 64-bit integers. Range: 0 through 18446744073709551615
+</ParamField>
+
+<ParamField path="uintptr" type="type">
+  Integer type large enough to hold the bit pattern of any pointer
+</ParamField>
+
+### Floating-Point Types
+
+<ParamField path="float32" type="type">
+  IEEE 754 32-bit floating-point numbers
+</ParamField>
+
+<ParamField path="float64" type="type">
+  IEEE 754 64-bit floating-point numbers
+</ParamField>
+
+<ParamField path="complex64" type="type">
+  Complex numbers with float32 real and imaginary parts
+</ParamField>
+
+<ParamField path="complex128" type="type">
+  Complex numbers with float64 real and imaginary parts
+</ParamField>
+
+### String and Character Types
+
+<ParamField path="string" type="type">
+  Set of all strings of 8-bit bytes, conventionally but not necessarily representing UTF-8-encoded text. Strings are immutable.
+</ParamField>
+
+<ParamField path="byte" type="type alias">
+  Alias for uint8. Used to distinguish byte values from 8-bit unsigned integers.
+</ParamField>
+
+<ParamField path="rune" type="type alias">
+  Alias for int32. Used to distinguish character values from integer values.
+</ParamField>
+
+### Special Types
+
+<ParamField path="any" type="type alias">
+  Alias for interface{}. Represents values of any type.
+</ParamField>
+
+<ParamField path="comparable" type="interface">
+  Interface implemented by all comparable types (booleans, numbers, strings, pointers, channels, arrays of comparable types, structs whose fields are all comparable types). May only be used as a type parameter constraint.
+</ParamField>
+
+<ParamField path="error" type="interface">
+  The conventional interface for representing an error condition, with nil representing no error.
+  
+  ```go
+  type error interface {
+      Error() string
+  }
+  ```
+</ParamField>
+
+## Built-in Functions
+
+### Memory Allocation
+
+<ParamField path="make" type="func make(t Type, size ...IntegerType) Type">
+  Allocates and initializes an object of type slice, map, or channel. Returns the initialized object (not a pointer).
+  
+  - **Slice**: `make([]int, length, capacity)` - capacity is optional
+  - **Map**: `make(map[string]int, initialSize)` - size is optional
+  - **Channel**: `make(chan int, bufferSize)` - buffer size is optional (0 for unbuffered)
+</ParamField>
+
+<ParamField path="new" type="func new(Type) *Type">
+  Allocates memory for a variable of the specified type, initializes it to its zero value, and returns a pointer to it.
+  
+  ```go
+  p := new(int)  // p is *int, points to 0
+  ```
+</ParamField>
+
+### Slice and Array Operations
+
+<ParamField path="append" type="func append(slice []Type, elems ...Type) []Type">
+  Appends elements to the end of a slice. If capacity is insufficient, a new underlying array is allocated. Returns the updated slice.
+  
+  ```go
+  slice = append(slice, elem1, elem2)
+  slice = append(slice, anotherSlice...)
+  ```
+</ParamField>
+
+<ParamField path="copy" type="func copy(dst, src []Type) int">
+  Copies elements from source slice to destination slice. Returns the number of elements copied (minimum of len(src) and len(dst)). Source and destination may overlap.
+</ParamField>
+
+<ParamField path="len" type="func len(v Type) int">
+  Returns the length of v:
+  - Array: number of elements
+  - Slice/Map: number of elements (0 if nil)
+  - String: number of bytes
+  - Channel: number of queued elements (0 if nil)
+</ParamField>
+
+<ParamField path="cap" type="func cap(v Type) int">
+  Returns the capacity of v:
+  - Array: number of elements (same as len)
+  - Slice: maximum length when resliced (0 if nil)
+  - Channel: buffer capacity (0 if nil)
+</ParamField>
+
+### Map Operations
+
+<ParamField path="delete" type="func delete(m map[Type]Type1, key Type)">
+  Deletes the element with the specified key from the map. If m is nil or the key doesn't exist, delete is a no-op.
+</ParamField>
+
+### Channel Operations
+
+<ParamField path="close" type="func close(c chan<- Type)">
+  Closes a channel. Should only be executed by the sender. After closing, receives will return the zero value without blocking.
+  
+  ```go
+  close(ch)
+  x, ok := <-ch  // ok is false for closed channel
+  ```
+</ParamField>
+
+### Collection Operations
+
+<ParamField path="clear" type="func clear[T ~[]Type | ~map[Type]Type1](t T)">
+  Clears maps and slices. For maps, deletes all entries. For slices, sets all elements up to the length to their zero value.
+</ParamField>
+
+### Comparison Functions
+
+<ParamField path="max" type="func max[T cmp.Ordered](x T, y ...T) T">
+  Returns the largest value of the arguments. Requires at least one argument. For floating-point types, returns NaN if any argument is NaN.
+</ParamField>
+
+<ParamField path="min" type="func min[T cmp.Ordered](x T, y ...T) T">
+  Returns the smallest value of the arguments. Requires at least one argument. For floating-point types, returns NaN if any argument is NaN.
+</ParamField>
+
+### Complex Number Functions
+
+<ParamField path="complex" type="func complex(r, i FloatType) ComplexType">
+  Constructs a complex value from two floating-point values (real and imaginary parts).
+  
+  ```go
+  c := complex(1.0, 2.0)  // 1+2i
+  ```
+</ParamField>
+
+<ParamField path="real" type="func real(c ComplexType) FloatType">
+  Returns the real part of the complex number c.
+</ParamField>
+
+<ParamField path="imag" type="func imag(c ComplexType) FloatType">
+  Returns the imaginary part of the complex number c.
+</ParamField>
+
+### Panic and Recovery
+
+<ParamField path="panic" type="func panic(v any)">
+  Stops normal execution of the current goroutine. Deferred functions still run. Calling panic with a nil value causes a run-time error.
+  
+  ```go
+  if err != nil {
+      panic(err)
+  }
+  ```
+</ParamField>
+
+<ParamField path="recover" type="func recover() any">
+  Allows a program to manage panicking behavior. Only useful inside deferred functions. Returns the value passed to panic, or nil if not panicking.
+  
+  ```go
+  defer func() {
+      if r := recover(); r != nil {
+          fmt.Println("Recovered:", r)
+      }
+  }()
+  ```
+</ParamField>
+
+## Constants
+
+<ParamField path="true" type="const bool">
+  Boolean constant representing true
+</ParamField>
+
+<ParamField path="false" type="const bool">
+  Boolean constant representing false
+</ParamField>
+
+<ParamField path="iota" type="const int">
+  Predeclared identifier representing the untyped integer ordinal number of the current const specification in a const declaration (zero-indexed).
+  
+  ```go
+  const (
+      Sunday = iota    // 0
+      Monday           // 1
+      Tuesday          // 2
+  )
+  ```
+</ParamField>
+
+<ParamField path="nil" type="const">
+  Predeclared identifier representing the zero value for pointer, channel, func, interface, map, or slice types.
+</ParamField>
+
+## Examples
+
+### Working with Slices
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+    // Create a slice with make
+    s := make([]int, 0, 10)
+    
+    // Append elements
+    s = append(s, 1, 2, 3)
+    
+    // Get length and capacity
+    fmt.Printf("len=%d cap=%d\n", len(s), cap(s))
+    
+    // Copy slice
+    s2 := make([]int, len(s))
+    copy(s2, s)
+}
+```
+
+### Using Min and Max
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+    // Find minimum and maximum
+    minimum := min(5, 3, 8, 1)
+    maximum := max(5, 3, 8, 1)
+    
+    fmt.Println("Min:", minimum)  // 1
+    fmt.Println("Max:", maximum)  // 8
+}
+```
+
+### Panic and Recover
+
+```go
+package main
+
+import "fmt"
+
+func safeDivide(a, b int) (result int) {
+    defer func() {
+        if r := recover(); r != nil {
+            fmt.Println("Recovered from panic:", r)
+            result = 0
+        }
+    }()
+    
+    if b == 0 {
+        panic("division by zero")
+    }
+    return a / b
+}
+
+func main() {
+    fmt.Println(safeDivide(10, 2))  // 5
+    fmt.Println(safeDivide(10, 0))  // Recovered from panic: division by zero\n0
+}
+```

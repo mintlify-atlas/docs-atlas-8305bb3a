@@ -1,0 +1,659 @@
+---
+title: 'Go Modules'
+description: 'Dependency management with Go modules'
+---
+
+Go modules are the standard way to manage dependencies in Go. A module is a collection of related Go packages versioned together as a single unit.
+
+## Overview
+
+Introduced in Go 1.11, modules provide:
+- **Version management** - Explicit dependency versions
+- **Reproducible builds** - Lock files ensure consistency
+- **Decentralized** - No central repository required
+- **Semantic versioning** - v1.2.3 version scheme
+
+<Note>
+Modules are enabled by default in Go 1.16+. The `GO111MODULE` environment variable is no longer needed for most cases.
+</Note>
+
+## Creating a Module
+
+<Steps>
+  <Step title="Initialize Module">
+    Create a new module in your project directory:
+    
+    ```bash
+    go mod init example.com/myapp
+    ```
+    
+    This creates a `go.mod` file:
+    
+    ```go
+    module example.com/myapp
+    
+    go 1.21
+    ```
+  </Step>
+  
+  <Step title="Add Dependencies">
+    Import packages in your code:
+    
+    ```go
+    import "github.com/gorilla/mux"
+    ```
+    
+    Then run:
+    
+    ```bash
+    go mod tidy
+    ```
+    
+    This updates `go.mod` and creates `go.sum`.
+  </Step>
+  
+  <Step title="Build or Test">
+    ```bash
+    go build
+    go test ./...
+    ```
+    
+    Dependencies are automatically downloaded.
+  </Step>
+</Steps>
+
+## The go.mod File
+
+The `go.mod` file defines the module and its dependencies:
+
+```go go.mod
+module example.com/myapp
+
+go 1.21
+
+require (
+    github.com/gorilla/mux v1.8.0
+    golang.org/x/sync v0.3.0
+)
+
+require (
+    github.com/stretchr/testify v1.8.4 // indirect
+)
+
+replace github.com/old/package => github.com/new/package v1.0.0
+
+exclude github.com/broken/package v1.2.3
+```
+
+### Directives
+
+<AccordionGroup>
+  <Accordion title="module">
+    Declares the module path:
+    
+    ```go
+    module example.com/myapp
+    ```
+  </Accordion>
+  
+  <Accordion title="go">
+    Specifies the Go version:
+    
+    ```go
+    go 1.21
+    ```
+  </Accordion>
+  
+  <Accordion title="require">
+    Lists dependencies:
+    
+    ```go
+    require (
+        github.com/pkg/errors v0.9.1
+        golang.org/x/sync v0.3.0 // indirect
+    )
+    ```
+    
+    `// indirect` means the dependency is not directly imported.
+  </Accordion>
+  
+  <Accordion title="replace">
+    Replaces a module version or path:
+    
+    ```go
+    // Replace with local version
+    replace example.com/old => ./local/path
+    
+    // Replace with different module
+    replace example.com/old => example.com/new v1.0.0
+    
+    // Replace specific version
+    replace example.com/pkg v1.0.0 => example.com/pkg v1.1.0
+    ```
+  </Accordion>
+  
+  <Accordion title="exclude">
+    Excludes specific versions:
+    
+    ```go
+    exclude github.com/broken/pkg v1.2.3
+    ```
+  </Accordion>
+  
+  <Accordion title="retract">
+    Marks versions as retracted:
+    
+    ```go
+    // Published accidentally
+    retract v1.0.0
+    
+    // Range of versions
+    retract [v1.0.0, v1.2.0]
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Module Commands
+
+### go mod init
+
+Initialize a new module:
+
+```bash
+# With module path
+go mod init example.com/myapp
+
+# Infer from VCS (if in Git repo)
+go mod init
+
+# Using current directory name
+go mod init
+```
+
+### go mod tidy
+
+Add missing and remove unused dependencies:
+
+```bash
+go mod tidy
+
+# Verbose output
+go mod tidy -v
+
+# Specify Go version
+go mod tidy -go=1.21
+```
+
+<Tip>
+Run `go mod tidy` regularly to keep dependencies clean and up-to-date.
+</Tip>
+
+### go mod download
+
+Download modules to local cache:
+
+```bash
+# Download all dependencies
+go mod download
+
+# Download specific module
+go mod download github.com/gorilla/mux@v1.8.0
+
+# Output JSON
+go mod download -json
+```
+
+### go mod verify
+
+Verify dependencies haven't been modified:
+
+```bash
+go mod verify
+```
+
+Outputs:
+```
+all modules verified
+```
+
+### go mod graph
+
+Print module dependency graph:
+
+```bash
+go mod graph
+
+# Example output:
+example.com/myapp github.com/gorilla/mux@v1.8.0
+example.com/myapp golang.org/x/sync@v0.3.0
+```
+
+### go mod why
+
+Explain why packages or modules are needed:
+
+```bash
+# Why is this package needed?
+go mod why github.com/pkg/errors
+
+# Why is this module needed?
+go mod why -m github.com/gorilla/mux
+
+# Check multiple packages
+go mod why github.com/pkg1 github.com/pkg2
+```
+
+### go mod edit
+
+Edit go.mod programmatically:
+
+<CodeGroup>
+```bash Add Requirements
+# Add requirement
+go mod edit -require=github.com/pkg/errors@v0.9.1
+
+# Drop requirement
+go mod edit -droprequire=github.com/pkg/errors
+```
+
+```bash Add Replacements
+# Add replace directive
+go mod edit -replace=old@v1.0.0=new@v1.1.0
+
+# Replace with local path
+go mod edit -replace=example.com/pkg=../pkg
+
+# Drop replace
+go mod edit -dropreplace=old@v1.0.0
+```
+
+```bash Exclude Versions
+# Exclude version
+go mod edit -exclude=github.com/broken/pkg@v1.2.3
+
+# Drop exclusion
+go mod edit -dropexclude=github.com/broken/pkg@v1.2.3
+```
+
+```bash Set Go Version
+# Update Go version
+go mod edit -go=1.21
+
+# Set module path
+go mod edit -module=example.com/newpath
+```
+</CodeGroup>
+
+### go mod vendor
+
+Create vendor directory:
+
+```bash
+# Create vendor directory
+go mod vendor
+
+# Verbose output
+go mod vendor -v
+
+# Build using vendor
+go build -mod=vendor
+```
+
+## Adding and Upgrading Dependencies
+
+### Adding Dependencies
+
+<Steps>
+  <Step title="Import Package">
+    Add import to your code:
+    
+    ```go
+    import "github.com/gorilla/mux"
+    ```
+  </Step>
+  
+  <Step title="Run go mod tidy">
+    ```bash
+    go mod tidy
+    ```
+    
+    This automatically adds the dependency to go.mod.
+  </Step>
+</Steps>
+
+Or use `go get`:
+
+```bash
+# Add latest version
+go get github.com/gorilla/mux
+
+# Add specific version
+go get github.com/gorilla/mux@v1.8.0
+
+# Add latest patch release
+go get github.com/gorilla/mux@v1.8
+```
+
+### Upgrading Dependencies
+
+<CodeGroup>
+```bash Upgrade Single Package
+# Upgrade to latest
+go get -u github.com/gorilla/mux
+
+# Upgrade to specific version
+go get github.com/gorilla/mux@v1.8.1
+
+# Upgrade to latest patch
+go get -u=patch github.com/gorilla/mux
+```
+
+```bash Upgrade All Dependencies
+# Upgrade all direct dependencies
+go get -u ./...
+
+# Upgrade all dependencies (direct and indirect)
+go get -u all
+
+# Upgrade to latest patch versions
+go get -u=patch ./...
+```
+
+```bash Downgrade
+# Downgrade to specific version
+go get github.com/gorilla/mux@v1.7.0
+
+# Downgrade using list
+go list -m -versions github.com/gorilla/mux
+go get github.com/gorilla/mux@v1.7.4
+```
+</CodeGroup>
+
+### Removing Dependencies
+
+```bash
+# Remove from go.mod (if not used)
+go mod tidy
+
+# Remove specific dependency
+go get example.com/pkg@none
+```
+
+## Version Selection
+
+### Version Queries
+
+```bash
+# Latest version
+go get example.com/pkg@latest
+
+# Specific version
+go get example.com/pkg@v1.2.3
+
+# Version prefix
+go get example.com/pkg@v1.2
+
+# Commit hash
+go get example.com/pkg@abc123
+
+# Branch
+go get example.com/pkg@master
+go get example.com/pkg@main
+
+# Upgrade (latest with same major version)
+go get -u example.com/pkg
+
+# Upgrade to latest patch
+go get -u=patch example.com/pkg
+
+# Remove dependency
+go get example.com/pkg@none
+```
+
+### Listing Versions
+
+```bash
+# List available versions
+go list -m -versions github.com/gorilla/mux
+
+# Show current version
+go list -m github.com/gorilla/mux
+
+# Show all dependencies
+go list -m all
+
+# Show as JSON
+go list -m -json all
+```
+
+## Semantic Versioning
+
+Go modules use semantic versioning:
+
+```
+v1.2.3
+│ │ └─ Patch: Bug fixes
+│ └─── Minor: New features (backward compatible)
+└───── Major: Breaking changes
+```
+
+### Major Versions
+
+<AccordionGroup>
+  <Accordion title="v0 and v1 (No /vN)">
+    ```go
+    module example.com/myapp
+    
+    require example.com/pkg v1.5.0
+    ```
+    
+    ```go
+    import "example.com/pkg"
+    ```
+  </Accordion>
+  
+  <Accordion title="v2+ (Include /vN in path)">
+    ```go
+    module example.com/myapp/v2
+    
+    require example.com/pkg/v2 v2.1.0
+    ```
+    
+    ```go
+    import "example.com/pkg/v2"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Version Compatibility
+
+```go
+// Can use v1.2.0, v1.2.1, v1.3.0, etc.
+require example.com/pkg v1.2.0
+
+// Cannot automatically upgrade to v2.0.0
+// Must explicitly import v2:
+import "example.com/pkg/v2"
+```
+
+## Module Cache
+
+### Cache Location
+
+```bash
+# View cache directory
+go env GOMODCACHE
+
+# Default: $GOPATH/pkg/mod
+```
+
+### Cache Management
+
+```bash
+# Clear module cache
+go clean -modcache
+
+# Download without installing
+go mod download
+
+# Verify cache integrity
+go mod verify
+```
+
+## Private Modules
+
+### Configuring Private Repositories
+
+<Steps>
+  <Step title="Set GOPRIVATE">
+    ```bash
+    go env -w GOPRIVATE=github.com/mycompany/*
+    
+    # Multiple patterns
+    go env -w GOPRIVATE=github.com/mycompany/*,gitlab.com/myorg/*
+    ```
+  </Step>
+  
+  <Step title="Configure Git">
+    ```bash
+    # Use SSH instead of HTTPS
+    git config --global url."git@github.com:".insteadOf "https://github.com/"
+    ```
+  </Step>
+  
+  <Step title="Set Credentials (if needed)">
+    ```bash
+    # Using .netrc
+    cat >> ~/.netrc << EOF
+    machine github.com
+        login $USERNAME
+        password $TOKEN
+    EOF
+    ```
+  </Step>
+</Steps>
+
+### Environment Variables
+
+- **`GOPRIVATE`** - Skip proxy and checksum database
+- **`GONOPROXY`** - Skip proxy (but not checksum)
+- **`GONOSUMDB`** - Skip checksum database
+
+```bash
+# Set multiple
+go env -w GOPRIVATE=github.com/company1/*,github.com/company2/*
+go env -w GONOPROXY=github.com/company1/*
+go env -w GONOSUMDB=github.com/company1/*
+```
+
+## Working with Replacements
+
+### Local Development
+
+```bash
+# Replace with local directory
+go mod edit -replace=example.com/pkg=../pkg
+```
+
+```go go.mod
+replace example.com/pkg => ../pkg
+```
+
+### Forked Repositories
+
+```bash
+# Replace with fork
+go mod edit -replace=original/pkg=github.com/myuser/pkg@v1.2.3
+```
+
+```go go.mod
+replace original/pkg => github.com/myuser/pkg v1.2.3
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Run go mod tidy Regularly" icon="broom">
+    Keep dependencies clean and minimal
+  </Card>
+  <Card title="Commit go.sum" icon="file-check">
+    Ensures reproducible builds
+  </Card>
+  <Card title="Use Semantic Versioning" icon="tag">
+    Follow semver for your modules
+  </Card>
+  <Card title="Pin Dependencies" icon="lock">
+    Use specific versions in production
+  </Card>
+</CardGroup>
+
+### Vendoring
+
+Consider vendoring for:
+- Offline builds
+- Guaranteed availability
+- Build reproducibility
+
+```bash
+# Create vendor directory
+go mod vendor
+
+# Verify vendor is in sync
+go mod vendor -v
+
+# Build with vendor
+go build -mod=vendor
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Module not found">
+    ```bash
+    # Update module cache
+    go get -u example.com/pkg
+    
+    # Clear cache and retry
+    go clean -modcache
+    go mod download
+    ```
+  </Accordion>
+  
+  <Accordion title="Version conflicts">
+    ```bash
+    # See dependency tree
+    go mod graph
+    
+    # Find why package is needed
+    go mod why -m example.com/pkg
+    
+    # Force specific version
+    go get example.com/pkg@v1.2.3
+    ```
+  </Accordion>
+  
+  <Accordion title="go.sum mismatch">
+    ```bash
+    # Verify checksums
+    go mod verify
+    
+    # Regenerate go.sum
+    rm go.sum
+    go mod tidy
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="go Command" href="/tools/go-command">
+    Overview of go command
+  </Card>
+  <Card title="Workspaces" href="/tools/workspaces">
+    Multi-module development
+  </Card>
+  <Card title="Building" href="/tools/build">
+    Building Go programs
+  </Card>
+</CardGroup>

@@ -1,0 +1,188 @@
+---
+title: archive
+description: Read and write archive files in tar and zip formats
+---
+
+The `archive` package provides implementations for reading and writing archive files. It contains two main subpackages for working with tar and zip formats.
+
+## Subpackages
+
+### archive/tar
+
+Provides sequential access to tar archives.
+
+**Key Types:**
+- `Reader` - Sequential access to tar archive contents
+- `Writer` - Writing tar archives
+- `Header` - Represents a single header in a tar archive
+
+**Example - Reading a tar archive:**
+
+```go
+import (
+    "archive/tar"
+    "io"
+    "log"
+    "os"
+)
+
+func extractTar(filename string) error {
+    f, err := os.Open(filename)
+    if err != nil {
+        return err
+    }
+    defer f.Close()
+
+    tr := tar.NewReader(f)
+    for {
+        hdr, err := tr.Next()
+        if err == io.EOF {
+            break // End of archive
+        }
+        if err != nil {
+            return err
+        }
+        
+        log.Printf("Contents of %s:", hdr.Name)
+        if _, err := io.Copy(os.Stdout, tr); err != nil {
+            return err
+        }
+    }
+    return nil
+}
+```
+
+**Example - Creating a tar archive:**
+
+```go
+func createTar(filename string, files []string) error {
+    f, err := os.Create(filename)
+    if err != nil {
+        return err
+    }
+    defer f.Close()
+
+    tw := tar.NewWriter(f)
+    defer tw.Close()
+
+    for _, file := range files {
+        fi, err := os.Stat(file)
+        if err != nil {
+            return err
+        }
+
+        hdr := &tar.Header{
+            Name: file,
+            Mode: 0600,
+            Size: fi.Size(),
+        }
+
+        if err := tw.WriteHeader(hdr); err != nil {
+            return err
+        }
+
+        data, err := os.ReadFile(file)
+        if err != nil {
+            return err
+        }
+
+        if _, err := tw.Write(data); err != nil {
+            return err
+        }
+    }
+    return nil
+}
+```
+
+### archive/zip
+
+Provides support for reading and writing ZIP archives.
+
+**Key Types:**
+- `Reader` - Reading zip archives
+- `ReadCloser` - Reader that must be closed
+- `Writer` - Writing zip archives
+- `File` - A single file in a ZIP archive
+
+**Example - Reading a zip archive:**
+
+```go
+import (
+    "archive/zip"
+    "io"
+    "log"
+)
+
+func readZip(filename string) error {
+    r, err := zip.OpenReader(filename)
+    if err != nil {
+        return err
+    }
+    defer r.Close()
+
+    for _, f := range r.File {
+        log.Printf("File: %s\n", f.Name)
+        
+        rc, err := f.Open()
+        if err != nil {
+            return err
+        }
+        
+        _, err = io.Copy(os.Stdout, rc)
+        rc.Close()
+        if err != nil {
+            return err
+        }
+    }
+    return nil
+}
+```
+
+**Example - Creating a zip archive:**
+
+```go
+func createZip(filename string, files map[string][]byte) error {
+    f, err := os.Create(filename)
+    if err != nil {
+        return err
+    }
+    defer f.Close()
+
+    zw := zip.NewWriter(f)
+    defer zw.Close()
+
+    for name, content := range files {
+        w, err := zw.Create(name)
+        if err != nil {
+            return err
+        }
+        
+        if _, err := w.Write(content); err != nil {
+            return err
+        }
+    }
+    return nil
+}
+```
+
+## Common Use Cases
+
+- **Backup and restore**: Create compressed archives of files and directories
+- **Distribution**: Package multiple files for download or transfer
+- **Deployment**: Bundle application assets and resources
+- **Data compression**: Reduce storage space and transfer time
+
+## Security Considerations
+
+Both `archive/tar` and `archive/zip` validate file paths to prevent directory traversal attacks:
+
+- Use `filepath.IsLocal()` to check for non-local paths
+- The `ErrInsecurePath` error is returned for insecure paths
+- Control behavior with the `GODEBUG` environment variables: `tarinsecurepath` and `zipinsecurepath`
+
+## Related Packages
+
+- `compress/gzip` - Compress tar archives with gzip
+- `compress/bzip2` - Compress with bzip2
+- `io` - Low-level I/O primitives
+- `os` - Operating system file operations

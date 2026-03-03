@@ -1,0 +1,190 @@
+---
+title: strconv
+description: String conversions to and from basic data types
+---
+
+The `strconv` package implements conversions to and from string representations of basic data types.
+
+## String to Number
+
+```go
+import "strconv"
+
+// String to int
+i, err := strconv.Atoi("42")
+
+// String to int with base
+i64, err := strconv.ParseInt("101", 2, 64) // Binary
+i64, err = strconv.ParseInt("FF", 16, 64)  // Hex
+
+// String to uint
+u64, err := strconv.ParseUint("42", 10, 64)
+
+// String to float
+f, err := strconv.ParseFloat("3.14", 64)
+
+// String to bool
+b, err := strconv.ParseBool("true")
+```
+
+## Number to String
+
+```go
+// Int to string
+s := strconv.Itoa(42) // "42"
+
+// Int64 to string with base
+s = strconv.FormatInt(255, 16) // "ff"
+s = strconv.FormatInt(8, 2)    // "1000"
+
+// Uint to string
+s = strconv.FormatUint(42, 10)
+
+// Float to string
+s = strconv.FormatFloat(3.14159, 'f', 2, 64) // "3.14"
+s = strconv.FormatFloat(1000.0, 'e', -1, 64) // "1e+03"
+
+// Bool to string
+s = strconv.FormatBool(true) // "true"
+```
+
+## Format Specifiers
+
+```go
+// Float formats:
+// 'b' (-ddddp±ddd, binary exponent)
+// 'e' (-d.dddde±dd, decimal exponent)
+// 'E' (-d.ddddE±dd, decimal exponent)
+// 'f' (-ddd.dddd, no exponent)
+// 'g' large exponents: 'e', else 'f'
+// 'G' large exponents: 'E', else 'f'
+
+s := strconv.FormatFloat(123.456, 'f', 2, 64) // "123.46"
+s = strconv.FormatFloat(123.456, 'e', 2, 64)  // "1.23e+02"
+```
+
+## Quoting
+
+```go
+// Quote string
+quoted := strconv.Quote("Hello\nWorld")
+// "\"Hello\\nWorld\""
+
+// Unquote
+unquoted, err := strconv.Unquote(quoted)
+
+// Quote to ASCII
+ascii := strconv.QuoteToASCII("Hello 👋")
+
+// Quote rune
+rQuote := strconv.QuoteRune('A') // "'A'"
+```
+
+## Append Functions
+
+```go
+// Efficient string building
+buf := []byte("Number: ")
+buf = strconv.AppendInt(buf, 42, 10)
+buf = strconv.AppendFloat(buf, 3.14, 'f', 2, 64)
+s := string(buf)
+```
+
+## Practical Examples
+
+### Parse Configuration
+
+```go
+func parseConfig(value string) (interface{}, error) {
+    // Try int
+    if i, err := strconv.Atoi(value); err == nil {
+        return i, nil
+    }
+    
+    // Try float
+    if f, err := strconv.ParseFloat(value, 64); err == nil {
+        return f, nil
+    }
+    
+    // Try bool
+    if b, err := strconv.ParseBool(value); err == nil {
+        return b, nil
+    }
+    
+    // Return as string
+    return value, nil
+}
+```
+
+### Format File Size
+
+```go
+func formatBytes(bytes int64) string {
+    const unit = 1024
+    if bytes < unit {
+        return strconv.FormatInt(bytes, 10) + " B"
+    }
+    
+    div, exp := int64(unit), 0
+    for n := bytes / unit; n >= unit; n /= unit {
+        div *= unit
+        exp++
+    }
+    
+    return strconv.FormatFloat(
+        float64(bytes)/float64(div), 'f', 1, 64,
+    ) + " " + "KMGTPE"[exp:exp+1] + "B"
+}
+```
+
+### Safe Atoi
+
+```go
+func safeAtoi(s string, defaultValue int) int {
+    if i, err := strconv.Atoi(s); err == nil {
+        return i
+    }
+    return defaultValue
+}
+```
+
+### CSV to Numbers
+
+```go
+func parseCSVNumbers(csv string) ([]int, error) {
+    parts := strings.Split(csv, ",")
+    nums := make([]int, 0, len(parts))
+    
+    for _, part := range parts {
+        n, err := strconv.Atoi(strings.TrimSpace(part))
+        if err != nil {
+            return nil, err
+        }
+        nums = append(nums, n)
+    }
+    
+    return nums, nil
+}
+```
+
+## Error Handling
+
+```go
+func handleParseError() {
+    _, err := strconv.Atoi("abc")
+    if err != nil {
+        if numErr, ok := err.(*strconv.NumError); ok {
+            fmt.Printf("Failed to parse '%s': %v\n",
+                numErr.Num, numErr.Err)
+        }
+    }
+}
+```
+
+## Best Practices
+
+1. **Check errors** - All Parse functions return errors
+2. **Use Append for performance** - When building strings
+3. **Specify precision** - For float formatting
+4. **Use correct base** - 10 for decimal, 16 for hex
+5. **Validate input** - Before parsing user input

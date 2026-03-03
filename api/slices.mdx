@@ -1,0 +1,698 @@
+---
+title: Slices
+description: API reference for Go slices package - functions for working with slices of any type
+---
+
+Package slices defines various functions useful with slices of any type.
+
+## Comparison Functions
+
+### Equal
+
+```go
+func Equal[S ~[]E, E comparable](s1, s2 S) bool
+```
+
+Reports whether two slices are equal: the same length and all elements equal. Empty and nil slices are considered equal. Floating point NaNs are not considered equal.
+
+<ParamField path="s1" type="S" required>
+  First slice to compare
+</ParamField>
+
+<ParamField path="s2" type="S" required>
+  Second slice to compare
+</ParamField>
+
+<ResponseField name="return" type="bool">
+  true if slices are equal, false otherwise
+</ResponseField>
+
+### EqualFunc
+
+```go
+func EqualFunc[S1 ~[]E1, S2 ~[]E2, E1, E2 any](s1 S1, s2 S2, eq func(E1, E2) bool) bool
+```
+
+Reports whether two slices are equal using an equality function on each pair of elements.
+
+<ParamField path="s1" type="S1" required>
+  First slice to compare
+</ParamField>
+
+<ParamField path="s2" type="S2" required>
+  Second slice to compare
+</ParamField>
+
+<ParamField path="eq" type="func(E1, E2) bool" required>
+  Equality function
+</ParamField>
+
+### Compare
+
+```go
+func Compare[S ~[]E, E cmp.Ordered](s1, s2 S) int
+```
+
+Compares the elements of s1 and s2 using cmp.Compare on each pair. The result is 0 if s1 == s2, -1 if s1 < s2, and +1 if s1 > s2.
+
+<ParamField path="s1" type="S" required>
+  First slice to compare
+</ParamField>
+
+<ParamField path="s2" type="S" required>
+  Second slice to compare
+</ParamField>
+
+<ResponseField name="return" type="int">
+  0 if equal, -1 if s1 < s2, +1 if s1 > s2
+</ResponseField>
+
+### CompareFunc
+
+```go
+func CompareFunc[S1 ~[]E1, S2 ~[]E2, E1, E2 any](s1 S1, s2 S2, cmp func(E1, E2) int) int
+```
+
+Like Compare but uses a custom comparison function on each pair of elements.
+
+<ParamField path="s1" type="S1" required>
+  First slice to compare
+</ParamField>
+
+<ParamField path="s2" type="S2" required>
+  Second slice to compare
+</ParamField>
+
+<ParamField path="cmp" type="func(E1, E2) int" required>
+  Comparison function returning negative, zero, or positive
+</ParamField>
+
+## Search Functions
+
+### Index
+
+```go
+func Index[S ~[]E, E comparable](s S, v E) int
+```
+
+Returns the index of the first occurrence of v in s, or -1 if not present.
+
+<ParamField path="s" type="S" required>
+  The slice to search
+</ParamField>
+
+<ParamField path="v" type="E" required>
+  The value to find
+</ParamField>
+
+<ResponseField name="return" type="int">
+  Index of first occurrence, or -1 if not found
+</ResponseField>
+
+### IndexFunc
+
+```go
+func IndexFunc[S ~[]E, E any](s S, f func(E) bool) int
+```
+
+Returns the first index i satisfying f(s[i]), or -1 if none do.
+
+<ParamField path="s" type="S" required>
+  The slice to search
+</ParamField>
+
+<ParamField path="f" type="func(E) bool" required>
+  Predicate function
+</ParamField>
+
+### Contains
+
+```go
+func Contains[S ~[]E, E comparable](s S, v E) bool
+```
+
+Reports whether v is present in s.
+
+<ParamField path="s" type="S" required>
+  The slice to search
+</ParamField>
+
+<ParamField path="v" type="E" required>
+  The value to find
+</ParamField>
+
+<ResponseField name="return" type="bool">
+  true if v is present, false otherwise
+</ResponseField>
+
+### ContainsFunc
+
+```go
+func ContainsFunc[S ~[]E, E any](s S, f func(E) bool) bool
+```
+
+Reports whether at least one element e of s satisfies f(e).
+
+<ParamField path="s" type="S" required>
+  The slice to search
+</ParamField>
+
+<ParamField path="f" type="func(E) bool" required>
+  Predicate function
+</ParamField>
+
+## Modification Functions
+
+### Insert
+
+```go
+func Insert[S ~[]E, E any](s S, i int, v ...E) S
+```
+
+Inserts the values v... into s at index i, returning the modified slice. The elements at s[i:] are shifted up to make room. Insert panics if i > len(s).
+
+<ParamField path="s" type="S" required>
+  The slice to insert into
+</ParamField>
+
+<ParamField path="i" type="int" required>
+  The index to insert at
+</ParamField>
+
+<ParamField path="v" type="...E" required>
+  The values to insert
+</ParamField>
+
+<ResponseField name="return" type="S">
+  The modified slice
+</ResponseField>
+
+<ResponseField name="complexity" type="string">
+  O(len(s) + len(v))
+</ResponseField>
+
+### Delete
+
+```go
+func Delete[S ~[]E, E any](s S, i, j int) S
+```
+
+Removes the elements s[i:j] from s, returning the modified slice. Delete panics if j > len(s) or s[i:j] is not a valid slice.
+
+<ParamField path="s" type="S" required>
+  The slice to delete from
+</ParamField>
+
+<ParamField path="i" type="int" required>
+  Start index (inclusive)
+</ParamField>
+
+<ParamField path="j" type="int" required>
+  End index (exclusive)
+</ParamField>
+
+<ResponseField name="return" type="S">
+  The modified slice
+</ResponseField>
+
+<ResponseField name="complexity" type="string">
+  O(len(s)-i)
+</ResponseField>
+
+### DeleteFunc
+
+```go
+func DeleteFunc[S ~[]E, E any](s S, del func(E) bool) S
+```
+
+Removes any elements from s for which del returns true, returning the modified slice.
+
+<ParamField path="s" type="S" required>
+  The slice to delete from
+</ParamField>
+
+<ParamField path="del" type="func(E) bool" required>
+  Predicate function to determine which elements to delete
+</ParamField>
+
+### Replace
+
+```go
+func Replace[S ~[]E, E any](s S, i, j int, v ...E) S
+```
+
+Replaces the elements s[i:j] by the given v, and returns the modified slice. Replace panics if j > len(s) or s[i:j] is not a valid slice.
+
+<ParamField path="s" type="S" required>
+  The slice to modify
+</ParamField>
+
+<ParamField path="i" type="int" required>
+  Start index (inclusive)
+</ParamField>
+
+<ParamField path="j" type="int" required>
+  End index (exclusive)
+</ParamField>
+
+<ParamField path="v" type="...E" required>
+  The replacement values
+</ParamField>
+
+## Sorting Functions
+
+### Sort
+
+```go
+func Sort[S ~[]E, E cmp.Ordered](x S)
+```
+
+Sorts a slice of any ordered type in ascending order. When sorting floating-point numbers, NaNs are ordered before other values.
+
+<ParamField path="x" type="S" required>
+  The slice to sort
+</ParamField>
+
+### SortFunc
+
+```go
+func SortFunc[S ~[]E, E any](x S, cmp func(a, b E) int)
+```
+
+Sorts the slice x in ascending order as determined by the cmp function. This sort is not guaranteed to be stable.
+
+<ParamField path="x" type="S" required>
+  The slice to sort
+</ParamField>
+
+<ParamField path="cmp" type="func(a, b E) int" required>
+  Comparison function returning negative when a < b, positive when a > b, zero when equal
+</ParamField>
+
+### SortStableFunc
+
+```go
+func SortStableFunc[S ~[]E, E any](x S, cmp func(a, b E) int)
+```
+
+Sorts the slice x while keeping the original order of equal elements, using cmp to compare elements.
+
+<ParamField path="x" type="S" required>
+  The slice to sort
+</ParamField>
+
+<ParamField path="cmp" type="func(a, b E) int" required>
+  Comparison function
+</ParamField>
+
+### IsSorted
+
+```go
+func IsSorted[S ~[]E, E cmp.Ordered](x S) bool
+```
+
+Reports whether x is sorted in ascending order.
+
+<ParamField path="x" type="S" required>
+  The slice to check
+</ParamField>
+
+<ResponseField name="return" type="bool">
+  true if sorted, false otherwise
+</ResponseField>
+
+### IsSortedFunc
+
+```go
+func IsSortedFunc[S ~[]E, E any](x S, cmp func(a, b E) int) bool
+```
+
+Reports whether x is sorted in ascending order, with cmp as the comparison function.
+
+<ParamField path="x" type="S" required>
+  The slice to check
+</ParamField>
+
+<ParamField path="cmp" type="func(a, b E) int" required>
+  Comparison function
+</ParamField>
+
+### BinarySearch
+
+```go
+func BinarySearch[S ~[]E, E cmp.Ordered](x S, target E) (int, bool)
+```
+
+Searches for target in a sorted slice and returns the position where target is found, or the position where target would appear in the sort order. The slice must be sorted in increasing order.
+
+<ParamField path="x" type="S" required>
+  The sorted slice to search
+</ParamField>
+
+<ParamField path="target" type="E" required>
+  The value to search for
+</ParamField>
+
+<ResponseField name="index" type="int">
+  The position where target is found or should be inserted
+</ResponseField>
+
+<ResponseField name="found" type="bool">
+  true if target was found, false otherwise
+</ResponseField>
+
+### BinarySearchFunc
+
+```go
+func BinarySearchFunc[S ~[]E, E, T any](x S, target T, cmp func(E, T) int) (int, bool)
+```
+
+Works like BinarySearch, but uses a custom comparison function. The slice must be sorted in increasing order.
+
+<ParamField path="x" type="S" required>
+  The sorted slice to search
+</ParamField>
+
+<ParamField path="target" type="T" required>
+  The value to search for
+</ParamField>
+
+<ParamField path="cmp" type="func(E, T) int" required>
+  Comparison function returning 0 if match, negative if element precedes target, positive if follows
+</ParamField>
+
+## Min/Max Functions
+
+### Min
+
+```go
+func Min[S ~[]E, E cmp.Ordered](x S) E
+```
+
+Returns the minimal value in x. It panics if x is empty. For floating-point numbers, Min propagates NaNs.
+
+<ParamField path="x" type="S" required>
+  The slice to search (must not be empty)
+</ParamField>
+
+<ResponseField name="return" type="E">
+  The minimum value
+</ResponseField>
+
+### MinFunc
+
+```go
+func MinFunc[S ~[]E, E any](x S, cmp func(a, b E) int) E
+```
+
+Returns the minimal value in x, using cmp to compare elements. It panics if x is empty.
+
+<ParamField path="x" type="S" required>
+  The slice to search (must not be empty)
+</ParamField>
+
+<ParamField path="cmp" type="func(a, b E) int" required>
+  Comparison function
+</ParamField>
+
+### Max
+
+```go
+func Max[S ~[]E, E cmp.Ordered](x S) E
+```
+
+Returns the maximal value in x. It panics if x is empty. For floating-point numbers, Max propagates NaNs.
+
+<ParamField path="x" type="S" required>
+  The slice to search (must not be empty)
+</ParamField>
+
+<ResponseField name="return" type="E">
+  The maximum value
+</ResponseField>
+
+### MaxFunc
+
+```go
+func MaxFunc[S ~[]E, E any](x S, cmp func(a, b E) int) E
+```
+
+Returns the maximal value in x, using cmp to compare elements. It panics if x is empty.
+
+<ParamField path="x" type="S" required>
+  The slice to search (must not be empty)
+</ParamField>
+
+<ParamField path="cmp" type="func(a, b E) int" required>
+  Comparison function
+</ParamField>
+
+## Utility Functions
+
+### Clone
+
+```go
+func Clone[S ~[]E, E any](s S) S
+```
+
+Returns a copy of the slice. The elements are copied using assignment, so this is a shallow clone. The result may have additional unused capacity.
+
+<ParamField path="s" type="S" required>
+  The slice to clone
+</ParamField>
+
+<ResponseField name="return" type="S">
+  A copy of the slice
+</ResponseField>
+
+### Compact
+
+```go
+func Compact[S ~[]E, E comparable](s S) S
+```
+
+Replaces consecutive runs of equal elements with a single copy. This is like the uniq command found on Unix.
+
+<ParamField path="s" type="S" required>
+  The slice to compact
+</ParamField>
+
+<ResponseField name="return" type="S">
+  The compacted slice
+</ResponseField>
+
+### CompactFunc
+
+```go
+func CompactFunc[S ~[]E, E any](s S, eq func(E, E) bool) S
+```
+
+Like Compact but uses an equality function to compare elements. For runs of elements that compare equal, CompactFunc keeps the first one.
+
+<ParamField path="s" type="S" required>
+  The slice to compact
+</ParamField>
+
+<ParamField path="eq" type="func(E, E) bool" required>
+  Equality function
+</ParamField>
+
+### Grow
+
+```go
+func Grow[S ~[]E, E any](s S, n int) S
+```
+
+Increases the slice's capacity, if necessary, to guarantee space for another n elements. After Grow(n), at least n elements can be appended to the slice without another allocation.
+
+<ParamField path="s" type="S" required>
+  The slice to grow
+</ParamField>
+
+<ParamField path="n" type="int" required>
+  Number of additional elements to make room for
+</ParamField>
+
+<ResponseField name="return" type="S">
+  The slice with increased capacity
+</ResponseField>
+
+### Clip
+
+```go
+func Clip[S ~[]E, E any](s S) S
+```
+
+Removes unused capacity from the slice, returning s[:len(s):len(s)].
+
+<ParamField path="s" type="S" required>
+  The slice to clip
+</ParamField>
+
+<ResponseField name="return" type="S">
+  The clipped slice
+</ResponseField>
+
+### Reverse
+
+```go
+func Reverse[S ~[]E, E any](s S)
+```
+
+Reverses the elements of the slice in place.
+
+<ParamField path="s" type="S" required>
+  The slice to reverse
+</ParamField>
+
+### Concat
+
+```go
+func Concat[S ~[]E, E any](slices ...S) S
+```
+
+Returns a new slice concatenating the passed in slices. If the concatenation is empty, the result is nil.
+
+<ParamField path="slices" type="...S" required>
+  The slices to concatenate
+</ParamField>
+
+<ResponseField name="return" type="S">
+  The concatenated slice
+</ResponseField>
+
+### Repeat
+
+```go
+func Repeat[S ~[]E, E any](x S, count int) S
+```
+
+Returns a new slice that repeats the provided slice the given number of times. The result has length and capacity (len(x) * count).
+
+<ParamField path="x" type="S" required>
+  The slice to repeat
+</ParamField>
+
+<ParamField path="count" type="int" required>
+  Number of times to repeat (must be non-negative)
+</ParamField>
+
+<ResponseField name="return" type="S">
+  The repeated slice
+</ResponseField>
+
+## Examples
+
+### Basic Operations
+
+```go
+package main
+
+import (
+    "fmt"
+    "slices"
+)
+
+func main() {
+    // Equal
+    s1 := []int{1, 2, 3}
+    s2 := []int{1, 2, 3}
+    fmt.Println(slices.Equal(s1, s2)) // true
+
+    // Contains
+    fmt.Println(slices.Contains(s1, 2)) // true
+
+    // Index
+    fmt.Println(slices.Index(s1, 3)) // 2
+
+    // Clone
+    s3 := slices.Clone(s1)
+    fmt.Println(s3) // [1 2 3]
+}
+```
+
+### Sorting
+
+```go
+package main
+
+import (
+    "cmp"
+    "fmt"
+    "slices"
+)
+
+type Person struct {
+    Name string
+    Age  int
+}
+
+func main() {
+    people := []Person{
+        {"Alice", 55},
+        {"Bob", 24},
+        {"Gopher", 13},
+    }
+
+    // Sort by age
+    slices.SortFunc(people, func(a, b Person) int {
+        return cmp.Compare(a.Age, b.Age)
+    })
+
+    fmt.Println(people)
+    // [{Gopher 13} {Bob 24} {Alice 55}]
+}
+```
+
+### Modification
+
+```go
+package main
+
+import (
+    "fmt"
+    "slices"
+)
+
+func main() {
+    s := []int{1, 2, 3, 4, 5}
+
+    // Insert
+    s = slices.Insert(s, 2, 99)
+    fmt.Println(s) // [1 2 99 3 4 5]
+
+    // Delete
+    s = slices.Delete(s, 2, 3)
+    fmt.Println(s) // [1 2 3 4 5]
+
+    // DeleteFunc
+    s = slices.DeleteFunc(s, func(n int) bool {
+        return n%2 == 0 // delete even numbers
+    })
+    fmt.Println(s) // [1 3 5]
+}
+```
+
+### Search
+
+```go
+package main
+
+import (
+    "fmt"
+    "slices"
+)
+
+func main() {
+    numbers := []int{1, 3, 5, 7, 9}
+
+    // BinarySearch
+    i, found := slices.BinarySearch(numbers, 5)
+    fmt.Printf("Index: %d, Found: %v\n", i, found)
+    // Index: 2, Found: true
+
+    // Min and Max
+    fmt.Println("Min:", slices.Min(numbers)) // 1
+    fmt.Println("Max:", slices.Max(numbers)) // 9
+}
+```

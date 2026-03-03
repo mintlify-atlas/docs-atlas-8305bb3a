@@ -1,0 +1,296 @@
+---
+title: bytes
+description: Functions for manipulating byte slices
+---
+
+The `bytes` package implements functions for the manipulation of byte slices. It is analogous to the facilities of the `strings` package.
+
+## Key Functions
+
+### Comparison
+
+```go
+import "bytes"
+
+// Equal reports whether a and b are the same length and contain the same bytes
+equal := bytes.Equal([]byte("hello"), []byte("hello")) // true
+
+// Compare returns an integer comparing two byte slices lexicographically
+result := bytes.Compare([]byte("a"), []byte("b")) // -1
+```
+
+### Searching
+
+```go
+// Contains reports whether subslice is within b
+contains := bytes.Contains([]byte("seafood"), []byte("foo")) // true
+
+// Index returns the index of the first instance of sep in s
+idx := bytes.Index([]byte("chicken"), []byte("ken")) // 4
+
+// LastIndex returns the index of the last instance
+last := bytes.LastIndex([]byte("go gopher"), []byte("go")) // 3
+
+// Count counts the number of non-overlapping instances of sep
+count := bytes.Count([]byte("cheese"), []byte("e")) // 3
+```
+
+### Manipulation
+
+```go
+// Split slices s into subslices separated by sep
+parts := bytes.Split([]byte("a,b,c"), []byte(",")) 
+// [][]byte{[]byte("a"), []byte("b"), []byte("c")}
+
+// Join concatenates the elements to create a single byte slice
+joined := bytes.Join([][]byte{[]byte("foo"), []byte("bar")}, []byte(","))
+// []byte("foo,bar")
+
+// Repeat returns a new byte slice consisting of count copies of b
+repeated := bytes.Repeat([]byte("na"), 2) // []byte("nana")
+
+// Replace returns a copy with replacements
+replaced := bytes.Replace(
+    []byte("oink oink oink"),
+    []byte("oink"),
+    []byte("moo"),
+    2,
+) // []byte("moo moo oink")
+
+// ReplaceAll replaces all instances
+all := bytes.ReplaceAll(
+    []byte("oink oink oink"),
+    []byte("oink"),
+    []byte("moo"),
+) // []byte("moo moo moo")
+```
+
+### Trimming
+
+```go
+// Trim returns subslice with leading/trailing bytes from cutset removed
+trimmed := bytes.Trim([]byte("!!!Hello!!!"), "!") // []byte("Hello")
+
+// TrimSpace returns subslice with leading/trailing whitespace removed
+spaced := bytes.TrimSpace([]byte("  \t\n Hello \n\t  ")) // []byte("Hello")
+
+// TrimPrefix returns s without the provided leading prefix string
+prefixed := bytes.TrimPrefix([]byte("Goodbye"), []byte("Good")) 
+// []byte("bye")
+
+// TrimSuffix returns s without the provided trailing suffix string
+suffixed := bytes.TrimSuffix([]byte("Hello!"), []byte("!")) 
+// []byte("Hello")
+```
+
+### Case Conversion
+
+```go
+// ToUpper returns a copy with all Unicode letters mapped to uppercase
+upper := bytes.ToUpper([]byte("Gopher")) // []byte("GOPHER")
+
+// ToLower returns a copy with all Unicode letters mapped to lowercase
+lower := bytes.ToLower([]byte("Gopher")) // []byte("gopher")
+
+// Title returns a copy with all Unicode letters in words mapped to title case
+title := bytes.Title([]byte("her royal highness")) 
+// []byte("Her Royal Highness")
+```
+
+## Buffer Type
+
+The `Buffer` type is a variable-sized buffer of bytes with `Read` and `Write` methods.
+
+```go
+type Buffer struct {
+    // contains filtered or unexported fields
+}
+```
+
+### Creating Buffers
+
+```go
+import "bytes"
+
+// Create new empty buffer
+var buf bytes.Buffer
+
+// Create buffer from existing bytes
+buf := bytes.NewBuffer([]byte("initial content"))
+
+// Create buffer from string
+buf := bytes.NewBufferString("initial content")
+```
+
+### Writing to Buffers
+
+```go
+var buf bytes.Buffer
+
+// Write bytes
+buf.Write([]byte("hello "))
+
+// Write string
+buf.WriteString("world")
+
+// Write byte
+buf.WriteByte('!')
+
+// Write rune
+buf.WriteRune('🎉')
+
+// Get contents
+content := buf.String() // "hello world!🎉"
+bytes := buf.Bytes()    // []byte("hello world!🎉")
+```
+
+### Reading from Buffers
+
+```go
+buf := bytes.NewBufferString("hello world")
+
+// Read into byte slice
+p := make([]byte, 5)
+n, err := buf.Read(p)
+// n = 5, p = []byte("hello")
+
+// Read byte
+b, err := buf.ReadByte()
+// b = ' ' (space character)
+
+// Read until delimiter
+line, err := buf.ReadString('\n')
+
+// Read bytes until delimiter
+line, err := buf.ReadBytes('\n')
+```
+
+### Buffer Methods
+
+```go
+buf := bytes.NewBufferString("content")
+
+// Get length
+len := buf.Len() // 7
+
+// Get capacity
+cap := buf.Cap()
+
+// Reset buffer (clears content)
+buf.Reset()
+
+// Grow buffer capacity
+buf.Grow(100)
+
+// Truncate buffer to n bytes
+buf.Truncate(3)
+```
+
+## Reader Type
+
+A `Reader` implements `io.Reader`, `io.ReaderAt`, `io.WriterTo`, `io.Seeker`, `io.ByteScanner`, and `io.RuneScanner` by reading from a byte slice.
+
+```go
+r := bytes.NewReader([]byte("Hello, World!"))
+
+// Read bytes
+p := make([]byte, 5)
+n, err := r.Read(p) // n = 5, p = []byte("Hello")
+
+// Seek to position
+r.Seek(0, io.SeekStart) // Reset to beginning
+
+// Read at specific offset
+n, err = r.ReadAt(p, 7) // Read from offset 7
+```
+
+## Practical Examples
+
+### Building a CSV-like structure
+
+```go
+func buildCSV(rows [][]string) []byte {
+    var buf bytes.Buffer
+    
+    for _, row := range rows {
+        line := bytes.Join(
+            convertStringsToBytes(row),
+            []byte(","),
+        )
+        buf.Write(line)
+        buf.WriteByte('\n')
+    }
+    
+    return buf.Bytes()
+}
+
+func convertStringsToBytes(strs []string) [][]byte {
+    result := make([][]byte, len(strs))
+    for i, s := range strs {
+        result[i] = []byte(s)
+    }
+    return result
+}
+```
+
+### Parsing key-value pairs
+
+```go
+func parseKeyValue(data []byte) map[string]string {
+    result := make(map[string]string)
+    
+    lines := bytes.Split(data, []byte("\n"))
+    for _, line := range lines {
+        if len(line) == 0 {
+            continue
+        }
+        
+        parts := bytes.SplitN(line, []byte("="), 2)
+        if len(parts) == 2 {
+            key := string(bytes.TrimSpace(parts[0]))
+            value := string(bytes.TrimSpace(parts[1]))
+            result[key] = value
+        }
+    }
+    
+    return result
+}
+```
+
+### Efficient string building
+
+```go
+func buildMessage(parts []string) string {
+    var buf bytes.Buffer
+    
+    buf.WriteString("Message: ")
+    for i, part := range parts {
+        if i > 0 {
+            buf.WriteString(", ")
+        }
+        buf.WriteString(part)
+    }
+    buf.WriteByte('.')
+    
+    return buf.String()
+}
+```
+
+## Performance Tips
+
+1. **Use Buffer for concatenation** - More efficient than repeated `append()` calls
+2. **Preallocate Buffer capacity** - Use `Grow()` if you know the approximate size
+3. **Reuse Buffers** - Call `Reset()` to reuse buffers and reduce allocations
+4. **Choose appropriate functions** - `Equal` is optimized, faster than manual comparison
+
+## Relation to strings Package
+
+Most functions in `bytes` have equivalents in the `strings` package:
+
+- `bytes.Equal` ↔ `strings.EqualFold`
+- `bytes.Contains` ↔ `strings.Contains`
+- `bytes.Index` ↔ `strings.Index`
+- `bytes.Split` ↔ `strings.Split`
+- etc.
+
+Use `bytes` when working with `[]byte`, and `strings` when working with `string`.

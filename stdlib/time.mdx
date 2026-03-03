@@ -1,0 +1,444 @@
+---
+title: time
+description: Time measurement and display functionality
+---
+
+Package time provides functionality for measuring and displaying time. The calendrical calculations always assume a Gregorian calendar, with no leap seconds.
+
+## Time Type
+
+<ParamField path="Time" type="type">
+  Represents an instant in time with nanosecond precision. Programs should typically store and pass Time values, not pointers.
+  
+  ```go
+  type Time struct {
+      // contains filtered or unexported fields
+  }
+  ```
+  
+  Time values can be compared using Before, After, and Equal methods. The Sub method subtracts two instants, producing a Duration. The Add method adds a Time and a Duration, producing a Time.
+</ParamField>
+
+## Getting Current Time
+
+<ParamField path="Now" type="func Now() Time">
+  Returns the current local time.
+  
+  ```go
+  now := time.Now()
+  fmt.Println("Current time:", now)
+  ```
+</ParamField>
+
+<ParamField path="Date" type="func Date(year int, month Month, day, hour, min, sec, nsec int, loc *Location) Time">
+  Returns the Time corresponding to the specified date and time in the given location.
+  
+  ```go
+  t := time.Date(2024, time.March, 15, 14, 30, 0, 0, time.UTC)
+  fmt.Println(t)  // 2024-03-15 14:30:00 +0000 UTC
+  ```
+</ParamField>
+
+<ParamField path="Unix" type="func Unix(sec int64, nsec int64) Time">
+  Returns the local Time corresponding to the given Unix time (seconds since January 1, 1970 UTC).
+  
+  ```go
+  t := time.Unix(1609459200, 0)  // 2021-01-01 00:00:00 UTC
+  ```
+</ParamField>
+
+## Time Methods
+
+<ParamField path="Time.Year" type="func (t Time) Year() int">
+  Returns the year in which t occurs.
+</ParamField>
+
+<ParamField path="Time.Month" type="func (t Time) Month() Month">
+  Returns the month of the year specified by t.
+</ParamField>
+
+<ParamField path="Time.Day" type="func (t Time) Day() int">
+  Returns the day of the month specified by t.
+</ParamField>
+
+<ParamField path="Time.Hour" type="func (t Time) Hour() int">
+  Returns the hour within the day specified by t, in the range [0, 23].
+</ParamField>
+
+<ParamField path="Time.Minute" type="func (t Time) Minute() int">
+  Returns the minute offset within the hour specified by t, in the range [0, 59].
+</ParamField>
+
+<ParamField path="Time.Second" type="func (t Time) Second() int">
+  Returns the second offset within the minute specified by t, in the range [0, 59].
+</ParamField>
+
+<ParamField path="Time.Unix" type="func (t Time) Unix() int64">
+  Returns t as a Unix time, the number of seconds elapsed since January 1, 1970 UTC.
+  
+  ```go
+  timestamp := time.Now().Unix()
+  fmt.Println("Unix timestamp:", timestamp)
+  ```
+</ParamField>
+
+## Time Comparison
+
+<ParamField path="Time.Before" type="func (t Time) Before(u Time) bool">
+  Reports whether the time instant t is before u.
+  
+  ```go
+  t1 := time.Now()
+  time.Sleep(time.Second)
+  t2 := time.Now()
+  fmt.Println(t1.Before(t2))  // true
+  ```
+</ParamField>
+
+<ParamField path="Time.After" type="func (t Time) After(u Time) bool">
+  Reports whether the time instant t is after u.
+  
+  ```go
+  fmt.Println(t2.After(t1))  // true
+  ```
+</ParamField>
+
+<ParamField path="Time.Equal" type="func (t Time) Equal(u Time) bool">
+  Reports whether t and u represent the same time instant.
+  
+  ```go
+  if t1.Equal(t2) {
+      fmt.Println("Same time")
+  }
+  ```
+</ParamField>
+
+<ParamField path="Time.Compare" type="func (t Time) Compare(u Time) int">
+  Compares the time instant t with u. Returns -1 if t is before u, 0 if they're the same, +1 if t is after u.
+</ParamField>
+
+## Duration Type
+
+<ParamField path="Duration" type="type">
+  Represents the elapsed time between two instants as an int64 nanosecond count.
+  
+  ```go
+  type Duration int64
+  ```
+  
+  Common duration constants:
+  ```go
+  const (
+      Nanosecond  Duration = 1
+      Microsecond          = 1000 * Nanosecond
+      Millisecond          = 1000 * Microsecond
+      Second               = 1000 * Millisecond
+      Minute               = 60 * Second
+      Hour                 = 60 * Minute
+  )
+  ```
+</ParamField>
+
+<ParamField path="ParseDuration" type="func ParseDuration(s string) (Duration, error)">
+  Parses a duration string. Valid time units are "ns", "us", "ms", "s", "m", "h".
+  
+  ```go
+  d, err := time.ParseDuration("2h45m")
+  fmt.Println(d)  // 2h45m0s
+  
+  d2, _ := time.ParseDuration("300ms")
+  fmt.Println(d2)  // 300ms
+  ```
+</ParamField>
+
+## Time Arithmetic
+
+<ParamField path="Time.Add" type="func (t Time) Add(d Duration) Time">
+  Returns the time t + d.
+  
+  ```go
+  now := time.Now()
+  later := now.Add(2 * time.Hour)
+  fmt.Println("2 hours from now:", later)
+  ```
+</ParamField>
+
+<ParamField path="Time.Sub" type="func (t Time) Sub(u Time) Duration">
+  Returns the duration t - u.
+  
+  ```go
+  start := time.Now()
+  // ... do work ...
+  duration := time.Since(start)
+  fmt.Println("Elapsed:", duration)
+  ```
+</ParamField>
+
+<ParamField path="Since" type="func Since(t Time) Duration">
+  Returns the time elapsed since t. Shorthand for time.Now().Sub(t).
+  
+  ```go
+  start := time.Now()
+  time.Sleep(100 * time.Millisecond)
+  fmt.Println("Elapsed:", time.Since(start))
+  ```
+</ParamField>
+
+<ParamField path="Until" type="func Until(t Time) Duration">
+  Returns the duration until t. Shorthand for t.Sub(time.Now()).
+  
+  ```go
+  deadline := time.Now().Add(5 * time.Second)
+  fmt.Println("Time until deadline:", time.Until(deadline))
+  ```
+</ParamField>
+
+<ParamField path="Time.AddDate" type="func (t Time) AddDate(years int, months int, days int) Time">
+  Returns the time corresponding to adding the given number of years, months, and days to t.
+  
+  ```go
+  now := time.Now()
+  nextYear := now.AddDate(1, 0, 0)
+  nextMonth := now.AddDate(0, 1, 0)
+  tomorrow := now.AddDate(0, 0, 1)
+  ```
+</ParamField>
+
+## Formatting and Parsing
+
+<ParamField path="Time.Format" type="func (t Time) Format(layout string) string">
+  Returns a textual representation of the time value formatted according to layout. The layout is defined by showing how the reference time would be displayed.
+  
+  Reference time: Mon Jan 2 15:04:05 MST 2006
+  
+  ```go
+  now := time.Now()
+  fmt.Println(now.Format("2006-01-02"))                  // 2024-03-15
+  fmt.Println(now.Format("Jan 02, 2006"))                // Mar 15, 2024
+  fmt.Println(now.Format("15:04:05"))                    // 14:30:45
+  fmt.Println(now.Format("2006-01-02 15:04:05 MST"))    // 2024-03-15 14:30:45 UTC
+  ```
+</ParamField>
+
+<ParamField path="Parse" type="func Parse(layout, value string) (Time, error)">
+  Parses a formatted string and returns the time value it represents.
+  
+  ```go
+  t, err := time.Parse("2006-01-02", "2024-03-15")
+  if err != nil {
+      log.Fatal(err)
+  }
+  fmt.Println(t)
+  ```
+</ParamField>
+
+### Common Layout Constants
+
+```go
+const (
+    Layout      = "01/02 03:04:05PM '06 -0700" // The reference time
+    ANSIC       = "Mon Jan _2 15:04:05 2006"
+    UnixDate    = "Mon Jan _2 15:04:05 MST 2006"
+    RubyDate    = "Mon Jan 02 15:04:05 -0700 2006"
+    RFC822      = "02 Jan 06 15:04 MST"
+    RFC850      = "Monday, 02-Jan-06 15:04:05 MST"
+    RFC1123     = "Mon, 02 Jan 2006 15:04:05 MST"
+    RFC3339     = "2006-01-02T15:04:05Z07:00"
+    Kitchen     = "3:04PM"
+    DateTime    = "2006-01-02 15:04:05"
+    DateOnly    = "2006-01-02"
+    TimeOnly    = "15:04:05"
+)
+```
+
+## Timers and Tickers
+
+<ParamField path="Sleep" type="func Sleep(d Duration)">
+  Pauses the current goroutine for at least the duration d.
+  
+  ```go
+  fmt.Println("Waiting...")
+  time.Sleep(2 * time.Second)
+  fmt.Println("Done!")
+  ```
+</ParamField>
+
+<ParamField path="After" type="func After(d Duration) <-chan Time">
+  Waits for the duration to elapse and then sends the current time on the returned channel.
+  
+  ```go
+  select {
+  case <-time.After(5 * time.Second):
+      fmt.Println("Timeout!")
+  }
+  ```
+</ParamField>
+
+<ParamField path="NewTimer" type="func NewTimer(d Duration) *Timer">
+  Creates a new Timer that will send the current time on its channel after at least duration d.
+  
+  ```go
+  timer := time.NewTimer(2 * time.Second)
+  <-timer.C
+  fmt.Println("Timer expired")
+  ```
+</ParamField>
+
+<ParamField path="NewTicker" type="func NewTicker(d Duration) *Ticker">
+  Returns a new Ticker containing a channel that will send the time with a period specified by the duration argument.
+  
+  ```go
+  ticker := time.NewTicker(1 * time.Second)
+  defer ticker.Stop()
+  
+  for t := range ticker.C {
+      fmt.Println("Tick at", t)
+  }
+  ```
+</ParamField>
+
+## Locations and Timezones
+
+<ParamField path="Time.In" type="func (t Time) In(loc *Location) Time">
+  Returns t with the location set to loc.
+  
+  ```go
+  now := time.Now()
+  tokyo, _ := time.LoadLocation("Asia/Tokyo")
+  tokyoTime := now.In(tokyo)
+  fmt.Println("Tokyo time:", tokyoTime)
+  ```
+</ParamField>
+
+<ParamField path="LoadLocation" type="func LoadLocation(name string) (*Location, error)">
+  Returns the Location with the given name.
+  
+  ```go
+  loc, err := time.LoadLocation("America/New_York")
+  if err != nil {
+      log.Fatal(err)
+  }
+  ```
+</ParamField>
+
+<ParamField path="UTC" type="var *Location">
+  Represents UTC (Universal Coordinated Time).
+  
+  ```go
+  utcTime := time.Now().UTC()
+  ```
+</ParamField>
+
+<ParamField path="Local" type="var *Location">
+  Represents the system's local time zone.
+  
+  ```go
+  localTime := time.Now().Local()
+  ```
+</ParamField>
+
+## Examples
+
+### Measuring Elapsed Time
+
+```go
+package main
+
+import (
+    "fmt"
+    "time"
+)
+
+func main() {
+    start := time.Now()
+    
+    // Simulate work
+    time.Sleep(2 * time.Second)
+    
+    elapsed := time.Since(start)
+    fmt.Printf("Operation took %s\n", elapsed)
+}
+```
+
+### Formatting Dates
+
+```go
+package main
+
+import (
+    "fmt"
+    "time"
+)
+
+func main() {
+    now := time.Now()
+    
+    // Various formats
+    fmt.Println(now.Format(time.RFC3339))           // 2024-03-15T14:30:45Z
+    fmt.Println(now.Format("2006-01-02"))           // 2024-03-15
+    fmt.Println(now.Format("January 2, 2006"))      // March 15, 2024
+    fmt.Println(now.Format("3:04 PM"))              // 2:30 PM
+    fmt.Println(now.Format("Mon, 02 Jan 2006"))     // Fri, 15 Mar 2024
+}
+```
+
+### Using Timers
+
+```go
+package main
+
+import (
+    "fmt"
+    "time"
+)
+
+func main() {
+    // One-shot timer
+    timer := time.NewTimer(2 * time.Second)
+    fmt.Println("Waiting...")
+    <-timer.C
+    fmt.Println("Timer expired!")
+    
+    // Repeating ticker
+    ticker := time.NewTicker(500 * time.Millisecond)
+    defer ticker.Stop()
+    
+    count := 0
+    for t := range ticker.C {
+        count++
+        fmt.Printf("Tick %d at %v\n", count, t)
+        if count >= 5 {
+            break
+        }
+    }
+}
+```
+
+### Timeout Pattern
+
+```go
+package main
+
+import (
+    "fmt"
+    "time"
+)
+
+func doWork() <-chan string {
+    ch := make(chan string)
+    go func() {
+        time.Sleep(2 * time.Second)
+        ch <- "Work completed"
+    }()
+    return ch
+}
+
+func main() {
+    select {
+    case result := <-doWork():
+        fmt.Println(result)
+    case <-time.After(1 * time.Second):
+        fmt.Println("Timeout!")
+    }
+}
+```

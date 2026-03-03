@@ -1,0 +1,229 @@
+---
+title: reflect
+description: Runtime reflection for inspecting types and values
+---
+
+The `reflect` package implements run-time reflection, allowing a program to manipulate objects with arbitrary types.
+
+## Basic Reflection
+
+```go
+import "reflect"
+
+func basicReflection() {
+    var x float64 = 3.14
+    
+    // Get type
+    t := reflect.TypeOf(x)
+    fmt.Println(t) // float64
+    
+    // Get value
+    v := reflect.ValueOf(x)
+    fmt.Println(v) // 3.14
+    fmt.Println(v.Type()) // float64
+    fmt.Println(v.Kind()) // float64
+    
+    // Get underlying value
+    f := v.Float()
+    fmt.Println(f) // 3.14
+}
+```
+
+## Type Information
+
+```go
+type Person struct {
+    Name string `json:"name"`
+    Age  int    `json:"age"`
+}
+
+func typeInfo() {
+    p := Person{"Alice", 30}
+    t := reflect.TypeOf(p)
+    
+    fmt.Println(t.Name()) // Person
+    fmt.Println(t.Kind()) // struct
+    
+    // Iterate fields
+    for i := 0; i < t.NumField(); i++ {
+        field := t.Field(i)
+        fmt.Printf("Field: %s, Type: %s, Tag: %s\n",
+            field.Name, field.Type, field.Tag.Get("json"))
+    }
+}
+```
+
+## Modifying Values
+
+```go
+func modifyValue() {
+    var x float64 = 3.14
+    v := reflect.ValueOf(&x) // Pass pointer
+    v = v.Elem()              // Dereference
+    
+    if v.CanSet() {
+        v.SetFloat(7.28)
+    }
+    
+    fmt.Println(x) // 7.28
+}
+```
+
+## Struct Field Access
+
+```go
+func structFields() {
+    p := Person{"Alice", 30}
+    v := reflect.ValueOf(&p).Elem()
+    
+    // Get field by name
+    nameField := v.FieldByName("Name")
+    if nameField.IsValid() && nameField.CanSet() {
+        nameField.SetString("Bob")
+    }
+    
+    fmt.Println(p.Name) // Bob
+}
+```
+
+## Method Calls
+
+```go
+type Calculator struct{}
+
+func (c Calculator) Add(a, b int) int {
+    return a + b
+}
+
+func callMethod() {
+    calc := Calculator{}
+    v := reflect.ValueOf(calc)
+    
+    method := v.MethodByName("Add")
+    args := []reflect.Value{
+        reflect.ValueOf(2),
+        reflect.ValueOf(3),
+    }
+    
+    results := method.Call(args)
+    fmt.Println(results[0].Int()) // 5
+}
+```
+
+## Creating Values
+
+```go
+func createValue() {
+    // Create new instance
+    t := reflect.TypeOf(Person{})
+    v := reflect.New(t) // Returns pointer
+    
+    // Set fields
+    elem := v.Elem()
+    elem.FieldByName("Name").SetString("Charlie")
+    elem.FieldByName("Age").SetInt(25)
+    
+    person := v.Interface().(*Person)
+    fmt.Printf("%+v\n", person)
+}
+```
+
+## Practical Examples
+
+### JSON-like Marshal
+
+```go
+func marshal(v interface{}) string {
+    val := reflect.ValueOf(v)
+    typ := val.Type()
+    
+    if typ.Kind() != reflect.Struct {
+        return ""
+    }
+    
+    var parts []string
+    for i := 0; i < val.NumField(); i++ {
+        field := typ.Field(i)
+        value := val.Field(i)
+        
+        parts = append(parts, fmt.Sprintf("%s:%v",
+            field.Name, value.Interface()))
+    }
+    
+    return strings.Join(parts, ",")
+}
+```
+
+### Generic Copy Function
+
+```go
+func copyStruct(src, dst interface{}) error {
+    srcVal := reflect.ValueOf(src)
+    dstVal := reflect.ValueOf(dst)
+    
+    if srcVal.Kind() != reflect.Ptr || dstVal.Kind() != reflect.Ptr {
+        return errors.New("both arguments must be pointers")
+    }
+    
+    srcVal = srcVal.Elem()
+    dstVal = dstVal.Elem()
+    
+    if srcVal.Type() != dstVal.Type() {
+        return errors.New("types must match")
+    }
+    
+    dstVal.Set(srcVal)
+    return nil
+}
+```
+
+### Struct to Map
+
+```go
+func structToMap(s interface{}) map[string]interface{} {
+    result := make(map[string]interface{})
+    
+    v := reflect.ValueOf(s)
+    t := v.Type()
+    
+    for i := 0; i < v.NumField(); i++ {
+        field := t.Field(i)
+        value := v.Field(i)
+        result[field.Name] = value.Interface()
+    }
+    
+    return result
+}
+```
+
+## Kind Values
+
+```go
+const (
+    Invalid Kind = iota
+    Bool
+    Int, Int8, Int16, Int32, Int64
+    Uint, Uint8, Uint16, Uint32, Uint64
+    Float32, Float64
+    Complex64, Complex128
+    Array
+    Chan
+    Func
+    Interface
+    Map
+    Pointer
+    Slice
+    String
+    Struct
+    UnsafePointer
+)
+```
+
+## Best Practices
+
+1. **Use sparingly** - Reflection is slow and loses type safety
+2. **Check CanSet()** - Before modifying values
+3. **Handle panics** - Reflection can panic on invalid operations
+4. **Cache Type info** - Don't reflect in hot paths
+5. **Prefer interfaces** - When possible, use interface{} methods
+6. **Document usage** - Reflection code is hard to understand

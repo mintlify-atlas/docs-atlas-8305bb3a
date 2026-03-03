@@ -1,0 +1,416 @@
+---
+title: io
+description: Basic interfaces to I/O primitives
+---
+
+Package io provides basic interfaces to I/O primitives. Its primary job is to wrap existing implementations of such primitives into shared public interfaces that abstract the functionality.
+
+## Core Interfaces
+
+### Reader
+
+<ParamField path="Reader" type="interface">
+  The interface that wraps the basic Read method.
+  
+  ```go
+  type Reader interface {
+      Read(p []byte) (n int, err error)
+  }
+  ```
+  
+  Read reads up to len(p) bytes into p. It returns the number of bytes read (0 ≤ n ≤ len(p)) and any error encountered. At end of file, Read returns 0, EOF.
+</ParamField>
+
+### Writer
+
+<ParamField path="Writer" type="interface">
+  The interface that wraps the basic Write method.
+  
+  ```go
+  type Writer interface {
+      Write(p []byte) (n int, err error)
+  }
+  ```
+  
+  Write writes len(p) bytes from p to the underlying data stream. It returns the number of bytes written and any error encountered.
+</ParamField>
+
+### Closer
+
+<ParamField path="Closer" type="interface">
+  The interface that wraps the basic Close method.
+  
+  ```go
+  type Closer interface {
+      Close() error
+  }
+  ```
+  
+  The behavior of Close after the first call is undefined.
+</ParamField>
+
+### Seeker
+
+<ParamField path="Seeker" type="interface">
+  The interface that wraps the basic Seek method.
+  
+  ```go
+  type Seeker interface {
+      Seek(offset int64, whence int) (int64, error)
+  }
+  ```
+  
+  Seek sets the offset for the next Read or Write. Returns the new offset or an error.
+</ParamField>
+
+## Composite Interfaces
+
+<ParamField path="ReadWriter" type="interface">
+  Groups the basic Read and Write methods.
+  
+  ```go
+  type ReadWriter interface {
+      Reader
+      Writer
+  }
+  ```
+</ParamField>
+
+<ParamField path="ReadCloser" type="interface">
+  Groups the basic Read and Close methods.
+  
+  ```go
+  type ReadCloser interface {
+      Reader
+      Closer
+  }
+  ```
+</ParamField>
+
+<ParamField path="WriteCloser" type="interface">
+  Groups the basic Write and Close methods.
+  
+  ```go
+  type WriteCloser interface {
+      Writer
+      Closer
+  }
+  ```
+</ParamField>
+
+<ParamField path="ReadWriteCloser" type="interface">
+  Groups the basic Read, Write, and Close methods.
+  
+  ```go
+  type ReadWriteCloser interface {
+      Reader
+      Writer
+      Closer
+  }
+  ```
+</ParamField>
+
+<ParamField path="ReadSeeker" type="interface">
+  Groups the basic Read and Seek methods.
+</ParamField>
+
+<ParamField path="WriteSeeker" type="interface">
+  Groups the basic Write and Seek methods.
+</ParamField>
+
+<ParamField path="ReadWriteSeeker" type="interface">
+  Groups the basic Read, Write, and Seek methods.
+</ParamField>
+
+## Utility Functions
+
+### Copying Data
+
+<ParamField path="Copy" type="func Copy(dst Writer, src Reader) (written int64, err error)">
+  Copies from src to dst until either EOF is reached on src or an error occurs. Returns the number of bytes copied and the first error encountered.
+  
+  ```go
+  written, err := io.Copy(dst, src)
+  ```
+</ParamField>
+
+<ParamField path="CopyN" type="func CopyN(dst Writer, src Reader, n int64) (written int64, err error)">
+  Copies n bytes from src to dst. Returns the number of bytes copied and the first error encountered.
+  
+  ```go
+  // Copy first 100 bytes
+  written, err := io.CopyN(dst, src, 100)
+  ```
+</ParamField>
+
+<ParamField path="CopyBuffer" type="func CopyBuffer(dst Writer, src Reader, buf []byte) (written int64, err error)">
+  Identical to Copy but uses the provided buffer instead of allocating a temporary one.
+</ParamField>
+
+### Reading Data
+
+<ParamField path="ReadAll" type="func ReadAll(r Reader) ([]byte, error)">
+  Reads from r until an error or EOF and returns the data read.
+  
+  ```go
+  data, err := io.ReadAll(resp.Body)
+  if err != nil {
+      log.Fatal(err)
+  }
+  ```
+</ParamField>
+
+<ParamField path="ReadFull" type="func ReadFull(r Reader, buf []byte) (n int, err error)">
+  Reads exactly len(buf) bytes from r into buf. Returns the number of bytes copied and an error if fewer bytes were read.
+  
+  ```go
+  buf := make([]byte, 100)
+  n, err := io.ReadFull(r, buf)
+  ```
+</ParamField>
+
+<ParamField path="ReadAtLeast" type="func ReadAtLeast(r Reader, buf []byte, min int) (n int, err error)">
+  Reads from r into buf until it has read at least min bytes. Returns the number of bytes copied and an error if fewer bytes were read.
+  
+  ```go
+  buf := make([]byte, 100)
+  n, err := io.ReadAtLeast(r, buf, 50)  // Read at least 50 bytes
+  ```
+</ParamField>
+
+### Writing Data
+
+<ParamField path="WriteString" type="func WriteString(w Writer, s string) (n int, err error)">
+  Writes the contents of string s to w. If w implements a WriteString method, it is invoked directly.
+  
+  ```go
+  n, err := io.WriteString(w, "Hello, World!")
+  ```
+</ParamField>
+
+## Helper Types
+
+### LimitReader
+
+<ParamField path="LimitReader" type="func LimitReader(r Reader, n int64) Reader">
+  Returns a Reader that reads from r but stops with EOF after n bytes.
+  
+  ```go
+  // Read only first 1KB
+  limited := io.LimitReader(file, 1024)
+  data, err := io.ReadAll(limited)
+  ```
+</ParamField>
+
+### MultiReader
+
+<ParamField path="MultiReader" type="func MultiReader(readers ...Reader) Reader">
+  Returns a Reader that's the logical concatenation of the provided readers.
+  
+  ```go
+  r1 := strings.NewReader("Hello ")
+  r2 := strings.NewReader("World")
+  r := io.MultiReader(r1, r2)
+  io.Copy(os.Stdout, r)  // Hello World
+  ```
+</ParamField>
+
+### MultiWriter
+
+<ParamField path="MultiWriter" type="func MultiWriter(writers ...Writer) Writer">
+  Creates a writer that duplicates its writes to all provided writers.
+  
+  ```go
+  // Write to both file and stdout
+  w := io.MultiWriter(file, os.Stdout)
+  io.WriteString(w, "Hello")
+  ```
+</ParamField>
+
+### TeeReader
+
+<ParamField path="TeeReader" type="func TeeReader(r Reader, w Writer) Reader">
+  Returns a Reader that writes to w what it reads from r. All reads from r are written to w.
+  
+  ```go
+  // Read and log simultaneously
+  var buf bytes.Buffer
+  tee := io.TeeReader(resp.Body, &buf)
+  data, _ := io.ReadAll(tee)
+  log.Println("Read:", buf.String())
+  ```
+</ParamField>
+
+### Pipe
+
+<ParamField path="Pipe" type="func Pipe() (*PipeReader, *PipeWriter)">
+  Creates a synchronous in-memory pipe. Reads on the reader block until a write on the writer (or vice versa).
+  
+  ```go
+  r, w := io.Pipe()
+  
+  go func() {
+      fmt.Fprintln(w, "Hello from pipe")
+      w.Close()
+  }()
+  
+  io.Copy(os.Stdout, r)
+  ```
+</ParamField>
+
+## Seek Constants
+
+<ParamField path="SeekStart" type="const int = 0">
+  Seek relative to the origin of the file
+</ParamField>
+
+<ParamField path="SeekCurrent" type="const int = 1">
+  Seek relative to the current offset
+</ParamField>
+
+<ParamField path="SeekEnd" type="const int = 2">
+  Seek relative to the end of the file
+</ParamField>
+
+## Common Errors
+
+<ParamField path="EOF" type="var error">
+  Error returned by Read when no more input is available. Functions should return EOF only to signal a graceful end of input.
+  
+  ```go
+  n, err := reader.Read(buf)
+  if err == io.EOF {
+      // End of input reached
+  }
+  ```
+</ParamField>
+
+<ParamField path="ErrUnexpectedEOF" type="var error">
+  Error indicating EOF was encountered in the middle of reading a fixed-size block or data structure.
+</ParamField>
+
+<ParamField path="ErrShortWrite" type="var error">
+  Error indicating a write accepted fewer bytes than requested but failed to return an explicit error.
+</ParamField>
+
+<ParamField path="ErrShortBuffer" type="var error">
+  Error indicating a read required a longer buffer than was provided.
+</ParamField>
+
+## Examples
+
+### Reading from a File
+
+```go
+package main
+
+import (
+    "io"
+    "log"
+    "os"
+)
+
+func main() {
+    file, err := os.Open("example.txt")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer file.Close()
+    
+    // Read all content
+    data, err := io.ReadAll(file)
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    log.Printf("Read %d bytes\n", len(data))
+}
+```
+
+### Copying Files
+
+```go
+package main
+
+import (
+    "io"
+    "log"
+    "os"
+)
+
+func copyFile(src, dst string) error {
+    source, err := os.Open(src)
+    if err != nil {
+        return err
+    }
+    defer source.Close()
+    
+    destination, err := os.Create(dst)
+    if err != nil {
+        return err
+    }
+    defer destination.Close()
+    
+    _, err = io.Copy(destination, source)
+    return err
+}
+
+func main() {
+    err := copyFile("source.txt", "dest.txt")
+    if err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
+### Using MultiWriter
+
+```go
+package main
+
+import (
+    "io"
+    "log"
+    "os"
+)
+
+func main() {
+    logFile, err := os.Create("app.log")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer logFile.Close()
+    
+    // Write to both file and stdout
+    multi := io.MultiWriter(logFile, os.Stdout)
+    
+    io.WriteString(multi, "Application started\n")
+    io.WriteString(multi, "Processing data\n")
+}
+```
+
+### Limited Reading
+
+```go
+package main
+
+import (
+    "io"
+    "log"
+    "strings"
+)
+
+func main() {
+    r := strings.NewReader("This is a long string with lots of content")
+    
+    // Read only first 10 bytes
+    limited := io.LimitReader(r, 10)
+    
+    data, err := io.ReadAll(limited)
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    log.Printf("Read: %s\n", data)  // "This is a "
+}
+```

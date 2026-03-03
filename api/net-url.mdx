@@ -1,0 +1,490 @@
+---
+title: "net/url"
+description: "Package url parses URLs and implements query escaping."
+---
+
+## Overview
+
+Package url parses URLs and implements query escaping. It follows RFC 3986 with some deviations for compatibility.
+
+## URL Structure
+
+The general form of a URL is:
+
+```
+[scheme:][//[userinfo@]host][/]path[?query][#fragment]
+```
+
+## Types
+
+### URL
+
+URL represents a parsed URL (technically, a URI reference).
+
+```go
+type URL struct {
+    Scheme   string
+    Opaque   string    // encoded opaque data
+    User     *Userinfo // username and password information
+    Host     string    // "host" or "host:port"
+    Path     string    // path (relative paths may omit leading slash)
+    RawQuery string    // encoded query values, without '?'
+    Fragment string    // fragment for references, without '#'
+}
+```
+
+<ParamField path="Scheme" type="string">
+  The URL scheme (e.g., "http", "https", "ftp")
+</ParamField>
+
+<ParamField path="Host" type="string">
+  The host and port (e.g., "example.com:8080"). For IPv6 addresses, use square brackets: "[::1]:80"
+</ParamField>
+
+<ParamField path="Path" type="string">
+  The path component, stored in decoded form. Use EscapedPath() to get the encoded form
+</ParamField>
+
+<ParamField path="RawQuery" type="string">
+  The encoded query string without the '?'. Use Query() to parse it
+</ParamField>
+
+<ParamField path="Fragment" type="string">
+  The fragment identifier without the '#'
+</ParamField>
+
+## Parsing URLs
+
+### Parse
+
+Parses a raw URL into a URL structure.
+
+```go
+u, err := url.Parse("https://user:pass@example.com:8080/path?query=value#fragment")
+if err != nil {
+    // handle error
+}
+
+fmt.Println("Scheme:", u.Scheme)     // "https"
+fmt.Println("Host:", u.Host)         // "example.com:8080"
+fmt.Println("Path:", u.Path)         // "/path"
+fmt.Println("RawQuery:", u.RawQuery) // "query=value"
+fmt.Println("Fragment:", u.Fragment) // "fragment"
+```
+
+<ParamField path="rawURL" type="string" required>
+  The URL string to parse. May be relative (path only) or absolute (with scheme)
+</ParamField>
+
+<ResponseField name="url" type="*URL">
+  The parsed URL structure
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Error if parsing failed
+</ResponseField>
+
+### ParseRequestURI
+
+Parses a raw URL into a URL structure, assuming it was received in an HTTP request.
+
+```go
+u, err := url.ParseRequestURI("/path?query=value")
+if err != nil {
+    // handle error
+}
+```
+
+<ParamField path="rawURL" type="string" required>
+  The URL string from an HTTP request
+</ParamField>
+
+<ResponseField name="url" type="*URL">
+  The parsed URL structure
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Error if parsing failed
+</ResponseField>
+
+## URL Methods
+
+### String
+
+Reassembles the URL into a valid URL string.
+
+```go
+u := &url.URL{
+    Scheme: "https",
+    Host:   "example.com",
+    Path:   "/path",
+}
+fmt.Println(u.String()) // "https://example.com/path"
+```
+
+### Query
+
+Parses RawQuery and returns the corresponding values.
+
+```go
+u, _ := url.Parse("https://example.com/path?name=Alice&age=30")
+q := u.Query()
+
+fmt.Println(q.Get("name")) // "Alice"
+fmt.Println(q.Get("age"))  // "30"
+```
+
+<ResponseField name="values" type="Values">
+  A map of query parameters to their values
+</ResponseField>
+
+### ResolveReference
+
+Resolves a URI reference to an absolute URI from an absolute base URI.
+
+```go
+base, _ := url.Parse("https://example.com/path/")
+rel, _ := url.Parse("../other")
+absolute := base.ResolveReference(rel)
+fmt.Println(absolute.String()) // "https://example.com/other"
+```
+
+<ParamField path="ref" type="*URL" required>
+  The relative URL to resolve
+</ParamField>
+
+<ResponseField name="url" type="*URL">
+  The resolved absolute URL
+</ResponseField>
+
+## Query Values
+
+### Values
+
+Values maps a string key to a list of values.
+
+```go
+type Values map[string][]string
+```
+
+#### Get
+
+Gets the first value associated with the given key.
+
+```go
+v := url.Values{}
+v.Set("name", "Alice")
+v.Add("hobby", "reading")
+v.Add("hobby", "coding")
+
+fmt.Println(v.Get("name"))  // "Alice"
+fmt.Println(v.Get("hobby")) // "reading"
+fmt.Println(v["hobby"])     // ["reading" "coding"]
+```
+
+#### Set
+
+Sets the key to a single value, replacing any existing values.
+
+```go
+v := url.Values{}
+v.Set("key", "value")
+```
+
+<ParamField path="key" type="string" required>
+  The query parameter key
+</ParamField>
+
+<ParamField path="value" type="string" required>
+  The value to set
+</ParamField>
+
+#### Add
+
+Adds a value to the key.
+
+```go
+v := url.Values{}
+v.Add("key", "value1")
+v.Add("key", "value2")
+```
+
+<ParamField path="key" type="string" required>
+  The query parameter key
+</ParamField>
+
+<ParamField path="value" type="string" required>
+  The value to add
+</ParamField>
+
+#### Encode
+
+Encodes the values into URL-encoded form ("bar=baz&foo=quux").
+
+```go
+v := url.Values{}
+v.Set("name", "Alice Smith")
+v.Set("age", "30")
+fmt.Println(v.Encode()) // "age=30&name=Alice+Smith"
+```
+
+<ResponseField name="encoded" type="string">
+  The URL-encoded query string
+</ResponseField>
+
+## Escaping Functions
+
+### QueryEscape
+
+Escapes the string so it can be safely placed inside a URL query.
+
+```go
+safe := url.QueryEscape("hello world")
+fmt.Println(safe) // "hello+world"
+
+safe = url.QueryEscape("100% safe")
+fmt.Println(safe) // "100%25+safe"
+```
+
+<ParamField path="s" type="string" required>
+  The string to escape
+</ParamField>
+
+<ResponseField name="escaped" type="string">
+  The escaped string safe for use in URL queries
+</ResponseField>
+
+### QueryUnescape
+
+Does the inverse transformation of QueryEscape.
+
+```go
+unescaped, err := url.QueryUnescape("hello+world")
+fmt.Println(unescaped) // "hello world"
+
+unescaped, err = url.QueryUnescape("100%25+safe")
+fmt.Println(unescaped) // "100% safe"
+```
+
+<ParamField path="s" type="string" required>
+  The escaped string
+</ParamField>
+
+<ResponseField name="unescaped" type="string">
+  The unescaped string
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Error if the string is not properly escaped
+</ResponseField>
+
+### PathEscape
+
+Escapes the string so it can be safely placed inside a URL path segment.
+
+```go
+safe := url.PathEscape("hello world")
+fmt.Println(safe) // "hello%20world"
+```
+
+<ParamField path="s" type="string" required>
+  The string to escape
+</ParamField>
+
+<ResponseField name="escaped" type="string">
+  The escaped string safe for use in URL paths
+</ResponseField>
+
+### PathUnescape
+
+Does the inverse transformation of PathEscape.
+
+```go
+unescaped, err := url.PathUnescape("hello%20world")
+fmt.Println(unescaped) // "hello world"
+```
+
+<ParamField path="s" type="string" required>
+  The escaped string
+</ParamField>
+
+<ResponseField name="unescaped" type="string">
+  The unescaped string
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Error if the string is not properly escaped
+</ResponseField>
+
+## Userinfo
+
+Userinfo contains username and password information for a URL.
+
+### User
+
+Returns a Userinfo containing the provided username.
+
+```go
+user := url.User("alice")
+u := &url.URL{
+    Scheme: "https",
+    User:   user,
+    Host:   "example.com",
+    Path:   "/path",
+}
+fmt.Println(u.String()) // "https://alice@example.com/path"
+```
+
+<ParamField path="username" type="string" required>
+  The username
+</ParamField>
+
+<ResponseField name="userinfo" type="*Userinfo">
+  Userinfo with the username set
+</ResponseField>
+
+### UserPassword
+
+Returns a Userinfo containing the provided username and password.
+
+```go
+user := url.UserPassword("alice", "secret")
+u := &url.URL{
+    Scheme: "https",
+    User:   user,
+    Host:   "example.com",
+}
+fmt.Println(u.String()) // "https://alice:secret@example.com"
+```
+
+<ParamField path="username" type="string" required>
+  The username
+</ParamField>
+
+<ParamField path="password" type="string" required>
+  The password
+</ParamField>
+
+<ResponseField name="userinfo" type="*Userinfo">
+  Userinfo with username and password set
+</ResponseField>
+
+## Examples
+
+### Building a URL
+
+```go
+package main
+
+import (
+    "fmt"
+    "net/url"
+)
+
+func main() {
+    // Build URL from components
+    u := &url.URL{
+        Scheme: "https",
+        Host:   "api.example.com",
+        Path:   "/v1/users",
+    }
+    
+    // Add query parameters
+    q := u.Query()
+    q.Set("limit", "10")
+    q.Set("offset", "0")
+    q.Add("filter", "active")
+    u.RawQuery = q.Encode()
+    
+    fmt.Println(u.String())
+    // Output: https://api.example.com/v1/users?filter=active&limit=10&offset=0
+}
+```
+
+### Parsing and Modifying URLs
+
+```go
+package main
+
+import (
+    "fmt"
+    "net/url"
+)
+
+func main() {
+    rawURL := "https://example.com/search?q=golang&page=1"
+    u, err := url.Parse(rawURL)
+    if err != nil {
+        panic(err)
+    }
+    
+    // Read query parameters
+    q := u.Query()
+    fmt.Println("Search query:", q.Get("q")) // "golang"
+    
+    // Modify query parameters
+    q.Set("page", "2")
+    q.Add("sort", "date")
+    u.RawQuery = q.Encode()
+    
+    fmt.Println(u.String())
+    // Output: https://example.com/search?page=2&q=golang&sort=date
+}
+```
+
+### URL Resolution
+
+```go
+package main
+
+import (
+    "fmt"
+    "net/url"
+)
+
+func main() {
+    base, _ := url.Parse("https://example.com/docs/intro.html")
+    
+    // Relative URL
+    rel1, _ := url.Parse("../api/reference.html")
+    abs1 := base.ResolveReference(rel1)
+    fmt.Println(abs1.String())
+    // Output: https://example.com/api/reference.html
+    
+    // Absolute URL (returned unchanged)
+    rel2, _ := url.Parse("https://other.com/page")
+    abs2 := base.ResolveReference(rel2)
+    fmt.Println(abs2.String())
+    // Output: https://other.com/page
+}
+```
+
+## Error Handling
+
+### Error Type
+
+The Error type reports an error and the operation and URL that caused it.
+
+```go
+type Error struct {
+    Op  string
+    URL string
+    Err error
+}
+```
+
+### EscapeError
+
+EscapeError represents an invalid URL escape sequence.
+
+```go
+_, err := url.QueryUnescape("%zz")
+if err != nil {
+    fmt.Println(err) // invalid URL escape "%zz"
+}
+```
+
+## See Also
+
+- [net/http](/api/net-http) - HTTP client and server
+- [net](/api/net) - Low-level networking

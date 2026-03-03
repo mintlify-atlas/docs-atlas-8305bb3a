@@ -1,0 +1,401 @@
+---
+title: "net/http"
+description: "Package http provides HTTP client and server implementations."
+---
+
+## Overview
+
+Package http provides HTTP client and server implementations. Get, Head, Post, and PostForm make HTTP (or HTTPS) requests. The Client type provides more control over the HTTP client behavior.
+
+## HTTP Client
+
+### Client
+
+Client is an HTTP client. Its zero value (DefaultClient) is a usable client that uses DefaultTransport.
+
+```go
+type Client struct {
+    Transport     RoundTripper
+    CheckRedirect func(req *Request, via []*Request) error
+    Jar           CookieJar
+    Timeout       time.Duration
+}
+```
+
+<ParamField path="Transport" type="RoundTripper">
+  Specifies the mechanism by which individual HTTP requests are made. If nil, DefaultTransport is used
+</ParamField>
+
+<ParamField path="CheckRedirect" type="func(req *Request, via []*Request) error">
+  Specifies the policy for handling redirects. If nil, the default policy is to stop after 10 consecutive requests
+</ParamField>
+
+<ParamField path="Jar" type="CookieJar">
+  Specifies the cookie jar. If nil, cookies are only sent if explicitly set on the Request
+</ParamField>
+
+<ParamField path="Timeout" type="time.Duration">
+  Specifies a time limit for requests. Zero means no timeout
+</ParamField>
+
+### Making Requests
+
+#### Get
+
+Issues a GET request to the specified URL.
+
+```go
+resp, err := http.Get("https://api.example.com/users")
+if err != nil {
+    // handle error
+}
+defer resp.Body.Close()
+body, err := io.ReadAll(resp.Body)
+```
+
+<ParamField path="url" type="string" required>
+  The URL to request
+</ParamField>
+
+<ResponseField name="resp" type="*Response">
+  The HTTP response
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Error if request failed
+</ResponseField>
+
+#### Post
+
+Issues a POST request to the specified URL.
+
+```go
+resp, err := http.Post(
+    "https://api.example.com/users",
+    "application/json",
+    bytes.NewBuffer(jsonData),
+)
+if err != nil {
+    // handle error
+}
+defer resp.Body.Close()
+```
+
+<ParamField path="url" type="string" required>
+  The URL to request
+</ParamField>
+
+<ParamField path="contentType" type="string" required>
+  The content type of the request body
+</ParamField>
+
+<ParamField path="body" type="io.Reader" required>
+  The request body
+</ParamField>
+
+<ResponseField name="resp" type="*Response">
+  The HTTP response
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Error if request failed
+</ResponseField>
+
+### Request
+
+Request represents an HTTP request received by a server or to be sent by a client.
+
+```go
+req, err := http.NewRequest("POST", "https://api.example.com/users", body)
+if err != nil {
+    // handle error
+}
+req.Header.Set("Content-Type", "application/json")
+req.Header.Set("Authorization", "Bearer token")
+
+client := &http.Client{}
+resp, err := client.Do(req)
+```
+
+<ParamField path="Method" type="string">
+  Specifies the HTTP method (GET, POST, PUT, DELETE, etc.)
+</ParamField>
+
+<ParamField path="URL" type="*url.URL">
+  Specifies the URL being requested
+</ParamField>
+
+<ParamField path="Header" type="Header">
+  Contains the request header fields
+</ParamField>
+
+<ParamField path="Body" type="io.ReadCloser">
+  The request body
+</ParamField>
+
+### Response
+
+Response represents the response from an HTTP request.
+
+```go
+type Response struct {
+    Status     string // e.g. "200 OK"
+    StatusCode int    // e.g. 200
+    Proto      string // e.g. "HTTP/1.0"
+    Header     Header
+    Body       io.ReadCloser
+    ContentLength int64
+}
+```
+
+<ResponseField name="Status" type="string">
+  The status line (e.g., "200 OK")
+</ResponseField>
+
+<ResponseField name="StatusCode" type="int">
+  The HTTP status code (e.g., 200, 404, 500)
+</ResponseField>
+
+<ResponseField name="Header" type="Header">
+  The response headers
+</ResponseField>
+
+<ResponseField name="Body" type="io.ReadCloser">
+  The response body. Must be closed after reading
+</ResponseField>
+
+<ResponseField name="ContentLength" type="int64">
+  The length of the response body. -1 if unknown
+</ResponseField>
+
+## HTTP Server
+
+### Handler
+
+Handler responds to an HTTP request.
+
+```go
+type Handler interface {
+    ServeHTTP(ResponseWriter, *Request)
+}
+```
+
+### HandlerFunc
+
+HandlerFunc type is an adapter to allow the use of ordinary functions as HTTP handlers.
+
+```go
+func helloHandler(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintf(w, "Hello, %s!", r.URL.Path[1:])
+}
+
+http.HandleFunc("/hello/", helloHandler)
+http.ListenAndServe(":8080", nil)
+```
+
+<ParamField path="pattern" type="string" required>
+  The URL pattern to match
+</ParamField>
+
+<ParamField path="handler" type="func(ResponseWriter, *Request)" required>
+  The handler function
+</ParamField>
+
+### ResponseWriter
+
+ResponseWriter interface is used by an HTTP handler to construct an HTTP response.
+
+```go
+type ResponseWriter interface {
+    Header() Header
+    Write([]byte) (int, error)
+    WriteHeader(statusCode int)
+}
+```
+
+<ParamField path="Header" type="func() Header">
+  Returns the header map that will be sent. Must be called before WriteHeader or Write
+</ParamField>
+
+<ParamField path="Write" type="func([]byte) (int, error)">
+  Writes the data to the connection as part of an HTTP reply
+</ParamField>
+
+<ParamField path="WriteHeader" type="func(int)">
+  Sends an HTTP response header with the provided status code
+</ParamField>
+
+### ListenAndServe
+
+Listens on the TCP network address and then calls Serve to handle requests.
+
+```go
+http.HandleFunc("/", indexHandler)
+http.HandleFunc("/api/users", usersHandler)
+
+log.Fatal(http.ListenAndServe(":8080", nil))
+```
+
+<ParamField path="addr" type="string" required>
+  The TCP address to listen on (e.g., ":8080" or "127.0.0.1:8080")
+</ParamField>
+
+<ParamField path="handler" type="Handler">
+  The handler to invoke. If nil, DefaultServeMux is used
+</ParamField>
+
+<ResponseField name="err" type="error">
+  Always returns a non-nil error
+</ResponseField>
+
+### Server
+
+Server defines parameters for running an HTTP server.
+
+```go
+srv := &http.Server{
+    Addr:           ":8080",
+    Handler:        myHandler,
+    ReadTimeout:    10 * time.Second,
+    WriteTimeout:   10 * time.Second,
+    MaxHeaderBytes: 1 << 20,
+}
+
+log.Fatal(srv.ListenAndServe())
+```
+
+<ParamField path="Addr" type="string">
+  TCP address to listen on. If empty, ":http" is used
+</ParamField>
+
+<ParamField path="Handler" type="Handler">
+  Handler to invoke. If nil, DefaultServeMux is used
+</ParamField>
+
+<ParamField path="ReadTimeout" type="time.Duration">
+  Maximum duration for reading the entire request
+</ParamField>
+
+<ParamField path="WriteTimeout" type="time.Duration">
+  Maximum duration before timing out writes of the response
+</ParamField>
+
+## Examples
+
+### Simple HTTP Server
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    "net/http"
+)
+
+func main() {
+    http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+        fmt.Fprintf(w, "Hello, World!")
+    })
+    
+    http.HandleFunc("/api/users", func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Content-Type", "application/json")
+        fmt.Fprintf(w, `{"users": ["alice", "bob"]}`)
+    })
+    
+    log.Println("Starting server on :8080")
+    log.Fatal(http.ListenAndServe(":8080", nil))
+}
+```
+
+### HTTP Client with Custom Headers
+
+```go
+package main
+
+import (
+    "bytes"
+    "encoding/json"
+    "fmt"
+    "io"
+    "net/http"
+)
+
+type User struct {
+    Name  string `json:"name"`
+    Email string `json:"email"`
+}
+
+func main() {
+    user := User{Name: "Alice", Email: "alice@example.com"}
+    jsonData, _ := json.Marshal(user)
+    
+    req, err := http.NewRequest("POST", "https://api.example.com/users", bytes.NewBuffer(jsonData))
+    if err != nil {
+        panic(err)
+    }
+    
+    req.Header.Set("Content-Type", "application/json")
+    req.Header.Set("Authorization", "Bearer your-token-here")
+    
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        panic(err)
+    }
+    defer resp.Body.Close()
+    
+    body, _ := io.ReadAll(resp.Body)
+    fmt.Println("Response:", string(body))
+    fmt.Println("Status:", resp.StatusCode)
+}
+```
+
+### JSON API Handler
+
+```go
+func apiHandler(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+    
+    switch r.Method {
+    case "GET":
+        json.NewEncoder(w).Encode(map[string]string{
+            "message": "GET request received",
+        })
+    case "POST":
+        var data map[string]interface{}
+        if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+            w.WriteHeader(http.StatusBadRequest)
+            json.NewEncoder(w).Encode(map[string]string{
+                "error": "Invalid JSON",
+            })
+            return
+        }
+        
+        w.WriteHeader(http.StatusCreated)
+        json.NewEncoder(w).Encode(map[string]interface{
+            "message": "Created",
+            "data":    data,
+        })
+    default:
+        w.WriteHeader(http.StatusMethodNotAllowed)
+    }
+}
+```
+
+## Status Codes
+
+Common HTTP status codes:
+
+- `StatusOK` (200) - Request succeeded
+- `StatusCreated` (201) - Resource created
+- `StatusBadRequest` (400) - Invalid request
+- `StatusUnauthorized` (401) - Authentication required
+- `StatusForbidden` (403) - Access denied
+- `StatusNotFound` (404) - Resource not found
+- `StatusInternalServerError` (500) - Server error
+
+## See Also
+
+- [net](/api/net) - Low-level networking primitives
+- [net/url](/api/net-url) - URL parsing

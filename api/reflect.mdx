@@ -1,0 +1,356 @@
+---
+title: "reflect"
+description: "Runtime reflection for examining and manipulating Go values and types"
+---
+
+## Overview
+
+The `reflect` package implements run-time reflection, allowing a program to manipulate objects with arbitrary types. The typical use is to take a value with static type `interface{}` and extract its dynamic type information.
+
+**Key concepts:**
+- `TypeOf()` returns the reflection Type of a value
+- `ValueOf()` returns a Value representing the run-time data
+- `Zero()` creates a zero Value for a given Type
+
+<Tip>
+See [The Laws of Reflection](https://golang.org/doc/articles/laws_of_reflection.html) for an introduction to reflection in Go.
+</Tip>
+
+## Core Types
+
+### Type Interface
+
+The `Type` interface represents a Go type and provides methods to inspect type information.
+
+```go
+type Type interface {
+    // Type information
+    Name() string
+    PkgPath() string
+    Kind() Kind
+    
+    // Alignment
+    Align() int
+    FieldAlign() int
+    
+    // Methods
+    Method(int) Method
+    MethodByName(string) (Method, bool)
+    NumMethod() int
+    Methods() iter.Seq[Method]
+    
+    // Size
+    Size() uintptr
+    
+    // Type-specific methods
+    Field(i int) StructField  // for structs
+    Elem() Type               // for arrays, slices, maps, pointers, channels
+    Key() Type                // for maps
+    Len() int                 // for arrays
+    // ... and more
+}
+```
+
+#### Key Methods
+
+| Method | Description |
+|--------|-------------|
+| `Align()` | Returns alignment in bytes |
+| `Kind()` | Returns the specific kind of type |
+| `Name()` | Returns type's name within its package |
+| `PkgPath()` | Returns the package path |
+| `NumMethod()` | Returns number of methods |
+| `Field(i)` | Returns i'th struct field |
+| `Elem()` | Returns element type (for pointer, array, slice, map, chan) |
+
+### Value Struct
+
+`Value` is the reflection interface to a Go value.
+
+```go
+type Value struct {
+    // contains filtered or unexported fields
+}
+```
+
+<Warning>
+Not all methods apply to all kinds of values. Use the `Kind()` method to determine the kind before calling kind-specific methods. Calling an inappropriate method causes a runtime panic.
+</Warning>
+
+#### Common Value Methods
+
+| Method | Description |
+|--------|-------------|
+| `Kind()` | Returns the value's Kind |
+| `Type()` | Returns the value's Type |
+| `Interface()` | Returns value as interface{} |
+| `IsValid()` | Reports whether value is valid |
+| `IsZero()` | Reports whether value is zero |
+| `CanSet()` | Reports whether value can be changed |
+| `Set(Value)` | Sets value (must be settable) |
+| `Elem()` | Returns value that interface/pointer contains |
+
+#### Type-Specific Methods
+
+**For integers:**
+- `Int()` - returns as int64
+- `SetInt(int64)` - sets the value
+
+**For floats:**
+- `Float()` - returns as float64
+- `SetFloat(float64)` - sets the value
+
+**For strings:**
+- `String()` - returns as string
+- `SetString(string)` - sets the value
+
+**For structs:**
+- `Field(i int)` - returns i'th field
+- `FieldByName(string)` - returns field by name
+- `NumField()` - returns number of fields
+- `Fields()` - returns iterator over fields
+
+**For slices/arrays:**
+- `Len()` - returns length
+- `Index(i int)` - returns i'th element
+- `Slice(i, j int)` - returns slice
+
+**For maps:**
+- `MapKeys()` - returns slice of map keys
+- `MapIndex(key)` - returns value for key
+- `SetMapIndex(key, val)` - sets map entry
+
+## Core Functions
+
+### TypeOf
+
+Returns the reflection Type of the value in the interface{}.
+
+```go
+func TypeOf(i any) Type
+```
+
+**Example:**
+```go
+t := reflect.TypeOf(3)
+fmt.Println(t)  // "int"
+
+// Get interface type
+writerType := reflect.TypeOf((*io.Writer)(nil)).Elem()
+fmt.Println(writerType)  // "io.Writer"
+```
+
+### ValueOf
+
+Returns a new Value initialized to the concrete value stored in the interface.
+
+```go
+func ValueOf(i any) Value
+```
+
+**Example:**
+```go
+v := reflect.ValueOf(42)
+fmt.Println(v.Int())  // 42
+```
+
+### Zero
+
+Returns a Value representing the zero value for the specified type.
+
+```go
+func Zero(typ Type) Value
+```
+
+**Example:**
+```go
+zv := reflect.Zero(reflect.TypeOf(3))
+fmt.Println(zv.Int())  // 0
+```
+
+### New
+
+Returns a Value representing a pointer to a new zero value for the specified type.
+
+```go
+func New(typ Type) Value
+```
+
+**Example:**
+```go
+v := reflect.New(reflect.TypeOf(42))
+v.Elem().SetInt(100)
+fmt.Println(v.Elem().Int())  // 100
+```
+
+### MakeFunc
+
+Returns a new function of the given Type that wraps the function fn.
+
+```go
+func MakeFunc(typ Type, fn func(args []Value) []Value) Value
+```
+
+**Example:**
+```go
+swap := func(in []reflect.Value) []reflect.Value {
+    return []reflect.Value{in[1], in[0]}
+}
+
+var intSwap func(int, int) (int, int)
+fn := reflect.ValueOf(&intSwap).Elem()
+v := reflect.MakeFunc(fn.Type(), swap)
+fn.Set(v)
+
+fmt.Println(intSwap(0, 1))  // 1 0
+```
+
+## Kind Type
+
+Kind represents the specific kind of type.
+
+```go
+type Kind uint
+
+const (
+    Invalid Kind = iota
+    Bool
+    Int
+    Int8
+    Int16
+    Int32
+    Int64
+    Uint
+    Uint8
+    Uint16
+    Uint32
+    Uint64
+    Uintptr
+    Float32
+    Float64
+    Complex64
+    Complex128
+    Array
+    Chan
+    Func
+    Interface
+    Map
+    Pointer
+    Slice
+    String
+    Struct
+    UnsafePointer
+)
+```
+
+## Struct Tags
+
+### StructTag
+
+StructTag is the tag string in a struct field.
+
+```go
+type StructTag string
+
+func (tag StructTag) Get(key string) string
+func (tag StructTag) Lookup(key string) (value string, ok bool)
+```
+
+**Example:**
+```go
+type S struct {
+    F string `species:"gopher" color:"blue"`
+}
+
+st := reflect.TypeOf(S{})
+field := st.Field(0)
+fmt.Println(field.Tag.Get("color"))    // "blue"
+fmt.Println(field.Tag.Get("species"))  // "gopher"
+```
+
+## Common Patterns
+
+### Checking Type Kind
+
+```go
+for _, v := range []any{"hi", 42, func() {}} {
+    switch val := reflect.ValueOf(v); val.Kind() {
+    case reflect.String:
+        fmt.Println(val.String())
+    case reflect.Int, reflect.Int64:
+        fmt.Println(val.Int())
+    default:
+        fmt.Printf("unhandled kind %s", val.Kind())
+    }
+}
+```
+
+### Iterating Struct Fields
+
+```go
+type Person struct {
+    Name string
+    Age  int
+}
+
+p := Person{Name: "Alice", Age: 30}
+v := reflect.ValueOf(p)
+
+for field, value := range v.Fields() {
+    fmt.Printf("%s = %v\n", field.Name, value)
+}
+```
+
+### Creating Dynamic Structs
+
+```go
+typ := reflect.StructOf([]reflect.StructField{
+    {
+        Name: "Height",
+        Type: reflect.TypeOf(float64(0)),
+        Tag:  `json:"height"`
+    },
+    {
+        Name: "Age",
+        Type: reflect.TypeOf(int(0)),
+        Tag:  `json:"age"`
+    },
+})
+
+v := reflect.New(typ).Elem()
+v.Field(0).SetFloat(0.4)
+v.Field(1).SetInt(2)
+```
+
+### Modifying Values
+
+```go
+x := 42
+v := reflect.ValueOf(&x).Elem()  // Get addressable value
+if v.CanSet() {
+    v.SetInt(100)
+}
+fmt.Println(x)  // 100
+```
+
+## Performance Considerations
+
+<Warning>
+Reflection is significantly slower than direct code. Use it judiciously:
+- **Direct access:** ~1 ns
+- **Reflection access:** ~50-100 ns
+- **Method calls via reflection:** Can be 10-50x slower
+</Warning>
+
+**Best practices:**
+- Cache `reflect.Type` and `reflect.Value` when possible
+- Avoid reflection in hot paths
+- Use type assertions when the type is known
+- Consider code generation for performance-critical code
+
+## Related Packages
+
+- `encoding/json` - Uses reflection for marshaling/unmarshaling
+- `encoding/xml` - Uses reflection for XML processing
+- `fmt` - Uses reflection for printing values
+- `database/sql` - Uses reflection for scanning rows

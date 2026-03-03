@@ -1,0 +1,221 @@
+---
+title: net
+description: Network I/O including TCP/IP, UDP, DNS, and Unix domain sockets
+---
+
+The `net` package provides a portable interface for network I/O, including TCP/IP, UDP, domain name resolution, and Unix domain sockets.
+
+## TCP Server
+
+```go
+import "net"
+
+func tcpServer() error {
+    listener, err := net.Listen("tcp", ":8080")
+    if err != nil {
+        return err
+    }
+    defer listener.Close()
+    
+    for {
+        conn, err := listener.Accept()
+        if err != nil {
+            continue
+        }
+        go handleConnection(conn)
+    }
+}
+
+func handleConnection(conn net.Conn) {
+    defer conn.Close()
+    
+    buf := make([]byte, 1024)
+    n, err := conn.Read(buf)
+    if err != nil {
+        return
+    }
+    
+    conn.Write([]byte("Response: " + string(buf[:n])))
+}
+```
+
+## TCP Client
+
+```go
+func tcpClient(addr string) error {
+    conn, err := net.Dial("tcp", addr)
+    if err != nil {
+        return err
+    }
+    defer conn.Close()
+    
+    // Send data
+    conn.Write([]byte("Hello, server!"))
+    
+    // Read response
+    buf := make([]byte, 1024)
+    n, err := conn.Read(buf)
+    if err != nil {
+        return err
+    }
+    
+    fmt.Printf("Received: %s\n", buf[:n])
+    return nil
+}
+```
+
+## UDP
+
+```go
+// UDP Server
+func udpServer() error {
+    addr, err := net.ResolveUDPAddr("udp", ":8080")
+    if err != nil {
+        return err
+    }
+    
+    conn, err := net.ListenUDP("udp", addr)
+    if err != nil {
+        return err
+    }
+    defer conn.Close()
+    
+    buf := make([]byte, 1024)
+    for {
+        n, clientAddr, err := conn.ReadFromUDP(buf)
+        if err != nil {
+            continue
+        }
+        
+        go conn.WriteToUDP(buf[:n], clientAddr)
+    }
+}
+
+// UDP Client
+func udpClient(addr string) error {
+    serverAddr, err := net.ResolveUDPAddr("udp", addr)
+    if err != nil {
+        return err
+    }
+    
+    conn, err := net.DialUDP("udp", nil, serverAddr)
+    if err != nil {
+        return err
+    }
+    defer conn.Close()
+    
+    conn.Write([]byte("Hello UDP"))
+    
+    buf := make([]byte, 1024)
+    n, err := conn.Read(buf)
+    if err != nil {
+        return err
+    }
+    
+    fmt.Printf("Response: %s\n", buf[:n])
+    return nil
+}
+```
+
+## DNS Lookup
+
+```go
+func dnsLookup(hostname string) error {
+    // Lookup IP addresses
+    ips, err := net.LookupIP(hostname)
+    if err != nil {
+        return err
+    }
+    
+    for _, ip := range ips {
+        fmt.Println(ip)
+    }
+    
+    // Lookup host
+    names, err := net.LookupAddr("8.8.8.8")
+    if err != nil {
+        return err
+    }
+    fmt.Println(names)
+    
+    return nil
+}
+```
+
+## HTTP Client
+
+```go
+import "net/http"
+
+func httpGet(url string) error {
+    resp, err := http.Get(url)
+    if err != nil {
+        return err
+    }
+    defer resp.Body.Close()
+    
+    body, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return err
+    }
+    
+    fmt.Println(string(body))
+    return nil
+}
+
+func httpPost(url string, data []byte) error {
+    resp, err := http.Post(url, "application/json", bytes.NewBuffer(data))
+    if err != nil {
+        return err
+    }
+    defer resp.Body.Close()
+    
+    return nil
+}
+```
+
+## HTTP Server
+
+```go
+func httpServer() error {
+    http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+        fmt.Fprintf(w, "Hello, World!")
+    })
+    
+    http.HandleFunc("/api/users", func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Content-Type", "application/json")
+        json.NewEncoder(w).Encode(map[string]string{
+            "name": "Alice",
+        })
+    })
+    
+    return http.ListenAndServe(":8080", nil)
+}
+```
+
+## Timeouts
+
+```go
+func withTimeout() error {
+    conn, err := net.DialTimeout("tcp", "example.com:80", 5*time.Second)
+    if err != nil {
+        return err
+    }
+    defer conn.Close()
+    
+    // Set read/write deadlines
+    conn.SetDeadline(time.Now().Add(10 * time.Second))
+    conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+    conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+    
+    return nil
+}
+```
+
+## Best Practices
+
+1. **Always close connections** - Use defer conn.Close()
+2. **Set timeouts** - Prevent hanging connections
+3. **Handle errors** - Network operations can fail
+4. **Use goroutines** - Handle connections concurrently
+5. **Buffer appropriately** - Choose buffer sizes wisely

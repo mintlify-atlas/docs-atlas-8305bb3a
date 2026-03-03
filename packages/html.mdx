@@ -1,0 +1,482 @@
+---
+title: html
+description: HTML parsing and template rendering
+---
+
+The `html` package provides functions for escaping and unescaping HTML text, and the `html/template` subpackage provides data-driven templates for generating HTML output safe against code injection.
+
+## html Package
+
+### HTML Escaping
+
+```go
+import "html"
+
+func escapeExample() {
+    raw := `<script>alert("XSS")</script>`
+    escaped := html.EscapeString(raw)
+    fmt.Println(escaped)
+    // Output: &lt;script&gt;alert(&#34;XSS&#34;)&lt;/script&gt;
+    
+    unescaped := html.UnescapeString(escaped)
+    fmt.Println(unescaped)
+    // Output: <script>alert("XSS")</script>
+}
+```
+
+## html/template Package
+
+Provides data-driven templates with automatic contextual escaping.
+
+### Basic Template
+
+```go
+import "html/template"
+
+func basicTemplate() {
+    tmpl := template.Must(template.New("greeting").Parse(`
+        <h1>Hello, {{.Name}}!</h1>
+        <p>You are {{.Age}} years old.</p>
+    `))
+    
+    data := struct {
+        Name string
+        Age  int
+    }{"Alice", 30}
+    
+    tmpl.Execute(os.Stdout, data)
+}
+```
+
+### Template from File
+
+```go
+func fileTemplate() error {
+    tmpl, err := template.ParseFiles("templates/index.html")
+    if err != nil {
+        return err
+    }
+    
+    data := map[string]interface{}{
+        "Title": "My Page",
+        "User":  "Alice",
+    }
+    
+    return tmpl.Execute(os.Stdout, data)
+}
+```
+
+### Multiple Templates
+
+```go
+func multipleTemplates() error {
+    tmpl, err := template.ParseGlob("templates/*.html")
+    if err != nil {
+        return err
+    }
+    
+    // Execute specific template
+    return tmpl.ExecuteTemplate(os.Stdout, "index.html", data)
+}
+```
+
+## Template Syntax
+
+### Variables
+
+```html
+{{.}}              <!-- Current context -->
+{{.Name}}          <!-- Field access -->
+{{.User.Email}}    <!-- Nested field -->
+```
+
+### Conditionals
+
+```html
+{{if .IsLoggedIn}}
+    <p>Welcome back!</p>
+{{else}}
+    <p>Please log in.</p>
+{{end}}
+
+{{if and .User .User.IsActive}}
+    <p>Active user</p>
+{{end}}
+```
+
+### Loops
+
+```html
+<ul>
+{{range .Items}}
+    <li>{{.}}</li>
+{{end}}
+</ul>
+
+{{range $index, $item := .Items}}
+    <p>{{$index}}: {{$item}}</p>
+{{end}}
+
+{{range .Users}}
+    <div>{{.Name}} - {{.Email}}</div>
+{{else}}
+    <p>No users found</p>
+{{end}}
+```
+
+### With
+
+```html
+{{with .User}}
+    <p>Name: {{.Name}}</p>
+    <p>Email: {{.Email}}</p>
+{{end}}
+```
+
+### Variables
+
+```html
+{{$title := .Title}}
+<h1>{{$title}}</h1>
+
+{{range $i, $item := .Items}}
+    <p>Item {{$i}}: {{$item}}</p>
+{{end}}
+```
+
+### Template Inclusion
+
+```html
+{{template "header" .}}
+<main>
+    Content here
+</main>
+{{template "footer" .}}
+```
+
+### Define and Block
+
+```html
+{{define "header"}}
+<header>
+    <h1>{{.Title}}</h1>
+</header>
+{{end}}
+
+{{block "content" .}}
+    Default content
+{{end}}
+```
+
+## Template Functions
+
+### Built-in Functions
+
+```html
+<!-- Comparison -->
+{{if eq .Status "active"}}Active{{end}}
+{{if ne .Count 0}}Has items{{end}}
+{{if lt .Age 18}}Minor{{end}}
+{{if gt .Score 90}}Excellent{{end}}
+
+<!-- Logic -->
+{{if and .User .User.IsActive}}...{{end}}
+{{if or .IsAdmin .IsModerator}}...{{end}}
+{{if not .IsDeleted}}...{{end}}
+
+<!-- String operations -->
+{{print .Name}}
+{{printf "%s: %d" .Label .Count}}
+
+<!-- Indexing -->
+{{index .Items 0}}
+{{index .Map "key"}}
+
+<!-- Length -->
+{{len .Items}}
+```
+
+### Custom Functions
+
+```go
+func customFunctions() {
+    funcMap := template.FuncMap{
+        "upper": strings.ToUpper,
+        "add": func(a, b int) int {
+            return a + b
+        },
+        "formatDate": func(t time.Time) string {
+            return t.Format("2006-01-02")
+        },
+    }
+    
+    tmpl := template.New("test").Funcs(funcMap)
+    tmpl.Parse(`
+        <p>{{upper .Name}}</p>
+        <p>Total: {{add .A .B}}</p>
+        <p>Date: {{formatDate .Created}}</p>
+    `)
+}
+```
+
+## Practical Examples
+
+### Web Page Template
+
+```go
+type PageData struct {
+    Title       string
+    User        *User
+    Posts       []Post
+    CurrentYear int
+}
+
+func renderPage(w http.ResponseWriter, data PageData) error {
+    tmpl := template.Must(template.ParseFiles(
+        "templates/layout.html",
+        "templates/header.html",
+        "templates/footer.html",
+        "templates/post-list.html",
+    ))
+    
+    return tmpl.ExecuteTemplate(w, "layout.html", data)
+}
+```
+
+**layout.html:**
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{.Title}}</title>
+</head>
+<body>
+    {{template "header" .}}
+    
+    <main>
+        {{template "post-list" .}}
+    </main>
+    
+    {{template "footer" .}}
+</body>
+</html>
+```
+
+**post-list.html:**
+```html
+{{define "post-list"}}
+<div class="posts">
+    {{range .Posts}}
+    <article>
+        <h2>{{.Title}}</h2>
+        <p>{{.Content}}</p>
+        <small>By {{.Author}} on {{.Date}}</small>
+    </article>
+    {{else}}
+    <p>No posts available.</p>
+    {{end}}
+</div>
+{{end}}
+```
+
+### Email Template
+
+```go
+type EmailData struct {
+    RecipientName string
+    Subject       string
+    Message       string
+    SenderName    string
+    UnsubscribeURL string
+}
+
+func generateEmail(data EmailData) (string, error) {
+    tmpl := template.Must(template.New("email").Parse(`
+Subject: {{.Subject}}
+
+Dear {{.RecipientName}},
+
+{{.Message}}
+
+Best regards,
+{{.SenderName}}
+
+---
+To unsubscribe: {{.UnsubscribeURL}}
+    `))
+    
+    var buf bytes.Buffer
+    err := tmpl.Execute(&buf, data)
+    return buf.String(), err
+}
+```
+
+### HTML Form with Validation
+
+```go
+type FormData struct {
+    Values map[string]string
+    Errors map[string]string
+}
+
+func renderForm(w http.ResponseWriter, data FormData) {
+    tmpl := template.Must(template.New("form").Parse(`
+<form method="POST">
+    <div>
+        <label>Name:</label>
+        <input type="text" name="name" value="{{.Values.name}}">
+        {{if .Errors.name}}
+            <span class="error">{{.Errors.name}}</span>
+        {{end}}
+    </div>
+    
+    <div>
+        <label>Email:</label>
+        <input type="email" name="email" value="{{.Values.email}}">
+        {{if .Errors.email}}
+            <span class="error">{{.Errors.email}}</span>
+        {{end}}
+    </div>
+    
+    <button type="submit">Submit</button>
+</form>
+    `))
+    
+    tmpl.Execute(w, data)
+}
+```
+
+### Template Caching
+
+```go
+type TemplateCache struct {
+    templates map[string]*template.Template
+    mu        sync.RWMutex
+}
+
+func NewTemplateCache() *TemplateCache {
+    return &TemplateCache{
+        templates: make(map[string]*template.Template),
+    }
+}
+
+func (tc *TemplateCache) Get(name string) (*template.Template, error) {
+    tc.mu.RLock()
+    tmpl, ok := tc.templates[name]
+    tc.mu.RUnlock()
+    
+    if ok {
+        return tmpl, nil
+    }
+    
+    tc.mu.Lock()
+    defer tc.mu.Unlock()
+    
+    // Double-check
+    if tmpl, ok := tc.templates[name]; ok {
+        return tmpl, nil
+    }
+    
+    // Parse and cache
+    tmpl, err := template.ParseFiles("templates/" + name)
+    if err != nil {
+        return nil, err
+    }
+    
+    tc.templates[name] = tmpl
+    return tmpl, nil
+}
+
+func (tc *TemplateCache) Render(w http.ResponseWriter, name string, data interface{}) error {
+    tmpl, err := tc.Get(name)
+    if err != nil {
+        return err
+    }
+    return tmpl.Execute(w, data)
+}
+```
+
+## Security Features
+
+### Automatic Escaping
+
+```go
+// Template automatically escapes based on context
+data := map[string]string{
+    "UserInput": `<script>alert("XSS")</script>`,
+}
+
+tmpl.Parse(`<p>{{.UserInput}}</p>`)
+// Outputs: <p>&lt;script&gt;alert(&#34;XSS&#34;)&lt;/script&gt;</p>
+```
+
+### Safe HTML
+
+```go
+import "html/template"
+
+data := map[string]interface{}{
+    "SafeHTML": template.HTML("<b>Bold</b>"),
+}
+
+tmpl.Parse(`<div>{{.SafeHTML}}</div>`)
+// Outputs: <div><b>Bold</b></div>
+```
+
+### URL Escaping
+
+```go
+data := map[string]string{
+    "Query": "hello world",
+}
+
+tmpl.Parse(`<a href="/search?q={{.Query}}">Search</a>`)
+// Outputs: <a href="/search?q=hello%20world">Search</a>
+```
+
+## Best Practices
+
+1. **Use template caching** - Parse templates once, reuse many times
+2. **Validate data before rendering** - Don't rely solely on template escaping
+3. **Use typed data structures** - Avoid `map[string]interface{}`
+4. **Handle errors** - Check template execution errors
+5. **Organize templates** - Use subdirectories and naming conventions
+6. **Use Must carefully** - Only for templates that must parse successfully
+7. **Be careful with HTML/JS/CSS** - Use appropriate safe types
+8. **Test templates** - Write tests for template rendering
+
+## Common Patterns
+
+### Base Template Pattern
+
+```go
+func loadTemplates() (*template.Template, error) {
+    base := template.New("base")
+    base.Funcs(customFuncs)
+    
+    // Parse all templates
+    return base.ParseGlob("templates/**/*.html")
+}
+```
+
+### Layout Inheritance
+
+```go
+// base.html
+{{define "base"}}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{block "title" .}}Default Title{{end}}</title>
+</head>
+<body>
+    {{block "content" .}}Default content{{end}}
+</body>
+</html>
+{{end}}
+
+// page.html
+{{template "base" .}}
+{{define "title"}}Custom Title{{end}}
+{{define "content"}}<p>Custom content</p>{{end}}
+```

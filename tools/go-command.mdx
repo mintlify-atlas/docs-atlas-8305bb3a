@@ -1,0 +1,265 @@
+---
+title: 'The go Command'
+description: 'Overview of the go command-line tool for managing Go source code'
+---
+
+The `go` command is the primary tool for managing Go source code. It provides a unified interface for compiling, testing, installing, and managing Go packages and modules.
+
+## Usage
+
+```bash
+go <command> [arguments]
+```
+
+## Available Commands
+
+The go command provides the following subcommands:
+
+<CardGroup cols={2}>
+  <Card title="build" icon="hammer">
+    Compile packages and dependencies
+  </Card>
+  <Card title="test" icon="flask">
+    Test packages
+  </Card>
+  <Card title="run" icon="play">
+    Compile and run Go program
+  </Card>
+  <Card title="install" icon="download">
+    Compile and install packages
+  </Card>
+  <Card title="get" icon="plus">
+    Add dependencies to current module
+  </Card>
+  <Card title="mod" icon="box">
+    Module maintenance
+  </Card>
+  <Card title="work" icon="folder">
+    Workspace maintenance
+  </Card>
+  <Card title="fmt" icon="paintbrush">
+    Format package sources with gofmt
+  </Card>
+</CardGroup>
+
+### Build and Compilation
+
+- **`build`** - Compile packages and dependencies
+- **`install`** - Compile and install packages and dependencies
+- **`clean`** - Remove object files and cached files
+- **`run`** - Compile and run Go program
+
+### Testing and Analysis
+
+- **`test`** - Test packages
+- **`vet`** - Report likely mistakes in packages
+- **`doc`** - Show documentation for package or symbol
+
+### Module Management
+
+- **`get`** - Add dependencies to current module and install them
+- **`mod`** - Module maintenance
+- **`work`** - Workspace maintenance
+
+### Code Generation and Formatting
+
+- **`fmt`** - Format package sources with gofmt
+- **`generate`** - Generate Go files by processing source
+- **`fix`** - Apply fixes suggested by static checkers
+
+### Information and Environment
+
+- **`env`** - Print Go environment information
+- **`list`** - List packages or modules
+- **`version`** - Print Go version
+- **`tool`** - Run specified go tool
+
+### Other Commands
+
+- **`bug`** - Start a bug report
+- **`telemetry`** - Manage telemetry data and settings
+
+## Common Build Flags
+
+Many go commands share a common set of build flags:
+
+### Basic Flags
+
+```bash
+-C dir          # Change to dir before running the command
+-v              # Print names of packages as they are compiled
+-n              # Print commands but do not run them
+-x              # Print commands as they are executed
+-a              # Force rebuilding of packages that are already up-to-date
+```
+
+### Compilation Flags
+
+```bash
+-p n            # Number of programs that can run in parallel (default: GOMAXPROCS)
+-race           # Enable data race detection
+-msan           # Enable interoperation with memory sanitizer
+-asan           # Enable interoperation with address sanitizer
+-cover          # Enable code coverage instrumentation
+```
+
+### Advanced Flags
+
+```bash
+-gcflags '[pattern=]arg list'   # Arguments to pass to go tool compile
+-ldflags '[pattern=]arg list'   # Arguments to pass to go tool link
+-asmflags '[pattern=]arg list'  # Arguments to pass to go tool asm
+-tags tag,list                  # Build tags to consider satisfied
+-trimpath                       # Remove file system paths from executable
+-buildmode mode                 # Build mode to use
+```
+
+## Environment Variables
+
+<Steps>
+  <Step title="View Current Environment">
+    Display all Go environment variables:
+    
+    ```bash
+    go env
+    ```
+  </Step>
+  
+  <Step title="Check Specific Variables">
+    View specific environment variables:
+    
+    ```bash
+    go env GOPATH GOROOT GOOS GOARCH
+    ```
+  </Step>
+  
+  <Step title="Set Environment Variables">
+    Set a default environment variable:
+    
+    ```bash
+    go env -w GOPRIVATE=github.com/mycompany/*
+    ```
+  </Step>
+</Steps>
+
+### Key Environment Variables
+
+- **`GOROOT`** - Location of the Go installation
+- **`GOPATH`** - Workspace location (default: `$HOME/go`)
+- **`GOBIN`** - Directory where go install places binaries
+- **`GOOS`** - Target operating system
+- **`GOARCH`** - Target architecture
+- **`GO111MODULE`** - Module support mode
+- **`GOPROXY`** - Module proxy URL
+- **`GOPRIVATE`** - Patterns for private modules
+
+## Examples
+
+### Building Programs
+
+<CodeGroup>
+```bash Basic Build
+# Build current package
+go build
+
+# Build with output name
+go build -o myapp
+
+# Build specific package
+go build example.com/myapp
+```
+
+```bash Cross-Compilation
+# Build for Linux AMD64
+GOOS=linux GOARCH=amd64 go build
+
+# Build for Windows
+GOOS=windows GOARCH=amd64 go build -o app.exe
+
+# Build for macOS ARM64 (Apple Silicon)
+GOOS=darwin GOARCH=arm64 go build
+```
+
+```bash Advanced Options
+# Build with race detector
+go build -race
+
+# Build with custom flags
+go build -ldflags="-X main.version=1.0.0"
+
+# Build with verbose output
+go build -v -x
+```
+</CodeGroup>
+
+### Running Programs
+
+```bash
+# Run current package
+go run .
+
+# Run specific files
+go run main.go
+
+# Run with arguments
+go run . --help
+
+# Run from module path with version
+go run example.com/cmd/tool@latest
+```
+
+### Getting Help
+
+```bash
+# Get help on a command
+go help build
+go help test
+
+# Get help on a topic
+go help modules
+go help environment
+go help buildmode
+```
+
+## Help Topics
+
+The go command includes extensive documentation on various topics:
+
+- **`buildconstraint`** - Build constraints
+- **`buildjson`** - Build -json encoding
+- **`buildmode`** - Build modes
+- **`c`** - Calling between Go and C
+- **`cache`** - Build and test caching
+- **`environment`** - Environment variables
+- **`filetype`** - File types
+- **`go.mod`** - The go.mod file
+- **`gopath`** - GOPATH environment variable
+- **`goproxy`** - Module proxy protocol
+- **`importpath`** - Import path syntax
+- **`modules`** - Modules, module versions, and more
+- **`packages`** - Package lists and patterns
+- **`testflag`** - Testing flags
+- **`testfunc`** - Testing functions
+
+Access any help topic with:
+
+```bash
+go help <topic>
+```
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="Building Go Programs" href="/tools/build">
+    Learn about building Go applications
+  </Card>
+  <Card title="Testing" href="/tools/test">
+    Testing Go packages
+  </Card>
+  <Card title="Modules" href="/tools/modules">
+    Working with Go modules
+  </Card>
+  <Card title="Workspaces" href="/tools/workspaces">
+    Multi-module workspaces
+  </Card>
+</CardGroup>

@@ -1,0 +1,1100 @@
+---
+title: "Tutorial"
+description: "A comprehensive guide to learning Go programming from the ground up"
+---
+
+## Introduction
+
+This tutorial will teach you the fundamentals of Go programming through practical examples. By the end, you'll understand Go's syntax, core concepts, and be ready to build real applications.
+
+<Note>
+This tutorial assumes you have Go installed. If not, check the [installation guide](/installation) first.
+</Note>
+
+## Table of Contents
+
+1. [Basics](#basics)
+2. [Variables and Types](#variables-and-types)
+3. [Control Flow](#control-flow)
+4. [Functions](#functions)
+5. [Data Structures](#data-structures)
+6. [Methods and Interfaces](#methods-and-interfaces)
+7. [Error Handling](#error-handling)
+8. [Concurrency](#concurrency)
+9. [Working with Files](#working-with-files)
+10. [Building a Complete Application](#building-a-complete-application)
+
+## Basics
+
+### Package and Imports
+
+Every Go program is made up of packages. Programs start running in the `main` package:
+
+```go
+package main
+
+import (
+    "fmt"
+    "math"
+)
+
+func main() {
+    fmt.Println("Hello, World!")
+    fmt.Println("Square root of 16:", math.Sqrt(16))
+}
+```
+
+<Accordion title="Key Points">
+- `package main` is required for executable programs
+- Import statements bring in other packages
+- Grouped imports use parentheses: `import ( ... )`
+- Only exported names (starting with capital letter) can be used from imported packages
+</Accordion>
+
+### Exported Names
+
+In Go, a name is exported if it begins with a capital letter:
+
+```go
+package main
+
+import (
+    "fmt"
+    "math"
+)
+
+func main() {
+    fmt.Println(math.Pi)  // OK - Pi is exported
+    // fmt.Println(math.pi) // Error - pi is not exported
+}
+```
+
+## Variables and Types
+
+### Basic Types
+
+Go's basic types include:
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+    // Boolean
+    var isTrue bool = true
+    
+    // String
+    var message string = "Hello, Go!"
+    
+    // Integers
+    var age int = 25
+    var count int64 = 1000000
+    
+    // Unsigned integers
+    var positive uint = 42
+    
+    // Floating point
+    var price float64 = 29.99
+    var temperature float32 = 98.6
+    
+    // Complex numbers
+    var c complex128 = complex(5, 7)
+    
+    // Byte (alias for uint8)
+    var b byte = 'A'
+    
+    // Rune (alias for int32, represents Unicode code point)
+    var r rune = '世'
+    
+    fmt.Println(isTrue, message, age, count, positive)
+    fmt.Println(price, temperature, c, b, r)
+}
+```
+
+### Variable Declarations
+
+Go provides several ways to declare variables:
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+    // Explicit type
+    var name string = "Alice"
+    
+    // Type inference
+    var age = 30  // int
+    
+    // Short declaration (inside functions only)
+    city := "San Francisco"
+    
+    // Multiple variables
+    var x, y int = 10, 20
+    a, b := true, false
+    
+    // Variable block
+    var (
+        firstName string = "John"
+        lastName  string = "Doe"
+        salary    float64 = 75000.50
+    )
+    
+    fmt.Println(name, age, city, x, y, a, b)
+    fmt.Println(firstName, lastName, salary)
+}
+```
+
+### Constants
+
+Constants are declared with the `const` keyword:
+
+```go
+package main
+
+import "fmt"
+
+const Pi = 3.14159
+const MaxConnections = 100
+
+const (
+    StatusOK = 200
+    StatusNotFound = 404
+    StatusError = 500
+)
+
+func main() {
+    fmt.Println("Pi:", Pi)
+    fmt.Println("Status:", StatusOK)
+}
+```
+
+### Type Conversions
+
+Go requires explicit type conversions:
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+    var i int = 42
+    var f float64 = float64(i)
+    var u uint = uint(f)
+    
+    fmt.Printf("i: %T = %v\n", i, i)
+    fmt.Printf("f: %T = %v\n", f, f)
+    fmt.Printf("u: %T = %v\n", u, u)
+}
+```
+
+## Control Flow
+
+### If Statements
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+    age := 25
+    
+    if age >= 18 {
+        fmt.Println("Adult")
+    } else {
+        fmt.Println("Minor")
+    }
+    
+    // If with initialization statement
+    if score := 85; score >= 90 {
+        fmt.Println("Grade: A")
+    } else if score >= 80 {
+        fmt.Println("Grade: B")
+    } else {
+        fmt.Println("Grade: C or lower")
+    }
+}
+```
+
+<Note>
+The variable declared in an if statement is only available within that if/else block.
+</Note>
+
+### For Loops
+
+Go has only one looping construct: the `for` loop.
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+    // Standard for loop
+    for i := 0; i < 5; i++ {
+        fmt.Println(i)
+    }
+    
+    // For as while
+    sum := 1
+    for sum < 100 {
+        sum += sum
+    }
+    fmt.Println("Sum:", sum)
+    
+    // Infinite loop
+    // for {
+    //     fmt.Println("Forever")
+    // }
+    
+    // Range over slice
+    numbers := []int{1, 2, 3, 4, 5}
+    for index, value := range numbers {
+        fmt.Printf("Index: %d, Value: %d\n", index, value)
+    }
+    
+    // Ignore index with _
+    for _, value := range numbers {
+        fmt.Println(value)
+    }
+}
+```
+
+### Switch Statements
+
+```go
+package main
+
+import (
+    "fmt"
+    "time"
+)
+
+func main() {
+    // Basic switch
+    day := time.Now().Weekday()
+    switch day {
+    case time.Saturday, time.Sunday:
+        fmt.Println("It's the weekend!")
+    default:
+        fmt.Println("It's a weekday")
+    }
+    
+    // Switch with condition
+    hour := time.Now().Hour()
+    switch {
+    case hour < 12:
+        fmt.Println("Good morning!")
+    case hour < 17:
+        fmt.Println("Good afternoon!")
+    default:
+        fmt.Println("Good evening!")
+    }
+    
+    // Type switch
+    var i interface{} = "hello"
+    switch v := i.(type) {
+    case int:
+        fmt.Printf("Integer: %d\n", v)
+    case string:
+        fmt.Printf("String: %s\n", v)
+    default:
+        fmt.Printf("Unknown type\n")
+    }
+}
+```
+
+## Functions
+
+### Basic Functions
+
+```go
+package main
+
+import "fmt"
+
+// Simple function
+func greet(name string) {
+    fmt.Println("Hello,", name)
+}
+
+// Function with return value
+func add(a int, b int) int {
+    return a + b
+}
+
+// Shortened parameter list
+func multiply(a, b int) int {
+    return a * b
+}
+
+// Multiple return values
+func swap(x, y string) (string, string) {
+    return y, x
+}
+
+// Named return values
+func split(sum int) (x, y int) {
+    x = sum * 4 / 9
+    y = sum - x
+    return  // naked return
+}
+
+func main() {
+    greet("Alice")
+    fmt.Println("Sum:", add(5, 3))
+    fmt.Println("Product:", multiply(4, 7))
+    
+    a, b := swap("hello", "world")
+    fmt.Println(a, b)
+    
+    fmt.Println(split(17))
+}
+```
+
+### Variadic Functions
+
+Functions can accept a variable number of arguments:
+
+```go
+package main
+
+import "fmt"
+
+func sum(numbers ...int) int {
+    total := 0
+    for _, num := range numbers {
+        total += num
+    }
+    return total
+}
+
+func main() {
+    fmt.Println(sum(1, 2, 3))           // 6
+    fmt.Println(sum(1, 2, 3, 4, 5))     // 15
+    
+    // Pass slice to variadic function
+    nums := []int{10, 20, 30}
+    fmt.Println(sum(nums...))            // 60
+}
+```
+
+### Function Values and Closures
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+    // Function as a value
+    add := func(a, b int) int {
+        return a + b
+    }
+    fmt.Println(add(3, 4))
+    
+    // Closure
+    counter := makeCounter()
+    fmt.Println(counter())  // 1
+    fmt.Println(counter())  // 2
+    fmt.Println(counter())  // 3
+}
+
+func makeCounter() func() int {
+    count := 0
+    return func() int {
+        count++
+        return count
+    }
+}
+```
+
+## Data Structures
+
+### Arrays
+
+Arrays have fixed size:
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+    var numbers [5]int
+    numbers[0] = 10
+    numbers[1] = 20
+    
+    // Array literal
+    primes := [5]int{2, 3, 5, 7, 11}
+    
+    // Compiler counts elements
+    colors := [...]string{"red", "green", "blue"}
+    
+    fmt.Println(numbers)
+    fmt.Println(primes)
+    fmt.Println(colors)
+    fmt.Println("Length:", len(primes))
+}
+```
+
+### Slices
+
+Slices are dynamic, flexible views into arrays:
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+    // Create slice
+    numbers := []int{1, 2, 3, 4, 5}
+    fmt.Println("Numbers:", numbers)
+    
+    // Slicing
+    fmt.Println("numbers[1:3]:", numbers[1:3])  // [2 3]
+    fmt.Println("numbers[:3]:", numbers[:3])     // [1 2 3]
+    fmt.Println("numbers[2:]:", numbers[2:])     // [3 4 5]
+    
+    // Make slice with capacity
+    s := make([]int, 5)      // length 5
+    s2 := make([]int, 0, 5)  // length 0, capacity 5
+    
+    // Append to slice
+    s2 = append(s2, 1)
+    s2 = append(s2, 2, 3, 4)
+    
+    fmt.Println("s:", s, "len:", len(s), "cap:", cap(s))
+    fmt.Println("s2:", s2, "len:", len(s2), "cap:", cap(s2))
+    
+    // Copy slices
+    dest := make([]int, len(numbers))
+    copy(dest, numbers)
+    fmt.Println("Copy:", dest)
+}
+```
+
+### Maps
+
+Maps are Go's built-in key-value data structure:
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+    // Create map
+    ages := make(map[string]int)
+    ages["Alice"] = 30
+    ages["Bob"] = 25
+    
+    // Map literal
+    scores := map[string]int{
+        "Alice": 95,
+        "Bob":   87,
+        "Carol": 92,
+    }
+    
+    fmt.Println("Ages:", ages)
+    fmt.Println("Scores:", scores)
+    
+    // Access
+    fmt.Println("Alice's score:", scores["Alice"])
+    
+    // Check existence
+    score, exists := scores["David"]
+    if exists {
+        fmt.Println("David's score:", score)
+    } else {
+        fmt.Println("David not found")
+    }
+    
+    // Delete
+    delete(scores, "Bob")
+    fmt.Println("After delete:", scores)
+    
+    // Iterate
+    for name, score := range scores {
+        fmt.Printf("%s scored %d\n", name, score)
+    }
+}
+```
+
+### Structs
+
+Structs are typed collections of fields:
+
+```go
+package main
+
+import "fmt"
+
+type Person struct {
+    Name string
+    Age  int
+    City string
+}
+
+type Point struct {
+    X, Y int
+}
+
+func main() {
+    // Create struct
+    p1 := Person{Name: "Alice", Age: 30, City: "NYC"}
+    
+    // Positional (must include all fields)
+    p2 := Person{"Bob", 25, "SF"}
+    
+    // Zero value
+    var p3 Person
+    p3.Name = "Carol"
+    
+    fmt.Println(p1)
+    fmt.Println(p1.Name, "is", p1.Age, "years old")
+    fmt.Println(p2)
+    fmt.Println(p3)
+    
+    // Struct pointers
+    p := &p1
+    p.Age = 31  // Shorthand for (*p).Age
+    fmt.Println(p1)
+}
+```
+
+## Methods and Interfaces
+
+### Methods
+
+Go doesn't have classes, but you can define methods on types:
+
+```go
+package main
+
+import (
+    "fmt"
+    "math"
+)
+
+type Circle struct {
+    Radius float64
+}
+
+type Rectangle struct {
+    Width, Height float64
+}
+
+// Method on Circle
+func (c Circle) Area() float64 {
+    return math.Pi * c.Radius * c.Radius
+}
+
+// Method on Rectangle
+func (r Rectangle) Area() float64 {
+    return r.Width * r.Height
+}
+
+// Pointer receiver (can modify struct)
+func (c *Circle) Scale(factor float64) {
+    c.Radius *= factor
+}
+
+func main() {
+    circle := Circle{Radius: 5}
+    rect := Rectangle{Width: 3, Height: 4}
+    
+    fmt.Printf("Circle area: %.2f\n", circle.Area())
+    fmt.Printf("Rectangle area: %.2f\n", rect.Area())
+    
+    circle.Scale(2)
+    fmt.Printf("Scaled circle area: %.2f\n", circle.Area())
+}
+```
+
+### Interfaces
+
+Interfaces define behavior:
+
+```go
+package main
+
+import (
+    "fmt"
+    "math"
+)
+
+// Shape interface
+type Shape interface {
+    Area() float64
+    Perimeter() float64
+}
+
+type Circle struct {
+    Radius float64
+}
+
+type Rectangle struct {
+    Width, Height float64
+}
+
+// Circle implements Shape
+func (c Circle) Area() float64 {
+    return math.Pi * c.Radius * c.Radius
+}
+
+func (c Circle) Perimeter() float64 {
+    return 2 * math.Pi * c.Radius
+}
+
+// Rectangle implements Shape
+func (r Rectangle) Area() float64 {
+    return r.Width * r.Height
+}
+
+func (r Rectangle) Perimeter() float64 {
+    return 2 * (r.Width + r.Height)
+}
+
+// Function that works with any Shape
+func printShapeInfo(s Shape) {
+    fmt.Printf("Area: %.2f, Perimeter: %.2f\n", s.Area(), s.Perimeter())
+}
+
+func main() {
+    c := Circle{Radius: 5}
+    r := Rectangle{Width: 3, Height: 4}
+    
+    printShapeInfo(c)
+    printShapeInfo(r)
+}
+```
+
+## Error Handling
+
+Go uses explicit error returns instead of exceptions:
+
+```go
+package main
+
+import (
+    "errors"
+    "fmt"
+)
+
+func divide(a, b float64) (float64, error) {
+    if b == 0 {
+        return 0, errors.New("division by zero")
+    }
+    return a / b, nil
+}
+
+func sqrt(x float64) (float64, error) {
+    if x < 0 {
+        return 0, fmt.Errorf("cannot compute square root of negative number: %f", x)
+    }
+    // Simple approximation
+    return x / 2, nil
+}
+
+func main() {
+    // Always check errors
+    result, err := divide(10, 2)
+    if err != nil {
+        fmt.Println("Error:", err)
+        return
+    }
+    fmt.Println("Result:", result)
+    
+    // Error case
+    result, err = divide(10, 0)
+    if err != nil {
+        fmt.Println("Error:", err)
+    }
+    
+    _, err = sqrt(-4)
+    if err != nil {
+        fmt.Println("Error:", err)
+    }
+}
+```
+
+## Concurrency
+
+### Goroutines
+
+Goroutines are lightweight threads managed by Go runtime:
+
+```go
+package main
+
+import (
+    "fmt"
+    "time"
+)
+
+func say(s string) {
+    for i := 0; i < 3; i++ {
+        time.Sleep(100 * time.Millisecond)
+        fmt.Println(s)
+    }
+}
+
+func main() {
+    // Run concurrently
+    go say("world")
+    say("hello")
+}
+```
+
+### Channels
+
+Channels allow goroutines to communicate:
+
+```go
+package main
+
+import "fmt"
+
+func sum(numbers []int, c chan int) {
+    total := 0
+    for _, num := range numbers {
+        total += num
+    }
+    c <- total  // Send to channel
+}
+
+func main() {
+    numbers := []int{1, 2, 3, 4, 5, 6}
+    
+    c := make(chan int)
+    go sum(numbers[:len(numbers)/2], c)
+    go sum(numbers[len(numbers)/2:], c)
+    
+    x, y := <-c, <-c  // Receive from channel
+    
+    fmt.Println("Results:", x, y)
+    fmt.Println("Total:", x+y)
+}
+```
+
+### Select Statement
+
+The `select` statement lets you wait on multiple channel operations:
+
+```go
+package main
+
+import (
+    "fmt"
+    "time"
+)
+
+func main() {
+    c1 := make(chan string)
+    c2 := make(chan string)
+    
+    go func() {
+        time.Sleep(1 * time.Second)
+        c1 <- "one"
+    }()
+    
+    go func() {
+        time.Sleep(2 * time.Second)
+        c2 <- "two"
+    }()
+    
+    for i := 0; i < 2; i++ {
+        select {
+        case msg1 := <-c1:
+            fmt.Println("Received:", msg1)
+        case msg2 := <-c2:
+            fmt.Println("Received:", msg2)
+        }
+    }
+}
+```
+
+## Working with Files
+
+### Reading Files
+
+```go
+package main
+
+import (
+    "bufio"
+    "fmt"
+    "io"
+    "os"
+)
+
+func main() {
+    // Read entire file
+    data, err := os.ReadFile("test.txt")
+    if err != nil {
+        fmt.Println("Error:", err)
+        return
+    }
+    fmt.Println(string(data))
+    
+    // Read line by line
+    file, err := os.Open("test.txt")
+    if err != nil {
+        fmt.Println("Error:", err)
+        return
+    }
+    defer file.Close()
+    
+    scanner := bufio.NewScanner(file)
+    for scanner.Scan() {
+        fmt.Println(scanner.Text())
+    }
+    
+    if err := scanner.Err(); err != nil {
+        fmt.Println("Error:", err)
+    }
+}
+```
+
+### Writing Files
+
+```go
+package main
+
+import (
+    "fmt"
+    "os"
+)
+
+func main() {
+    // Write to file
+    data := []byte("Hello, Go!\n")
+    err := os.WriteFile("output.txt", data, 0644)
+    if err != nil {
+        fmt.Println("Error:", err)
+        return
+    }
+    
+    // Append to file
+    file, err := os.OpenFile("output.txt", os.O_APPEND|os.O_WRONLY, 0644)
+    if err != nil {
+        fmt.Println("Error:", err)
+        return
+    }
+    defer file.Close()
+    
+    if _, err := file.WriteString("Another line\n"); err != nil {
+        fmt.Println("Error:", err)
+    }
+}
+```
+
+## Building a Complete Application
+
+Let's build a simple TODO list application that demonstrates many concepts:
+
+```go
+package main
+
+import (
+    "bufio"
+    "encoding/json"
+    "fmt"
+    "os"
+    "strconv"
+    "strings"
+)
+
+type Todo struct {
+    ID        int    `json:"id"`
+    Task      string `json:"task"`
+    Completed bool   `json:"completed"`
+}
+
+type TodoList struct {
+    Todos  []Todo `json:"todos"`
+    nextID int
+}
+
+func NewTodoList() *TodoList {
+    return &TodoList{
+        Todos:  []Todo{},
+        nextID: 1,
+    }
+}
+
+func (tl *TodoList) Add(task string) {
+    todo := Todo{
+        ID:        tl.nextID,
+        Task:      task,
+        Completed: false,
+    }
+    tl.Todos = append(tl.Todos, todo)
+    tl.nextID++
+    fmt.Printf("Added: %s (ID: %d)\n", task, todo.ID)
+}
+
+func (tl *TodoList) Complete(id int) error {
+    for i := range tl.Todos {
+        if tl.Todos[i].ID == id {
+            tl.Todos[i].Completed = true
+            fmt.Printf("Completed: %s\n", tl.Todos[i].Task)
+            return nil
+        }
+    }
+    return fmt.Errorf("todo with ID %d not found", id)
+}
+
+func (tl *TodoList) List() {
+    if len(tl.Todos) == 0 {
+        fmt.Println("No todos yet!")
+        return
+    }
+    
+    fmt.Println("\nTodo List:")
+    fmt.Println("----------")
+    for _, todo := range tl.Todos {
+        status := " "
+        if todo.Completed {
+            status = "✓"
+        }
+        fmt.Printf("[%s] %d. %s\n", status, todo.ID, todo.Task)
+    }
+}
+
+func (tl *TodoList) Save(filename string) error {
+    data, err := json.MarshalIndent(tl, "", "  ")
+    if err != nil {
+        return err
+    }
+    return os.WriteFile(filename, data, 0644)
+}
+
+func (tl *TodoList) Load(filename string) error {
+    data, err := os.ReadFile(filename)
+    if err != nil {
+        return err
+    }
+    return json.Unmarshal(data, tl)
+}
+
+func main() {
+    todoList := NewTodoList()
+    
+    // Try to load existing todos
+    if err := todoList.Load("todos.json"); err == nil {
+        fmt.Println("Loaded existing todos")
+    }
+    
+    reader := bufio.NewReader(os.Stdin)
+    
+    for {
+        fmt.Println("\nCommands: add, list, complete, save, quit")
+        fmt.Print("Enter command: ")
+        
+        input, _ := reader.ReadString('\n')
+        input = strings.TrimSpace(input)
+        parts := strings.SplitN(input, " ", 2)
+        command := parts[0]
+        
+        switch command {
+        case "add":
+            if len(parts) < 2 {
+                fmt.Println("Usage: add <task>")
+                continue
+            }
+            todoList.Add(parts[1])
+            
+        case "list":
+            todoList.List()
+            
+        case "complete":
+            if len(parts) < 2 {
+                fmt.Println("Usage: complete <id>")
+                continue
+            }
+            id, err := strconv.Atoi(parts[1])
+            if err != nil {
+                fmt.Println("Invalid ID")
+                continue
+            }
+            if err := todoList.Complete(id); err != nil {
+                fmt.Println("Error:", err)
+            }
+            
+        case "save":
+            if err := todoList.Save("todos.json"); err != nil {
+                fmt.Println("Error saving:", err)
+            } else {
+                fmt.Println("Saved to todos.json")
+            }
+            
+        case "quit":
+            fmt.Println("Goodbye!")
+            return
+            
+        default:
+            fmt.Println("Unknown command")
+        }
+    }
+}
+```
+
+This application demonstrates:
+- Structs and methods
+- Slices and iteration
+- Error handling
+- File I/O
+- JSON encoding/decoding
+- User input
+- String manipulation
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Effective Go"
+    icon="lightbulb"
+    href="/language/effective-go"
+  >
+    Learn Go idioms and best practices from the official guide
+  </Card>
+  <Card
+    title="Standard Library"
+    icon="box"
+    href="/stdlib/overview"
+  >
+    Explore the comprehensive standard library
+  </Card>
+  <Card
+    title="Testing"
+    icon="flask"
+    href="/stdlib/testing"
+    >
+    Learn how to write tests and benchmarks
+  </Card>
+  <Card
+    title="Web Development"
+    icon="globe"
+    href="/stdlib/net-http"
+  >
+    Build web applications with net/http
+  </Card>
+</CardGroup>
+
+## Additional Resources
+
+- **Go by Example**: [gobyexample.com](https://gobyexample.com)
+- **A Tour of Go**: Interactive tutorial at [go.dev/tour](https://go.dev/tour)
+- **Go Documentation**: [go.dev/doc](https://go.dev/doc)
+- **Go Playground**: Try Go in your browser at [go.dev/play](https://go.dev/play)
+
+<Check>
+You now have a solid foundation in Go! Practice by building small projects and reading the standard library source code.
+</Check>

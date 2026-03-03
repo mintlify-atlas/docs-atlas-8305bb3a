@@ -1,0 +1,725 @@
+---
+title: 'Testing with go test'
+description: 'Automated testing of Go packages with go test'
+---
+
+The `go test` command automates testing the packages named by import paths. It compiles test files, runs test functions, and reports results.
+
+## Overview
+
+Testing is a first-class citizen in Go. The `go test` command provides built-in support for unit tests, benchmarks, examples, and fuzz tests.
+
+## Basic Usage
+
+```bash
+go test [build/test flags] [packages] [build/test flags & test binary flags]
+```
+
+<CodeGroup>
+```bash Current Package
+# Test current package
+go test
+
+# Test with verbose output
+go test -v
+
+# Test current package (explicit)
+go test .
+```
+
+```bash Multiple Packages
+# Test all packages recursively
+go test ./...
+
+# Test specific package
+go test example.com/myapp/pkg
+
+# Test multiple packages
+go test ./pkg/... ./cmd/...
+```
+</CodeGroup>
+
+## Test Files
+
+### Test File Naming
+
+Test files must:
+- End with `_test.go`
+- Be in the same package directory
+- Not start with `_` or `.`
+
+<CodeGroup>
+```go Internal Tests (same package)
+// mypackage_test.go
+package mypackage
+
+import "testing"
+
+func TestInternal(t *testing.T) {
+    // Can access unexported functions
+    result := internalFunc()
+    if result != expected {
+        t.Errorf("got %v, want %v", result, expected)
+    }
+}
+```
+
+```go External Tests (separate package)
+// mypackage_test.go
+package mypackage_test
+
+import (
+    "testing"
+    "example.com/mypackage"
+)
+
+func TestExternal(t *testing.T) {
+    // Only access exported functions
+    result := mypackage.PublicFunc()
+    if result != expected {
+        t.Errorf("got %v, want %v", result, expected)
+    }
+}
+```
+</CodeGroup>
+
+## Test Modes
+
+### Local Directory Mode
+
+Invoked without package arguments:
+
+```bash
+go test
+go test -v
+```
+
+- Compiles package in current directory
+- Runs test binary immediately
+- **Caching is disabled**
+- Prints summary after completion
+
+### Package List Mode
+
+Invoked with explicit package arguments:
+
+```bash
+go test ./...
+go test example.com/myapp
+```
+
+- Compiles and tests each listed package
+- **Results are cached**
+- Prints 'ok' for passing tests
+- Shows full output for failures
+
+## Common Test Flags
+
+### Test Selection
+
+<ParamField path="-run" type="regexp">
+  Run only tests matching regexp
+  
+  ```bash
+  # Run specific test
+  go test -run TestMyFunction
+  
+  # Run tests matching pattern
+  go test -run "Test.*Integration"
+  
+  # Run subtests
+  go test -run TestMyFunc/subtest_name
+  ```
+</ParamField>
+
+<ParamField path="-skip" type="regexp">
+  Skip tests matching regexp
+  
+  ```bash
+  go test -skip "TestSlow|TestExternal"
+  ```
+</ParamField>
+
+### Output Control
+
+<ParamField path="-v" type="flag">
+  Verbose output - print all test names and results
+  
+  ```bash
+  go test -v
+  ```
+</ParamField>
+
+<ParamField path="-json" type="flag">
+  Output test results as JSON
+  
+  ```bash
+  go test -json
+  go test -json | tee test-results.json
+  ```
+</ParamField>
+
+### Test Execution
+
+<ParamField path="-count" type="n">
+  Run each test n times (default: 1)
+  
+  ```bash
+  # Disable test caching
+  go test -count=1
+  
+  # Run tests multiple times
+  go test -count=10
+  ```
+</ParamField>
+
+<ParamField path="-parallel" type="n">
+  Maximum number of tests to run in parallel (default: GOMAXPROCS)
+  
+  ```bash
+  go test -parallel 4
+  ```
+</ParamField>
+
+<ParamField path="-timeout" type="duration">
+  Timeout for entire test execution (default: 10m)
+  
+  ```bash
+  go test -timeout 30s
+  go test -timeout 5m
+  ```
+</ParamField>
+
+<ParamField path="-short" type="flag">
+  Run in short mode - skip long-running tests
+  
+  ```bash
+  go test -short
+  ```
+  
+  In test code:
+  ```go
+  if testing.Short() {
+      t.Skip("skipping test in short mode")
+  }
+  ```
+</ParamField>
+
+<ParamField path="-failfast" type="flag">
+  Stop after first test failure
+  
+  ```bash
+  go test -failfast
+  ```
+</ParamField>
+
+## Coverage Flags
+
+<ParamField path="-cover" type="flag">
+  Enable coverage analysis
+  
+  ```bash
+  go test -cover
+  ```
+</ParamField>
+
+<ParamField path="-coverprofile" type="file">
+  Write coverage profile to file
+  
+  ```bash
+  go test -coverprofile=coverage.out
+  ```
+</ParamField>
+
+<ParamField path="-covermode" type="set|count|atomic">
+  Set coverage mode
+  
+  - `set`: boolean (was this line executed?)
+  - `count`: count how many times each line executed
+  - `atomic`: like count, but correct for concurrent tests
+  
+  ```bash
+  go test -covermode=count -coverprofile=coverage.out
+  ```
+</ParamField>
+
+## Writing Tests
+
+### Basic Test Function
+
+<Steps>
+  <Step title="Create Test File">
+    Create a file ending in `_test.go`:
+    
+    ```go
+    // math_test.go
+    package math
+    
+    import "testing"
+    ```
+  </Step>
+  
+  <Step title="Write Test Function">
+    Test functions must start with `Test` and take `*testing.T`:
+    
+    ```go
+    func TestAdd(t *testing.T) {
+        result := Add(2, 3)
+        expected := 5
+        
+        if result != expected {
+            t.Errorf("Add(2, 3) = %d; want %d", result, expected)
+        }
+    }
+    ```
+  </Step>
+  
+  <Step title="Run Tests">
+    ```bash
+    go test
+    go test -v
+    ```
+  </Step>
+</Steps>
+
+### Table-Driven Tests
+
+```go
+func TestAdd(t *testing.T) {
+    tests := []struct {
+        name     string
+        a, b     int
+        expected int
+    }{
+        {"positive numbers", 2, 3, 5},
+        {"negative numbers", -2, -3, -5},
+        {"mixed signs", -2, 3, 1},
+        {"zeros", 0, 0, 0},
+    }
+    
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            result := Add(tt.a, tt.b)
+            if result != tt.expected {
+                t.Errorf("Add(%d, %d) = %d; want %d", 
+                    tt.a, tt.b, result, tt.expected)
+            }
+        })
+    }
+}
+```
+
+Run specific subtests:
+
+```bash
+# Run all Add tests
+go test -run TestAdd
+
+# Run specific subtest
+go test -run TestAdd/positive
+```
+
+### Testing Methods
+
+<Accordion title="t.Error / t.Errorf">
+  Report error but continue test:
+  
+  ```go
+  t.Error("something went wrong")
+  t.Errorf("got %v, want %v", result, expected)
+  ```
+</Accordion>
+
+<Accordion title="t.Fatal / t.Fatalf">
+  Report error and stop test immediately:
+  
+  ```go
+  t.Fatal("critical failure")
+  t.Fatalf("setup failed: %v", err)
+  ```
+</Accordion>
+
+<Accordion title="t.Log / t.Logf">
+  Print log output (only shown with -v or on failure):
+  
+  ```go
+  t.Log("debug information")
+  t.Logf("processing item %d", i)
+  ```
+</Accordion>
+
+<Accordion title="t.Skip / t.Skipf">
+  Skip test:
+  
+  ```go
+  if runtime.GOOS == "windows" {
+      t.Skip("skipping on Windows")
+  }
+  ```
+</Accordion>
+
+<Accordion title="t.Cleanup">
+  Register cleanup function:
+  
+  ```go
+  tmpFile, err := os.CreateTemp("", "test")
+  if err != nil {
+      t.Fatal(err)
+  }
+  t.Cleanup(func() {
+      os.Remove(tmpFile.Name())
+  })
+  ```
+</Accordion>
+
+## Benchmarks
+
+### Writing Benchmarks
+
+```go
+func BenchmarkAdd(b *testing.B) {
+    for i := 0; i < b.N; i++ {
+        Add(2, 3)
+    }
+}
+
+func BenchmarkComplexOperation(b *testing.B) {
+    // Setup (not timed)
+    data := setupData()
+    
+    b.ResetTimer() // Reset timer after setup
+    
+    for i := 0; i < b.N; i++ {
+        ComplexOperation(data)
+    }
+}
+```
+
+### Running Benchmarks
+
+<CodeGroup>
+```bash Basic Benchmarks
+# Run all benchmarks
+go test -bench=.
+
+# Run specific benchmark
+go test -bench=BenchmarkAdd
+
+# Run benchmarks matching pattern
+go test -bench="Complex.*"
+```
+
+```bash Benchmark Options
+# Set benchmark time
+go test -bench=. -benchtime=10s
+go test -bench=. -benchtime=1000x
+
+# Set memory allocation stats
+go test -bench=. -benchmem
+
+# Set CPU count for parallel benchmarks
+go test -bench=. -cpu=1,2,4,8
+```
+
+```bash Save Results
+# Save to file
+go test -bench=. | tee bench.txt
+
+# Compare results
+go test -bench=. > new.txt
+benchcmp old.txt new.txt
+```
+</CodeGroup>
+
+## Examples
+
+### Writing Examples
+
+```go
+func ExampleAdd() {
+    result := Add(2, 3)
+    fmt.Println(result)
+    // Output: 5
+}
+
+func ExampleAdd_negative() {
+    result := Add(-2, -3)
+    fmt.Println(result)
+    // Output: -5
+}
+
+func ExamplePerson_String() {
+    p := Person{Name: "Alice", Age: 30}
+    fmt.Println(p)
+    // Output: Alice (30 years old)
+}
+```
+
+Examples serve as both documentation and tests.
+
+## Code Coverage
+
+<Steps>
+  <Step title="Generate Coverage Profile">
+    ```bash
+    go test -coverprofile=coverage.out
+    ```
+  </Step>
+  
+  <Step title="View Coverage Report">
+    ```bash
+    # Text summary
+    go tool cover -func=coverage.out
+    
+    # HTML visualization
+    go tool cover -html=coverage.out
+    ```
+  </Step>
+  
+  <Step title="Coverage for Multiple Packages">
+    ```bash
+    go test -coverprofile=coverage.out ./...
+    go tool cover -html=coverage.out
+    ```
+  </Step>
+</Steps>
+
+### Coverage Options
+
+```bash
+# Specify packages to cover
+go test -coverpkg=./... -coverprofile=coverage.out
+
+# Different coverage modes
+go test -covermode=set -coverprofile=coverage.out
+go test -covermode=count -coverprofile=coverage.out
+go test -covermode=atomic -coverprofile=coverage.out
+```
+
+## Test Caching
+
+Go caches successful test results to avoid unnecessary reruns.
+
+### Cacheable Flags
+
+Tests are cached when using only these flags:
+- `-benchtime`
+- `-cpu`
+- `-coverprofile`
+- `-failfast`
+- `-fullpath`
+- `-list`
+- `-outputdir`
+- `-parallel`
+- `-run`
+- `-short`
+- `-skip`
+- `-timeout`
+- `-v`
+
+### Disabling Cache
+
+<CodeGroup>
+```bash Using -count=1
+# Idiomatic way to disable cache
+go test -count=1
+```
+
+```bash Clear Cache
+# Clear test cache
+go clean -testcache
+
+# Clear all caches
+go clean -cache
+```
+</CodeGroup>
+
+## Advanced Testing
+
+### Setup and Teardown
+
+```go
+func TestMain(m *testing.M) {
+    // Setup before all tests
+    setup()
+    
+    // Run tests
+    code := m.Run()
+    
+    // Teardown after all tests
+    teardown()
+    
+    os.Exit(code)
+}
+```
+
+### Parallel Tests
+
+```go
+func TestParallel(t *testing.T) {
+    t.Parallel() // Mark test as parallelizable
+    
+    // Test code here
+}
+
+func TestParallelSubtests(t *testing.T) {
+    tests := []struct{
+        name string
+        // ...
+    }{
+        // test cases
+    }
+    
+    for _, tt := range tests {
+        tt := tt // Capture range variable
+        t.Run(tt.name, func(t *testing.T) {
+            t.Parallel()
+            // Subtest code
+        })
+    }
+}
+```
+
+### Using testdata Directory
+
+```
+mypackage/
+  ├── myfile.go
+  ├── myfile_test.go
+  └── testdata/
+      ├── input.json
+      └── expected.txt
+```
+
+```go
+func TestWithTestdata(t *testing.T) {
+    data, err := os.ReadFile("testdata/input.json")
+    if err != nil {
+        t.Fatal(err)
+    }
+    // Use data in test
+}
+```
+
+## Test Compilation
+
+### Compile Test Binary
+
+```bash
+# Compile but don't run
+go test -c
+
+# Compile with custom output name
+go test -c -o mytest.test
+
+# Run compiled test binary
+./mytest.test
+./mytest.test -test.v -test.run TestSpecific
+```
+
+### Binary Flags
+
+Compiled test binaries accept `-test.*` flags:
+
+```bash
+./mytest.test -test.v
+./mytest.test -test.run TestMyFunc
+./mytest.test -test.bench=.
+./mytest.test -test.cpuprofile=cpu.prof
+```
+
+## CI/CD Integration
+
+### GitHub Actions
+
+```yaml .github/workflows/test.yml
+name: Test
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      
+      - name: Run tests
+        run: go test -v -race -coverprofile=coverage.out ./...
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.out
+```
+
+### Makefile
+
+```makefile
+.PHONY: test
+test:
+	go test -v -race -coverprofile=coverage.out ./...
+
+.PHONY: test-short
+test-short:
+	go test -short ./...
+
+.PHONY: coverage
+coverage: test
+	go tool cover -html=coverage.out
+
+.PHONY: bench
+bench:
+	go test -bench=. -benchmem ./...
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Tests are cached when they shouldn't be">
+    ```bash
+    # Disable caching
+    go test -count=1
+    
+    # Or clear cache
+    go clean -testcache
+    ```
+  </Accordion>
+  
+  <Accordion title="Tests timeout">
+    ```bash
+    # Increase timeout
+    go test -timeout 30m
+    
+    # Check for infinite loops or deadlocks
+    go test -timeout 10s -v
+    ```
+  </Accordion>
+  
+  <Accordion title="Race detector issues">
+    ```bash
+    # Run with race detector
+    go test -race
+    
+    # May need more memory
+    GORACE="history_size=7" go test -race
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="go Command" href="/tools/go-command">
+    Overview of go command
+  </Card>
+  <Card title="Building" href="/tools/build">
+    Building Go programs
+  </Card>
+  <Card title="Benchmarking" href="/tools/test#benchmarks">
+    Performance testing
+  </Card>
+</CardGroup>

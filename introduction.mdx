@@ -1,0 +1,164 @@
+---
+title: "Welcome to Go"
+description: "Go is an open source programming language that makes it simple to build fast, reliable, and efficient software"
+---
+
+## Build fast, reliable, and efficient software at scale
+
+Go is a statically typed, compiled programming language designed at Google. It combines the performance and security benefits of a compiled language with the ease of programming of a dynamic language.
+
+<CardGroup cols={2}>
+  <Card
+    title="Install Go"
+    icon="download"
+    href="/installation"
+  >
+    Download and install Go on your system
+  </Card>
+  <Card
+    title="Quick Start"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Write your first Go program in minutes
+  </Card>
+  <Card
+    title="Language Specification"
+    icon="book"
+    href="/language/specification"
+  >
+    Complete language reference and syntax
+  </Card>
+  <Card
+    title="Standard Library"
+    icon="box"
+    href="/stdlib/overview"
+  >
+    Explore Go's comprehensive standard library
+  </Card>
+</CardGroup>
+
+## Why Go?
+
+### Fast compilation and execution
+
+Go compiles quickly to machine code yet has the convenience of garbage collection and runtime reflection. Programs compile in seconds and execute with near-C performance.
+
+### Built-in concurrency
+
+Goroutines and channels make it easy to write programs that get the most out of multicore and networked machines. Concurrent programming is part of the language, not an afterthought.
+
+```go
+go func() {
+    // This runs concurrently
+    fmt.Println("Hello from goroutine")
+}()
+```
+
+### Simple and productive
+
+Go's syntax is clean and concise. The language is small enough to fit in your head, with only 25 keywords. Code is easy to read, write, and maintain.
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("hello, world")
+}
+```
+
+### Strong standard library
+
+Go comes with a rich standard library covering:
+- Web servers and HTTP clients
+- JSON/XML encoding and decoding  
+- Cryptography and security
+- File I/O and OS interaction
+- Testing and benchmarking
+
+<Note>
+The standard library is production-ready and maintained by the Go team, so you can build complete applications without external dependencies.
+</Note>
+
+## Key Features
+
+<CardGroup cols={3}>
+  <Card title="Static Typing" icon="shield">
+    Catch errors at compile time with Go's type system
+  </Card>
+  <Card title="Fast Compilation" icon="bolt">
+    Build programs in seconds, not minutes
+  </Card>
+  <Card title="Garbage Collection" icon="broom">
+    Automatic memory management with low latency
+  </Card>
+  <Card title="Cross-Platform" icon="globe">
+    Compile for Linux, macOS, Windows, and more
+  </Card>
+  <Card title="Excellent Tooling" icon="wrench">
+    Built-in formatting, testing, and profiling tools
+  </Card>
+  <Card title="Great Performance" icon="gauge-high">
+    Near-C performance with modern language features
+  </Card>
+</CardGroup>
+
+## What You Can Build with Go
+
+### Cloud and Network Services
+
+Go excels at building scalable network services, APIs, and microservices. Companies like Google, Netflix, and Uber use Go for their infrastructure.
+
+### Command-Line Tools
+
+Go's single binary deployment and cross-compilation make it perfect for CLI tools. Popular tools like Docker, Kubernetes, and Terraform are written in Go.
+
+### Web Applications
+
+The `net/http` package provides a production-ready web server and client. Build RESTful APIs and web applications with minimal dependencies.
+
+### DevOps and Site Reliability
+
+Go's reliability, performance, and deployment simplicity make it ideal for DevOps tools, monitoring systems, and infrastructure automation.
+
+## Get Started
+
+<Steps>
+  <Step title="Install Go">
+    Download and install the latest version of Go for your platform
+    
+    [Go to installation guide →](/installation)
+  </Step>
+  
+  <Step title="Learn the Basics">
+    Follow our quickstart tutorial to write your first program
+    
+    [Start the quickstart →](/quickstart)
+  </Step>
+  
+  <Step title="Dive Deeper">
+    Explore the comprehensive tutorial and language guide
+    
+    [Begin the tutorial →](/tutorial)
+  </Step>
+</Steps>
+
+## Community and Support
+
+Go has a vibrant, welcoming community:
+
+- **Documentation**: Comprehensive docs at [go.dev](https://go.dev)
+- **GitHub**: Source code and issues at [github.com/golang/go](https://github.com/golang/go)
+- **Forum**: Discussion at [Go Forum](https://forum.golangbridge.org)
+- **Slack**: Real-time chat in the [Gophers Slack](https://gophers.slack.com)
+
+<Card
+  title="Ready to start?"
+  icon="play"
+  href="/installation"
+  horizontal
+>
+  Install Go and build your first program
+</Card>

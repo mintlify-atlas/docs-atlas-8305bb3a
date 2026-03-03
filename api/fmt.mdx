@@ -1,0 +1,358 @@
+---
+title: 'fmt'
+description: 'Formatted I/O with functions analogous to C printf and scanf'
+---
+
+## Overview
+
+Package fmt implements formatted I/O with functions analogous to C's printf and scanf. The format 'verbs' are derived from C's but are simpler.
+
+## Printing Functions
+
+There are four families of printing functions:
+- **Print**, **Println**, **Printf** - write to standard output
+- **Sprint**, **Sprintln**, **Sprintf** - return a string
+- **Fprint**, **Fprintln**, **Fprintf** - write to an io.Writer
+- **Append**, **Appendln**, **Appendf** - append to a byte slice
+
+### Printf
+
+Formats according to a format specifier and writes to standard output.
+
+```go
+func Printf(format string, a ...any) (n int, err error)
+```
+
+<ParamField path="format" type="string" required>
+  Format string with verbs like %v, %d, %s, etc.
+</ParamField>
+
+<ParamField path="a" type="...any">
+  Arguments to format according to the format string
+</ParamField>
+
+<ResponseField name="n" type="int">
+  Number of bytes written
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Any write error encountered
+</ResponseField>
+
+**Example:**
+```go
+fmt.Printf("Hello, %s! You are %d years old.\n", "Alice", 30)
+// Output: Hello, Alice! You are 30 years old.
+```
+
+### Sprintf
+
+Formats according to a format specifier and returns the resulting string.
+
+```go
+func Sprintf(format string, a ...any) string
+```
+
+<ParamField path="format" type="string" required>
+  Format string with verbs
+</ParamField>
+
+<ParamField path="a" type="...any">
+  Arguments to format
+</ParamField>
+
+<ResponseField name="result" type="string">
+  The formatted string
+</ResponseField>
+
+**Example:**
+```go
+s := fmt.Sprintf("Score: %d/%d", 85, 100)
+// s = "Score: 85/100"
+```
+
+### Fprintf
+
+Formats according to a format specifier and writes to w.
+
+```go
+func Fprintf(w io.Writer, format string, a ...any) (n int, err error)
+```
+
+<ParamField path="w" type="io.Writer" required>
+  Writer to output formatted text to
+</ParamField>
+
+<ParamField path="format" type="string" required>
+  Format string
+</ParamField>
+
+<ParamField path="a" type="...any">
+  Arguments to format
+</ParamField>
+
+<ResponseField name="n" type="int">
+  Number of bytes written
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Any write error encountered
+</ResponseField>
+
+**Example:**
+```go
+var buf bytes.Buffer
+fmt.Fprintf(&buf, "Value: %v", 42)
+```
+
+### Print
+
+Formats using the default formats and writes to standard output.
+
+```go
+func Print(a ...any) (n int, err error)
+```
+
+<ParamField path="a" type="...any">
+  Values to print
+</ParamField>
+
+<ResponseField name="n" type="int">
+  Number of bytes written
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Any write error encountered
+</ResponseField>
+
+**Example:**
+```go
+fmt.Print("Hello", " ", "World")
+// Output: Hello World
+```
+
+### Println
+
+Formats using default formats, adds spaces between operands and a newline.
+
+```go
+func Println(a ...any) (n int, err error)
+```
+
+**Example:**
+```go
+fmt.Println("Hello", "World")
+// Output: Hello World\n
+```
+
+## Scanning Functions
+
+### Scanf
+
+Scans text read from standard input, storing values into successive arguments.
+
+```go
+func Scanf(format string, a ...any) (n int, err error)
+```
+
+<ParamField path="format" type="string" required>
+  Format string specifying how to parse input
+</ParamField>
+
+<ParamField path="a" type="...any" required>
+  Pointers to variables to store scanned values
+</ParamField>
+
+<ResponseField name="n" type="int">
+  Number of items successfully scanned
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Error if scanning failed
+</ResponseField>
+
+**Example:**
+```go
+var name string
+var age int
+fmt.Scanf("%s %d", &name, &age)
+```
+
+### Scan
+
+Scans space-separated values from standard input.
+
+```go
+func Scan(a ...any) (n int, err error)
+```
+
+**Example:**
+```go
+var x, y int
+fmt.Scan(&x, &y)
+```
+
+### Sscanf
+
+Scans the argument string, storing values into successive arguments.
+
+```go
+func Sscanf(str string, format string, a ...any) (n int, err error)
+```
+
+<ParamField path="str" type="string" required>
+  String to parse
+</ParamField>
+
+<ParamField path="format" type="string" required>
+  Format string
+</ParamField>
+
+<ParamField path="a" type="...any" required>
+  Pointers to store parsed values
+</ParamField>
+
+**Example:**
+```go
+var name string
+var age int
+fmt.Sscanf("Alice 30", "%s %d", &name, &age)
+```
+
+## Format Verbs
+
+### General
+- `%v` - value in default format
+- `%+v` - adds field names for structs
+- `%#v` - Go-syntax representation
+- `%T` - type of the value
+- `%%` - literal percent sign
+
+### Boolean
+- `%t` - the word true or false
+
+### Integer
+- `%b` - base 2
+- `%d` - base 10
+- `%o` - base 8
+- `%x` - base 16, lowercase
+- `%X` - base 16, uppercase
+- `%c` - the character
+- `%q` - quoted character
+
+### Floating-point
+- `%f` - decimal point, no exponent
+- `%e` - scientific notation
+- `%g` - %e for large exponents, %f otherwise
+
+### String
+- `%s` - string or slice
+- `%q` - double-quoted string
+- `%x` - base 16, lowercase
+- `%X` - base 16, uppercase
+
+### Pointer
+- `%p` - base 16 notation with leading 0x
+
+## Interfaces
+
+### Stringer
+
+Implemented by any value that has a String method.
+
+```go
+type Stringer interface {
+    String() string
+}
+```
+
+**Example:**
+```go
+type Person struct {
+    Name string
+    Age  int
+}
+
+func (p Person) String() string {
+    return fmt.Sprintf("%s (%d)", p.Name, p.Age)
+}
+
+p := Person{"Alice", 30}
+fmt.Println(p) // Output: Alice (30)
+```
+
+### Formatter
+
+Implemented by any value that has a Format method for custom formatting.
+
+```go
+type Formatter interface {
+    Format(f State, verb rune)
+}
+```
+
+### State
+
+Represents the printer state passed to custom formatters.
+
+```go
+type State interface {
+    Write(b []byte) (n int, err error)
+    Width() (wid int, ok bool)
+    Precision() (prec int, ok bool)
+    Flag(c int) bool
+}
+```
+
+## Error Formatting
+
+### Errorf
+
+Formats according to a format specifier and returns the string as an error.
+
+```go
+func Errorf(format string, a ...any) error
+```
+
+**Example:**
+```go
+err := fmt.Errorf("user %s not found", username)
+return fmt.Errorf("failed to connect: %w", originalErr) // wraps error
+```
+
+## Complete Example
+
+```go
+package main
+
+import "fmt"
+
+type Point struct {
+    X, Y int
+}
+
+func (p Point) String() string {
+    return fmt.Sprintf("(%d, %d)", p.X, p.Y)
+}
+
+func main() {
+    // Printing
+    fmt.Println("Hello, World!")
+    fmt.Printf("Pi: %.2f\n", 3.14159)
+    
+    // String formatting
+    s := fmt.Sprintf("Value: %d", 42)
+    fmt.Println(s)
+    
+    // Custom Stringer
+    p := Point{10, 20}
+    fmt.Println(p) // Output: (10, 20)
+    
+    // Scanning
+    var name string
+    var age int
+    fmt.Print("Enter name and age: ")
+    fmt.Scan(&name, &age)
+    fmt.Printf("Hello %s, you are %d years old\n", name, age)
+}
+```

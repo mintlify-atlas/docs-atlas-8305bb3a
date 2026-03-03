@@ -1,0 +1,159 @@
+---
+title: Standard Library Overview
+description: Overview of the Go standard library and its core packages
+---
+
+The Go standard library is a comprehensive collection of packages that provide essential functionality for Go programs. The standard library is designed to be simple, efficient, and reliable.
+
+## Design Philosophy
+
+The Go standard library follows these key principles:
+
+- **Simplicity**: APIs are designed to be simple and easy to use
+- **Composition**: Small, focused interfaces that can be combined
+- **Consistency**: Uniform naming and error handling patterns
+- **Performance**: Efficient implementations with minimal overhead
+- **Compatibility**: Strong backward compatibility guarantees
+
+## Core Package Categories
+
+### Built-in Types and Functions
+
+The `builtin` package provides documentation for Go's predeclared identifiers including basic types, constants, and built-in functions like `make`, `append`, `len`, and `cap`.
+
+### Input/Output
+
+- **io**: Basic I/O interfaces and primitives
+- **fmt**: Formatted I/O operations
+- **bufio**: Buffered I/O operations
+
+### Data Structures and Algorithms
+
+- **strings**: String manipulation functions
+- **bytes**: Byte slice operations
+- **sort**: Sorting and searching algorithms
+- **container**: Specialized data structures (heap, list, ring)
+
+### System Interaction
+
+- **os**: Operating system functionality
+- **path/filepath**: File path manipulation
+- **flag**: Command-line flag parsing
+
+### Networking
+
+- **net**: Network I/O including TCP/IP, UDP, DNS
+- **net/http**: HTTP client and server implementations
+- **net/url**: URL parsing
+
+### Data Encoding
+
+- **encoding/json**: JSON encoding and decoding
+- **encoding/xml**: XML encoding and decoding
+- **encoding/csv**: CSV file reading and writing
+
+### Time and Date
+
+- **time**: Time measurement and display
+- **time/tzdata**: Embedded timezone database
+
+### Testing and Debugging
+
+- **testing**: Testing framework
+- **testing/quick**: Quick testing utilities
+- **log**: Logging functionality
+
+## Error Handling
+
+Go uses explicit error values returned from functions. The `error` interface is built into the language:
+
+```go
+type error interface {
+    Error() string
+}
+```
+
+Most functions that can fail return an `error` as their last return value. Always check errors:
+
+```go
+file, err := os.Open("file.txt")
+if err != nil {
+    log.Fatal(err)
+}
+defer file.Close()
+```
+
+## Concurrency
+
+Go's standard library provides excellent support for concurrent programming:
+
+- **Goroutines**: Lightweight threads managed by the Go runtime
+- **Channels**: Type-safe communication between goroutines
+- **sync**: Synchronization primitives (Mutex, WaitGroup, etc.)
+- **context**: Request-scoped values and cancellation
+
+## Common Patterns
+
+### Reader and Writer Interfaces
+
+Many packages use the `io.Reader` and `io.Writer` interfaces for I/O operations:
+
+```go
+type Reader interface {
+    Read(p []byte) (n int, err error)
+}
+
+type Writer interface {
+    Write(p []byte) (n int, err error)
+}
+```
+
+### Context for Cancellation
+
+Use `context.Context` for cancellation and timeouts:
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+defer cancel()
+
+req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+```
+
+### Defer for Cleanup
+
+Use `defer` to ensure cleanup code runs:
+
+```go
+f, err := os.Open(filename)
+if err != nil {
+    return err
+}
+defer f.Close() // Guaranteed to run when function exits
+```
+
+## Package Import Paths
+
+Standard library packages are imported by their package name:
+
+```go
+import (
+    "fmt"
+    "io"
+    "net/http"
+    "encoding/json"
+)
+```
+
+No external dependencies or version management is needed for standard library packages.
+
+## Documentation and Source Code
+
+The standard library is exceptionally well-documented. Every exported function, type, and constant includes documentation comments. You can view documentation:
+
+- Using `go doc` command: `go doc fmt.Printf`
+- At pkg.go.dev: https://pkg.go.dev/std
+- In the source code at: https://go.dev/src/
+
+## Stability and Compatibility
+
+The Go 1 compatibility promise ensures that code using the standard library will continue to compile and run correctly across Go 1.x releases. Breaking changes are extremely rare and only occur for critical security or correctness issues.

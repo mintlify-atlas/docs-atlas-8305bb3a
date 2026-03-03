@@ -1,0 +1,450 @@
+---
+title: Go Memory Model
+description: Understanding Go's memory consistency guarantees and synchronization primitives for concurrent programming
+keywords: ['go', 'memory model', 'concurrency', 'synchronization', 'goroutines', 'happens-before']
+icon: brain
+---
+
+## Introduction
+
+The Go memory model specifies the conditions under which reads of a variable in one goroutine can be guaranteed to observe values produced by writes to the same variable in a different goroutine.
+
+<Note>
+  This document version is from June 6, 2022. For the complete and most up-to-date memory model, see [go.dev/ref/mem](https://go.dev/ref/mem).
+</Note>
+
+## Advice
+
+Programs that modify data being simultaneously accessed by multiple goroutines must serialize such access.
+
+To serialize access, protect the data with channel operations or other synchronization primitives such as those in the [`sync`](https://pkg.go.dev/sync) and [`sync/atomic`](https://pkg.go.dev/sync/atomic) packages.
+
+<Warning>
+  If you must read the rest of this document to understand the behavior of your program, you are being too clever. Don't be clever.
+</Warning>
+
+## Informal Overview
+
+Go approaches its memory model in much the same way as the rest of the language, aiming to keep the semantics simple, understandable, and useful. This section gives a general overview of the approach and should suffice for most programmers.
+
+### Data Races
+
+A **data race** is defined as a write to a memory location happening concurrently with another read or write to that same location, unless all the accesses involved are atomic data accesses as provided by the `sync/atomic` package.
+
+<Info>
+  Programmers are strongly encouraged to use appropriate synchronization to avoid data races. In the absence of data races, Go programs behave as if all the goroutines were multiplexed onto a single processor. This property is sometimes referred to as DRF-SC: data-race-free programs execute in a sequentially consistent manner.
+</Info>
+
+While programmers should write Go programs without data races, there are limitations to what a Go implementation can do in response to a data race:
+
+- An implementation may always react to a data race by reporting the race and terminating the program
+- Each read of a single-word-sized or sub-word-sized memory location must observe a value actually written to that location (perhaps by a concurrent executing goroutine) and not yet overwritten
+
+Go's approach aims to make errant programs more reliable and easier to debug, while still insisting that races are errors and that tools can diagnose and report them.
+
+## Memory Model
+
+The formal definition of Go's memory model closely follows the approach presented by Hans-J. Boehm and Sarita V. Adve in "Foundations of the C++ Concurrency Memory Model".
+
+### Memory Operations
+
+A **memory operation** is modeled by four details:
+
+1. Its kind, indicating whether it is an ordinary data read, an ordinary data write, or a synchronizing operation such as an atomic data access, a mutex operation, or a channel operation
+2. Its location in the program
+3. The memory location or variable being accessed
+4. The values read or written by the operation
+
+<Info>
+  Some memory operations are **read-like** (read, atomic read, mutex lock, channel receive). Others are **write-like** (write, atomic write, mutex unlock, channel send, channel close). Some operations, such as atomic compare-and-swap, are both read-like and write-like.
+</Info>
+
+### Happens Before
+
+The **happens before** relation is defined as the transitive closure of the union of the sequenced before and synchronized before relations.
+
+For an ordinary (non-synchronizing) data read `r` on a memory location `x`, `W(r)` must be a write `w` that is **visible** to `r`, where visible means that both of the following hold:
+
+1. `w` happens before `r`
+2. `w` does not happen before any other write `w'` (to `x`) that happens before `r`
+
+### Data Races Defined
+
+A **read-write data race** on memory location `x` consists of:
+- A read-like memory operation `r` on `x`
+- A write-like memory operation `w` on `x`
+- At least one of which is non-synchronizing
+- Which are unordered by happens before
+
+A **write-write data race** on memory location `x` consists of:
+- Two write-like memory operations `w` and `w'` on `x`
+- At least one of which is non-synchronizing
+- Which are unordered by happens before
+
+<Tip>
+  If there are no read-write or write-write data races on memory location `x`, then any read `r` on `x` has only one possible write: the single write that immediately precedes it in the happens before order.
+</Tip>
+
+## Implementation Restrictions for Programs Containing Data Races
+
+Any implementation can, upon detecting a data race, report the race and halt execution of the program. Implementations using ThreadSanitizer (accessed with `go build -race`) do exactly this.
+
+A read of an array, struct, or complex number may be implemented as a read of each individual sub-value (array element, struct field, or real/imaginary component), in any order. Similarly, a write may be implemented as a write of each individual sub-value, in any order.
+
+<Warning>
+  Reads of memory locations larger than a single machine word can lead to inconsistent values in the presence of races. When the values depend on the consistency of internal (pointer, length) or (pointer, type) pairs, such races can lead to arbitrary memory corruption. This affects interface values, maps, slices, and strings in most Go implementations.
+</Warning>
+
+## Synchronization
+
+### Initialization
+
+Program initialization runs in a single goroutine, but that goroutine may create other goroutines, which run concurrently.
+
+<Info>
+  If a package `p` imports package `q`, the completion of `q`'s `init` functions happens before the start of any of `p`'s.
+</Info>
+
+The completion of all `init` functions is synchronized before the start of the function `main.main`.
+
+### Goroutine Creation
+
+<Note>
+  The `go` statement that starts a new goroutine is synchronized before the start of the goroutine's execution.
+</Note>
+
+For example, in this program:
+
+```go
+var a string
+
+func f() {
+    print(a)
+}
+
+func hello() {
+    a = "hello, world"
+    go f()
+}
+```
+
+Calling `hello` will print `"hello, world"` at some point in the future (perhaps after `hello` has returned).
+
+### Goroutine Destruction
+
+<Warning>
+  The exit of a goroutine is not guaranteed to be synchronized before any event in the program.
+</Warning>
+
+For example, in this program:
+
+```go
+var a string
+
+func hello() {
+    go func() { a = "hello" }()
+    print(a)
+}
+```
+
+The assignment to `a` is not followed by any synchronization event, so it is not guaranteed to be observed by any other goroutine. In fact, an aggressive compiler might delete the entire `go` statement.
+
+<Tip>
+  If the effects of a goroutine must be observed by another goroutine, use a synchronization mechanism such as a lock or channel communication to establish a relative ordering.
+</Tip>
+
+### Channel Communication
+
+Channel communication is the main method of synchronization between goroutines. Each send on a particular channel is matched to a corresponding receive from that channel, usually in a different goroutine.
+
+#### Rule 1: Send Before Receive
+
+<Note>
+  A send on a channel is synchronized before the completion of the corresponding receive from that channel.
+</Note>
+
+This program:
+
+```go
+var c = make(chan int, 10)
+var a string
+
+func f() {
+    a = "hello, world"
+    c <- 0
+}
+
+func main() {
+    go f()
+    <-c
+    print(a)
+}
+```
+
+This is guaranteed to print `"hello, world"`. The write to `a` is sequenced before the send on `c`, which is synchronized before the corresponding receive on `c` completes, which is sequenced before the `print`.
+
+#### Rule 2: Channel Close
+
+<Note>
+  The closing of a channel is synchronized before a receive that returns a zero value because the channel is closed.
+</Note>
+
+In the previous example, replacing `c <- 0` with `close(c)` yields a program with the same guaranteed behavior.
+
+#### Rule 3: Unbuffered Channels
+
+<Note>
+  A receive from an unbuffered channel is synchronized before the completion of the corresponding send on that channel.
+</Note>
+
+This program:
+
+```go
+var c = make(chan int)
+var a string
+
+func f() {
+    a = "hello, world"
+    <-c
+}
+
+func main() {
+    go f()
+    c <- 0
+    print(a)
+}
+```
+
+This is also guaranteed to print `"hello, world"`. The write to `a` is sequenced before the receive on `c`, which is synchronized before the corresponding send on `c` completes, which is sequenced before the `print`.
+
+<Warning>
+  If the channel were buffered (e.g., `c = make(chan int, 1)`), the program would not be guaranteed to print `"hello, world"` (it might print the empty string, crash, or do something else).
+</Warning>
+
+### Locks
+
+The `sync` package implements two lock data types: `sync.Mutex` and `sync.RWMutex`.
+
+<Note>
+  For any `sync.Mutex` or `sync.RWMutex` variable `l` and `n < m`, call `n` of `l.Unlock()` is synchronized before call `m` of `l.Lock()` returns.
+</Note>
+
+This program:
+
+```go
+var l sync.Mutex
+var a string
+
+func f() {
+    a = "hello, world"
+    l.Unlock()
+}
+
+func main() {
+    l.Lock()
+    go f()
+    l.Lock()
+    print(a)
+}
+```
+
+This is guaranteed to print `"hello, world"`. The first call to `l.Unlock()` (in `f`) is synchronized before the second call to `l.Lock()` (in `main`) returns, which is sequenced before the `print`.
+
+### Once
+
+The `sync` package provides a safe mechanism for initialization in the presence of multiple goroutines through the use of the `Once` type.
+
+<Note>
+  A single call of `f()` from `once.Do(f)` is synchronized before the return of any call of `once.Do(f)`.
+</Note>
+
+In this program:
+
+```go
+var a string
+var once sync.Once
+
+func setup() {
+    a = "hello, world"
+}
+
+func doprint() {
+    once.Do(setup)
+    print(a)
+}
+
+func twoprint() {
+    go doprint()
+    go doprint()
+}
+```
+
+Calling `twoprint` will call `setup` exactly once. The `setup` function will complete before either call of `print`. The result will be that `"hello, world"` will be printed twice.
+
+### Atomic Values
+
+The APIs in the `sync/atomic` package are collectively "atomic operations" that can be used to synchronize the execution of different goroutines.
+
+<Info>
+  If the effect of an atomic operation `A` is observed by atomic operation `B`, then `A` is synchronized before `B`. All the atomic operations executed in a program behave as though executed in some sequentially consistent order.
+</Info>
+
+## Incorrect Synchronization
+
+Programs with races can exhibit non-sequentially consistent executions. Be particularly careful with read-write races involving larger values.
+
+### Example: Double-Checked Locking
+
+This code is broken:
+
+```go
+var a string
+var done bool
+
+func setup() {
+    a = "hello, world"
+    done = true
+}
+
+func main() {
+    go setup()
+    for !done {
+    }
+    print(a)
+}
+```
+
+<Danger>
+  This program is not guaranteed to print `"hello, world"`. It might print an empty string or never terminate. Use proper synchronization instead.
+</Danger>
+
+### Example: Incorrect Lazy Initialization
+
+Another incorrect idiom is busy waiting for a value:
+
+```go
+var a string
+var done bool
+
+func setup() {
+    a = "hello, world"
+    done = true
+}
+
+func doprint() {
+    if !done {
+        once.Do(setup)
+    }
+    print(a)
+}
+```
+
+<Warning>
+  Without proper synchronization, there's no guarantee that observing `done` implies observing the write to `a`. Use `sync.Once` properly or explicit synchronization.
+</Warning>
+
+## Correct Synchronization Patterns
+
+<Tabs>
+  <Tab title="Channels">
+    ```go
+    // Using channels for synchronization
+    c := make(chan bool)
+    var a string
+
+    go func() {
+        a = "hello, world"
+        c <- true
+    }()
+
+    <-c
+    print(a)  // guaranteed to print "hello, world"
+    ```
+  </Tab>
+  <Tab title="Mutex">
+    ```go
+    // Using mutex for synchronization
+    var mu sync.Mutex
+    var a string
+
+    go func() {
+        mu.Lock()
+        a = "hello, world"
+        mu.Unlock()
+    }()
+
+    mu.Lock()
+    print(a)
+    mu.Unlock()
+    ```
+  </Tab>
+  <Tab title="sync.Once">
+    ```go
+    // Using sync.Once for initialization
+    var once sync.Once
+    var a string
+
+    setup := func() {
+        a = "hello, world"
+    }
+
+    func doprint() {
+        once.Do(setup)
+        print(a)  // guaranteed to see initialized value
+    }
+    ```
+  </Tab>
+  <Tab title="Atomic">
+    ```go
+    // Using atomic operations
+    var a string
+    var done atomic.Bool
+
+    go func() {
+        a = "hello, world"
+        done.Store(true)
+    }()
+
+    for !done.Load() {
+    }
+    print(a)
+    ```
+  </Tab>
+</Tabs>
+
+## Key Takeaways
+
+<CardGroup cols={2}>
+  <Card title="Avoid data races" icon="shield">
+    Use proper synchronization primitives to protect shared data.
+  </Card>
+  <Card title="Use channels" icon="pipe">
+    Prefer channels for communication between goroutines.
+  </Card>
+  <Card title="Understand happens-before" icon="arrow-right">
+    Know the synchronization guarantees provided by Go.
+  </Card>
+  <Card title="Use sync package" icon="lock">
+    Leverage sync.Mutex, sync.RWMutex, and sync.Once appropriately.
+  </Card>
+  <Card title="Test with -race" icon="bug">
+    Use the race detector during development and testing.
+  </Card>
+  <Card title="Keep it simple" icon="lightbulb">
+    If you need to understand the memory model deeply, you're being too clever.
+  </Card>
+</CardGroup>
+
+## Related Resources
+
+<CardGroup cols={3}>
+  <Card title="Language Specification" href="/language/specification" icon="file-code">
+    Complete Go language reference
+  </Card>
+  <Card title="Effective Go" href="/language/effective-go" icon="book">
+    Best practices for concurrent programming
+  </Card>
+  <Card title="GODEBUG" href="/language/godebug" icon="bug">
+    Runtime debugging and compatibility settings
+  </Card>
+</CardGroup>

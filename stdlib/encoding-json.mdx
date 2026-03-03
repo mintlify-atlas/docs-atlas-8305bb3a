@@ -1,0 +1,507 @@
+---
+title: encoding/json
+description: JSON encoding and decoding
+---
+
+Package json implements encoding and decoding of JSON as defined in RFC 7159. The mapping between JSON and Go values is described in the documentation for the Marshal and Unmarshal functions.
+
+## Encoding (Marshaling)
+
+<ParamField path="Marshal" type="func Marshal(v any) ([]byte, error)">
+  Returns the JSON encoding of v.
+  
+  ```go
+  type Person struct {
+      Name string `json:"name"`
+      Age  int    `json:"age"`
+  }
+  
+  p := Person{Name: "Alice", Age: 30}
+  jsonData, err := json.Marshal(p)
+  if err != nil {
+      log.Fatal(err)
+  }
+  fmt.Println(string(jsonData))  // {"name":"Alice","age":30}
+  ```
+</ParamField>
+
+<ParamField path="MarshalIndent" type="func MarshalIndent(v any, prefix, indent string) ([]byte, error)">
+  Like Marshal but applies indentation to format the output for human readability.
+  
+  ```go
+  jsonData, err := json.MarshalIndent(p, "", "  ")
+  // {
+  //   "name": "Alice",
+  //   "age": 30
+  // }
+  ```
+</ParamField>
+
+## Decoding (Unmarshaling)
+
+<ParamField path="Unmarshal" type="func Unmarshal(data []byte, v any) error">
+  Parses the JSON-encoded data and stores the result in the value pointed to by v.
+  
+  ```go
+  type Person struct {
+      Name string `json:"name"`
+      Age  int    `json:"age"`
+  }
+  
+  jsonData := []byte(`{"name":"Alice","age":30}`)
+  var p Person
+  err := json.Unmarshal(jsonData, &p)
+  if err != nil {
+      log.Fatal(err)
+  }
+  fmt.Printf("%+v\n", p)  // {Name:Alice Age:30}
+  ```
+</ParamField>
+
+## Struct Tags
+
+Struct fields can be customized using JSON tags:
+
+```go
+type User struct {
+    // Field appears as "username" in JSON
+    Name string `json:"username"`
+    
+    // Field appears as "email" and is omitted if empty
+    Email string `json:"email,omitempty"`
+    
+    // Field is omitted from JSON
+    Password string `json:"-"`
+    
+    // Field appears as "age" and is omitted if zero
+    Age int `json:"age,omitzero"`
+    
+    // Field uses default name (CreatedAt)
+    CreatedAt time.Time
+}
+```
+
+Tag options:
+- `json:"name"` - Use custom field name
+- `json:",omitempty"` - Omit field if empty (false, 0, nil, empty string/slice/map)
+- `json:",omitzero"` - Omit field if zero value
+- `json:"-"` - Never include field
+- `json:"-,"` - Use literal "-" as field name
+
+## Encoder and Decoder
+
+### Encoder
+
+<ParamField path="Encoder" type="type">
+  Writes JSON values to an output stream.
+  
+  ```go
+  type Encoder struct {
+      // contains filtered or unexported fields
+  }
+  ```
+</ParamField>
+
+<ParamField path="NewEncoder" type="func NewEncoder(w io.Writer) *Encoder">
+  Returns a new encoder that writes to w.
+  
+  ```go
+  // Encode to file
+  file, _ := os.Create("output.json")
+  defer file.Close()
+  
+  encoder := json.NewEncoder(file)
+  encoder.Encode(data)
+  
+  // Encode to HTTP response
+  w.Header().Set("Content-Type", "application/json")
+  json.NewEncoder(w).Encode(response)
+  ```
+</ParamField>
+
+<ParamField path="Encoder.Encode" type="func (enc *Encoder) Encode(v any) error">
+  Writes the JSON encoding of v to the stream.
+  
+  ```go
+  encoder := json.NewEncoder(os.Stdout)
+  encoder.Encode(Person{Name: "Bob", Age: 25})
+  ```
+</ParamField>
+
+<ParamField path="Encoder.SetIndent" type="func (enc *Encoder) SetIndent(prefix, indent string)">
+  Sets the indentation for formatted output.
+  
+  ```go
+  encoder := json.NewEncoder(os.Stdout)
+  encoder.SetIndent("", "  ")
+  encoder.Encode(data)
+  ```
+</ParamField>
+
+### Decoder
+
+<ParamField path="Decoder" type="type">
+  Reads and decodes JSON values from an input stream.
+  
+  ```go
+  type Decoder struct {
+      // contains filtered or unexported fields
+  }
+  ```
+</ParamField>
+
+<ParamField path="NewDecoder" type="func NewDecoder(r io.Reader) *Decoder">
+  Returns a new decoder that reads from r.
+  
+  ```go
+  // Decode from file
+  file, _ := os.Open("input.json")
+  defer file.Close()
+  
+  decoder := json.NewDecoder(file)
+  var data MyStruct
+  decoder.Decode(&data)
+  
+  // Decode from HTTP request
+  var user User
+  json.NewDecoder(r.Body).Decode(&user)
+  ```
+</ParamField>
+
+<ParamField path="Decoder.Decode" type="func (dec *Decoder) Decode(v any) error">
+  Reads the next JSON-encoded value from its input and stores it in v.
+  
+  ```go
+  decoder := json.NewDecoder(strings.NewReader(jsonString))
+  var result map[string]interface{}
+  err := decoder.Decode(&result)
+  ```
+</ParamField>
+
+<ParamField path="Decoder.More" type="func (dec *Decoder) More() bool">
+  Reports whether there is another element in the current array or object being parsed.
+  
+  ```go
+  decoder := json.NewDecoder(file)
+  for decoder.More() {
+      var item Item
+      decoder.Decode(&item)
+      // process item
+  }
+  ```
+</ParamField>
+
+## Working with Dynamic JSON
+
+### Using map[string]interface{}
+
+```go
+func parseJSON(jsonStr string) {
+    var result map[string]interface{}
+    json.Unmarshal([]byte(jsonStr), &result)
+    
+    // Access values with type assertion
+    name := result["name"].(string)
+    age := result["age"].(float64)  // JSON numbers are float64
+    
+    fmt.Printf("Name: %s, Age: %.0f\n", name, age)
+}
+```
+
+### Using []interface{}
+
+```go
+func parseArray(jsonStr string) {
+    var items []interface{}
+    json.Unmarshal([]byte(jsonStr), &items)
+    
+    for i, item := range items {
+        fmt.Printf("Item %d: %v\n", i, item)
+    }
+}
+```
+
+## RawMessage
+
+<ParamField path="RawMessage" type="type">
+  A raw encoded JSON value. It can be used to delay JSON decoding or precompute a JSON encoding.
+  
+  ```go
+  type RawMessage []byte
+  ```
+  
+  Usage for delayed decoding:
+  ```go
+  type Response struct {
+      Type string          `json:"type"`
+      Data json.RawMessage `json:"data"`
+  }
+  
+  var resp Response
+  json.Unmarshal(jsonData, &resp)
+  
+  // Decode Data based on Type
+  switch resp.Type {
+  case "user":
+      var user User
+      json.Unmarshal(resp.Data, &user)
+  case "product":
+      var product Product
+      json.Unmarshal(resp.Data, &product)
+  }
+  ```
+</ParamField>
+
+## Custom Marshaling
+
+<ParamField path="Marshaler" type="interface">
+  Interface implemented by types that can marshal themselves into valid JSON.
+  
+  ```go
+  type Marshaler interface {
+      MarshalJSON() ([]byte, error)
+  }
+  ```
+  
+  Example:
+  ```go
+  type Timestamp time.Time
+  
+  func (t Timestamp) MarshalJSON() ([]byte, error) {
+      stamp := fmt.Sprintf("\"%s\"", time.Time(t).Format("2006-01-02"))
+      return []byte(stamp), nil
+  }
+  ```
+</ParamField>
+
+<ParamField path="Unmarshaler" type="interface">
+  Interface implemented by types that can unmarshal a JSON description of themselves.
+  
+  ```go
+  type Unmarshaler interface {
+      UnmarshalJSON([]byte) error
+  }
+  ```
+  
+  Example:
+  ```go
+  func (t *Timestamp) UnmarshalJSON(b []byte) error {
+      s := strings.Trim(string(b), "\"")
+      parsed, err := time.Parse("2006-01-02", s)
+      if err != nil {
+          return err
+      }
+      *t = Timestamp(parsed)
+      return nil
+  }
+  ```
+</ParamField>
+
+## Error Types
+
+<ParamField path="SyntaxError" type="type">
+  Represents a JSON syntax error.
+  
+  ```go
+  var syntaxErr *json.SyntaxError
+  if errors.As(err, &syntaxErr) {
+      fmt.Printf("Syntax error at byte offset %d\n", syntaxErr.Offset)
+  }
+  ```
+</ParamField>
+
+<ParamField path="UnmarshalTypeError" type="type">
+  Describes a JSON value that was not appropriate for a value of a specific Go type.
+</ParamField>
+
+## Examples
+
+### Basic Marshal/Unmarshal
+
+```go
+package main
+
+import (
+    "encoding/json"
+    "fmt"
+    "log"
+)
+
+type Person struct {
+    Name    string   `json:"name"`
+    Age     int      `json:"age"`
+    Email   string   `json:"email,omitempty"`
+    Hobbies []string `json:"hobbies"`
+}
+
+func main() {
+    // Marshal
+    person := Person{
+        Name:    "Alice",
+        Age:     30,
+        Hobbies: []string{"reading", "hiking"},
+    }
+    
+    jsonData, err := json.MarshalIndent(person, "", "  ")
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Println(string(jsonData))
+    
+    // Unmarshal
+    jsonStr := `{"name":"Bob","age":25,"email":"bob@example.com"}`
+    var p Person
+    err = json.Unmarshal([]byte(jsonStr), &p)
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Printf("%+v\n", p)
+}
+```
+
+### Working with Files
+
+```go
+package main
+
+import (
+    "encoding/json"
+    "log"
+    "os"
+)
+
+type Config struct {
+    Host string `json:"host"`
+    Port int    `json:"port"`
+}
+
+func saveConfig(filename string, config Config) error {
+    file, err := os.Create(filename)
+    if err != nil {
+        return err
+    }
+    defer file.Close()
+    
+    encoder := json.NewEncoder(file)
+    encoder.SetIndent("", "  ")
+    return encoder.Encode(config)
+}
+
+func loadConfig(filename string) (*Config, error) {
+    file, err := os.Open(filename)
+    if err != nil {
+        return nil, err
+    }
+    defer file.Close()
+    
+    var config Config
+    decoder := json.NewDecoder(file)
+    err = decoder.Decode(&config)
+    return &config, err
+}
+
+func main() {
+    config := Config{Host: "localhost", Port: 8080}
+    saveConfig("config.json", config)
+    
+    loaded, err := loadConfig("config.json")
+    if err != nil {
+        log.Fatal(err)
+    }
+    log.Printf("Config: %+v\n", loaded)
+}
+```
+
+### Dynamic JSON
+
+```go
+package main
+
+import (
+    "encoding/json"
+    "fmt"
+)
+
+func main() {
+    jsonStr := `{
+        "name": "Alice",
+        "age": 30,
+        "address": {
+            "city": "New York",
+            "zip": "10001"
+        },
+        "scores": [95, 87, 92]
+    }`
+    
+    var result map[string]interface{}
+    json.Unmarshal([]byte(jsonStr), &result)
+    
+    // Access nested values
+    name := result["name"].(string)
+    age := result["age"].(float64)
+    address := result["address"].(map[string]interface{})
+    city := address["city"].(string)
+    scores := result["scores"].([]interface{})
+    
+    fmt.Printf("Name: %s, Age: %.0f\n", name, age)
+    fmt.Printf("City: %s\n", city)
+    fmt.Printf("Scores: %v\n", scores)
+}
+```
+
+### HTTP JSON API
+
+```go
+package main
+
+import (
+    "encoding/json"
+    "log"
+    "net/http"
+)
+
+type User struct {
+    ID    int    `json:"id"`
+    Name  string `json:"name"`
+    Email string `json:"email"`
+}
+
+type ErrorResponse struct {
+    Error string `json:"error"`
+}
+
+func handleGetUser(w http.ResponseWriter, r *http.Request) {
+    user := User{
+        ID:    1,
+        Name:  "Alice",
+        Email: "alice@example.com",
+    }
+    
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(user)
+}
+
+func handleCreateUser(w http.ResponseWriter, r *http.Request) {
+    var user User
+    
+    if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusBadRequest)
+        json.NewEncoder(w).Encode(ErrorResponse{Error: err.Error()})
+        return
+    }
+    
+    // Process user...
+    user.ID = 123
+    
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusCreated)
+    json.NewEncoder(w).Encode(user)
+}
+
+func main() {
+    http.HandleFunc("/user", handleGetUser)
+    http.HandleFunc("/users", handleCreateUser)
+    log.Fatal(http.ListenAndServe(":8080", nil))
+}
+```

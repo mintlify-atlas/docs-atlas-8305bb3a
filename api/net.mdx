@@ -1,0 +1,284 @@
+---
+title: "net"
+description: "Package net provides a portable interface for network I/O, including TCP/IP, UDP, domain name resolution, and Unix domain sockets."
+---
+
+## Overview
+
+Package net provides a portable interface for network I/O, including TCP/IP, UDP, domain name resolution, and Unix domain sockets.
+
+Although the package provides access to low-level networking primitives, most clients will need only the basic interface provided by the Dial, Listen, and Accept functions and the associated Conn and Listener interfaces.
+
+## Key Functions
+
+### Dial
+
+Connects to a server.
+
+```go
+conn, err := net.Dial("tcp", "golang.org:80")
+if err != nil {
+    // handle error
+}
+fmt.Fprintf(conn, "GET / HTTP/1.0\r\n\r\n")
+status, err := bufio.NewReader(conn).ReadString('\n')
+```
+
+<ParamField path="network" type="string" required>
+  The network type: "tcp", "tcp4" (IPv4-only), "tcp6" (IPv6-only), "udp", "udp4", "udp6", "ip", "ip4", "ip6", "unix", "unixgram", "unixpacket"
+</ParamField>
+
+<ParamField path="address" type="string" required>
+  The address to dial. For TCP and UDP networks, addresses have the form `host:port`. If host is a literal IPv6 address it must be enclosed in square brackets as in `[::1]:80`
+</ParamField>
+
+<ResponseField name="conn" type="Conn">
+  A generic stream-oriented network connection
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Error if connection failed
+</ResponseField>
+
+### Listen
+
+Creates a network listener on a local network address.
+
+```go
+ln, err := net.Listen("tcp", ":8080")
+if err != nil {
+    // handle error
+}
+for {
+    conn, err := ln.Accept()
+    if err != nil {
+        // handle error
+    }
+    go handleConnection(conn)
+}
+```
+
+<ParamField path="network" type="string" required>
+  The network type: "tcp", "tcp4", "tcp6", "unix", "unixpacket"
+</ParamField>
+
+<ParamField path="address" type="string" required>
+  The local address to listen on. For TCP networks, if the host is empty or a literal unspecified IP address, Listen listens on all available unicast and anycast IP addresses
+</ParamField>
+
+<ResponseField name="listener" type="Listener">
+  A network listener for stream-oriented protocols
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Error if listener creation failed
+</ResponseField>
+
+## Core Interfaces
+
+### Conn
+
+Conn is a generic stream-oriented network connection. Multiple goroutines may invoke methods on a Conn simultaneously.
+
+```go
+type Conn interface {
+    Read(b []byte) (n int, err error)
+    Write(b []byte) (n int, err error)
+    Close() error
+    LocalAddr() Addr
+    RemoteAddr() Addr
+    SetDeadline(t time.Time) error
+    SetReadDeadline(t time.Time) error
+    SetWriteDeadline(t time.Time) error
+}
+```
+
+#### Methods
+
+<ParamField path="Read" type="func([]byte) (int, error)">
+  Reads data from the connection. Can be made to time out and return an error after a fixed time limit
+</ParamField>
+
+<ParamField path="Write" type="func([]byte) (int, error)">
+  Writes data to the connection. Can be made to time out and return an error after a fixed time limit
+</ParamField>
+
+<ParamField path="Close" type="func() error">
+  Closes the connection. Any blocked Read or Write operations will be unblocked and return errors
+</ParamField>
+
+<ParamField path="SetDeadline" type="func(time.Time) error">
+  Sets the read and write deadlines. A zero value for t means I/O operations will not time out
+</ParamField>
+
+### Addr
+
+Addr represents a network end point address.
+
+```go
+type Addr interface {
+    Network() string // name of the network ("tcp", "udp")
+    String() string  // string form of address ("192.0.2.1:25")
+}
+```
+
+### Listener
+
+Listener is a generic network listener for stream-oriented protocols.
+
+```go
+type Listener interface {
+    Accept() (Conn, error)
+    Close() error
+    Addr() Addr
+}
+```
+
+<ParamField path="Accept" type="func() (Conn, error)">
+  Waits for and returns the next connection to the listener
+</ParamField>
+
+## Types
+
+### TCPAddr
+
+TCPAddr represents the address of a TCP end point.
+
+```go
+type TCPAddr struct {
+    IP   IP
+    Port int
+    Zone string // IPv6 scoped addressing zone
+}
+```
+
+<ParamField path="IP" type="IP">
+  The IP address
+</ParamField>
+
+<ParamField path="Port" type="int">
+  The port number
+</ParamField>
+
+<ParamField path="Zone" type="string">
+  IPv6 scoped addressing zone
+</ParamField>
+
+### TCPConn
+
+TCPConn is an implementation of the Conn interface for TCP network connections.
+
+```go
+// Set keep-alive period
+conn.SetKeepAlive(true)
+conn.SetKeepAlivePeriod(30 * time.Second)
+```
+
+## Name Resolution
+
+### LookupHost
+
+Looks up the given host using the local resolver.
+
+```go
+addrs, err := net.LookupHost("golang.org")
+if err != nil {
+    // handle error
+}
+for _, addr := range addrs {
+    fmt.Println(addr)
+}
+```
+
+<ParamField path="host" type="string" required>
+  The hostname to look up
+</ParamField>
+
+<ResponseField name="addrs" type="[]string">
+  A slice of the host's addresses
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Error if lookup failed
+</ResponseField>
+
+## Error Handling
+
+The net package returns errors that can be tested for specific conditions:
+
+```go
+if err, ok := err.(net.Error); ok && err.Timeout() {
+    // handle timeout
+}
+
+if err, ok := err.(net.Error); ok && err.Temporary() {
+    // retry the operation
+}
+```
+
+## Examples
+
+### TCP Server
+
+```go
+package main
+
+import (
+    "bufio"
+    "fmt"
+    "net"
+)
+
+func main() {
+    ln, err := net.Listen("tcp", ":8080")
+    if err != nil {
+        panic(err)
+    }
+    defer ln.Close()
+    
+    for {
+        conn, err := ln.Accept()
+        if err != nil {
+            continue
+        }
+        go handleConnection(conn)
+    }
+}
+
+func handleConnection(conn net.Conn) {
+    defer conn.Close()
+    scanner := bufio.NewScanner(conn)
+    for scanner.Scan() {
+        fmt.Fprintln(conn, "Echo:", scanner.Text())
+    }
+}
+```
+
+### TCP Client
+
+```go
+package main
+
+import (
+    "fmt"
+    "io"
+    "net"
+)
+
+func main() {
+    conn, err := net.Dial("tcp", "example.com:80")
+    if err != nil {
+        panic(err)
+    }
+    defer conn.Close()
+    
+    fmt.Fprintf(conn, "GET / HTTP/1.0\r\n\r\n")
+    io.Copy(os.Stdout, conn)
+}
+```
+
+## See Also
+
+- [net/http](/api/net-http) - HTTP client and server implementations
+- [net/url](/api/net-url) - URL parsing
+- [net/rpc](/api/net-rpc) - Remote procedure call support

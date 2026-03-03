@@ -1,0 +1,603 @@
+---
+title: 'os'
+description: 'Platform-independent interface to operating system functionality'
+---
+
+## Overview
+
+Package os provides a platform-independent interface to operating system functionality. The design is Unix-like, although the error handling is Go-like; failing calls return values of type error rather than error numbers.
+
+## File Operations
+
+### Open
+
+Opens the named file for reading.
+
+```go
+func Open(name string) (*File, error)
+```
+
+<ParamField path="name" type="string" required>
+  Path to the file to open
+</ParamField>
+
+<ResponseField name="file" type="*File">
+  Opened file with O_RDONLY mode
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Error of type *PathError if operation fails
+</ResponseField>
+
+**Example:**
+```go
+file, err := os.Open("example.txt")
+if err != nil {
+    log.Fatal(err)
+}
+defer file.Close()
+
+data := make([]byte, 100)
+n, err := file.Read(data)
+```
+
+### Create
+
+Creates or truncates the named file.
+
+```go
+func Create(name string) (*File, error)
+```
+
+<ParamField path="name" type="string" required>
+  Path to the file to create
+</ParamField>
+
+<ResponseField name="file" type="*File">
+  Created file with mode 0666 and O_RDWR mode
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Error if creation fails
+</ResponseField>
+
+**Example:**
+```go
+file, err := os.Create("output.txt")
+if err != nil {
+    log.Fatal(err)
+}
+defer file.Close()
+
+file.WriteString("Hello, World!")
+```
+
+### OpenFile
+
+Generalized open call with specified flags and permissions.
+
+```go
+func OpenFile(name string, flag int, perm FileMode) (*File, error)
+```
+
+<ParamField path="name" type="string" required>
+  Path to the file
+</ParamField>
+
+<ParamField path="flag" type="int" required>
+  Flags: O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_CREATE, O_TRUNC, etc.
+</ParamField>
+
+<ParamField path="perm" type="FileMode" required>
+  Unix permission bits (e.g., 0644)
+</ParamField>
+
+**Example:**
+```go
+file, err := os.OpenFile("log.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+if err != nil {
+    log.Fatal(err)
+}
+defer file.Close()
+```
+
+### File.Read
+
+Reads up to len(b) bytes from the File.
+
+```go
+func (f *File) Read(b []byte) (n int, err error)
+```
+
+<ParamField path="b" type="[]byte" required>
+  Buffer to read data into
+</ParamField>
+
+<ResponseField name="n" type="int">
+  Number of bytes read
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  io.EOF at end of file, or other error
+</ResponseField>
+
+### File.Write
+
+Writes len(b) bytes to the File.
+
+```go
+func (f *File) Write(b []byte) (n int, err error)
+```
+
+<ParamField path="b" type="[]byte" required>
+  Data to write
+</ParamField>
+
+<ResponseField name="n" type="int">
+  Number of bytes written
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Error if n != len(b)
+</ResponseField>
+
+**Example:**
+```go
+data := []byte("Hello, World!")
+n, err := file.Write(data)
+```
+
+### File.WriteString
+
+Writes the contents of string s to the file.
+
+```go
+func (f *File) WriteString(s string) (n int, err error)
+```
+
+**Example:**
+```go
+n, err := file.WriteString("Hello, World!\n")
+```
+
+### File.Close
+
+Closes the File.
+
+```go
+func (f *File) Close() error
+```
+
+**Example:**
+```go
+defer file.Close()
+```
+
+### File.Seek
+
+Sets the offset for the next Read or Write.
+
+```go
+func (f *File) Seek(offset int64, whence int) (ret int64, err error)
+```
+
+<ParamField path="offset" type="int64" required>
+  Offset to seek to
+</ParamField>
+
+<ParamField path="whence" type="int" required>
+  0 = relative to origin, 1 = relative to current, 2 = relative to end
+</ParamField>
+
+**Example:**
+```go
+// Seek to beginning
+file.Seek(0, 0)
+
+// Seek to end
+file.Seek(0, 2)
+```
+
+## File System Operations
+
+### ReadFile
+
+Reads the named file and returns the contents.
+
+```go
+func ReadFile(name string) ([]byte, error)
+```
+
+<ParamField path="name" type="string" required>
+  Path to the file to read
+</ParamField>
+
+<ResponseField name="data" type="[]byte">
+  File contents
+</ResponseField>
+
+<ResponseField name="err" type="error">
+  Error if read fails (EOF is not an error)
+</ResponseField>
+
+**Example:**
+```go
+data, err := os.ReadFile("config.json")
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("File size: %d bytes\n", len(data))
+```
+
+### WriteFile
+
+Writes data to the named file, creating it if necessary.
+
+```go
+func WriteFile(name string, data []byte, perm FileMode) error
+```
+
+<ParamField path="name" type="string" required>
+  Path to the file
+</ParamField>
+
+<ParamField path="data" type="[]byte" required>
+  Data to write
+</ParamField>
+
+<ParamField path="perm" type="FileMode" required>
+  Unix permission bits (e.g., 0644)
+</ParamField>
+
+**Example:**
+```go
+data := []byte("Hello, World!\n")
+err := os.WriteFile("output.txt", data, 0644)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### Remove
+
+Removes the named file or (empty) directory.
+
+```go
+func Remove(name string) error
+```
+
+**Example:**
+```go
+err := os.Remove("temp.txt")
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### RemoveAll
+
+Removes path and any children it contains.
+
+```go
+func RemoveAll(path string) error
+```
+
+**Example:**
+```go
+err := os.RemoveAll("temp_dir")
+```
+
+### Rename
+
+Renames (moves) oldpath to newpath.
+
+```go
+func Rename(oldpath, newpath string) error
+```
+
+**Example:**
+```go
+err := os.Rename("old.txt", "new.txt")
+```
+
+### Mkdir
+
+Creates a new directory with the specified name and permission bits.
+
+```go
+func Mkdir(name string, perm FileMode) error
+```
+
+<ParamField path="name" type="string" required>
+  Directory name
+</ParamField>
+
+<ParamField path="perm" type="FileMode" required>
+  Unix permission bits (e.g., 0755)
+</ParamField>
+
+**Example:**
+```go
+err := os.Mkdir("mydir", 0755)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### MkdirAll
+
+Creates a directory named path, along with any necessary parents.
+
+```go
+func MkdirAll(path string, perm FileMode) error
+```
+
+**Example:**
+```go
+err := os.MkdirAll("path/to/dir", 0755)
+```
+
+## File Info
+
+### Stat
+
+Returns a FileInfo describing the named file.
+
+```go
+func Stat(name string) (FileInfo, error)
+```
+
+<ParamField path="name" type="string" required>
+  File path
+</ParamField>
+
+<ResponseField name="info" type="FileInfo">
+  File information
+</ResponseField>
+
+**Example:**
+```go
+info, err := os.Stat("example.txt")
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("Size: %d bytes\n", info.Size())
+fmt.Printf("Modified: %v\n", info.ModTime())
+fmt.Printf("Is directory: %v\n", info.IsDir())
+```
+
+### FileInfo Interface
+
+```go
+type FileInfo interface {
+    Name() string       // base name of the file
+    Size() int64        // length in bytes
+    Mode() FileMode     // file mode bits
+    ModTime() time.Time // modification time
+    IsDir() bool        // abbreviation for Mode().IsDir()
+    Sys() any          // underlying data source
+}
+```
+
+## Directory Operations
+
+### ReadDir
+
+Reads the named directory, returning all its directory entries sorted by filename.
+
+```go
+func ReadDir(name string) ([]DirEntry, error)
+```
+
+<ParamField path="name" type="string" required>
+  Directory path
+</ParamField>
+
+<ResponseField name="entries" type="[]DirEntry">
+  Directory entries sorted by filename
+</ResponseField>
+
+**Example:**
+```go
+entries, err := os.ReadDir(".")
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, entry := range entries {
+    fmt.Println(entry.Name())
+}
+```
+
+### Getwd
+
+Returns a rooted path name corresponding to the current directory.
+
+```go
+func Getwd() (dir string, err error)
+```
+
+**Example:**
+```go
+dir, err := os.Getwd()
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("Current directory: %s\n", dir)
+```
+
+### Chdir
+
+Changes the current working directory to the named directory.
+
+```go
+func Chdir(dir string) error
+```
+
+**Example:**
+```go
+err := os.Chdir("/tmp")
+```
+
+## Environment Variables
+
+### Getenv
+
+Retrieves the value of the environment variable named by the key.
+
+```go
+func Getenv(key string) string
+```
+
+**Example:**
+```go
+path := os.Getenv("PATH")
+home := os.Getenv("HOME")
+```
+
+### Setenv
+
+Sets the value of the environment variable named by the key.
+
+```go
+func Setenv(key, value string) error
+```
+
+**Example:**
+```go
+err := os.Setenv("MY_VAR", "value")
+```
+
+### Environ
+
+Returns a copy of strings representing the environment.
+
+```go
+func Environ() []string
+```
+
+**Example:**
+```go
+for _, env := range os.Environ() {
+    fmt.Println(env)
+}
+```
+
+## Process Operations
+
+### Exit
+
+Causes the current program to exit with the given status code.
+
+```go
+func Exit(code int)
+```
+
+**Example:**
+```go
+if err != nil {
+    fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+    os.Exit(1)
+}
+os.Exit(0)
+```
+
+### Getpid
+
+Returns the process id of the caller.
+
+```go
+func Getpid() int
+```
+
+**Example:**
+```go
+pid := os.Getpid()
+fmt.Printf("Process ID: %d\n", pid)
+```
+
+## Standard File Descriptors
+
+```go
+var (
+    Stdin  = NewFile(uintptr(syscall.Stdin), "/dev/stdin")
+    Stdout = NewFile(uintptr(syscall.Stdout), "/dev/stdout")
+    Stderr = NewFile(uintptr(syscall.Stderr), "/dev/stderr")
+)
+```
+
+**Example:**
+```go
+fmt.Fprintln(os.Stdout, "Standard output")
+fmt.Fprintln(os.Stderr, "Error message")
+```
+
+## File Mode Flags
+
+```go
+const (
+    O_RDONLY int = syscall.O_RDONLY // open read-only
+    O_WRONLY int = syscall.O_WRONLY // open write-only
+    O_RDWR   int = syscall.O_RDWR   // open read-write
+    O_APPEND int = syscall.O_APPEND // append data to file
+    O_CREATE int = syscall.O_CREAT  // create file if none exists
+    O_EXCL   int = syscall.O_EXCL   // used with O_CREATE, file must not exist
+    O_SYNC   int = syscall.O_SYNC   // open for synchronous I/O
+    O_TRUNC  int = syscall.O_TRUNC  // truncate file when opened
+)
+```
+
+## Complete Example
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    "os"
+)
+
+func main() {
+    // Write to file
+    err := os.WriteFile("example.txt", []byte("Hello, World!\n"), 0644)
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    // Read from file
+    data, err := os.ReadFile("example.txt")
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Printf("File contents: %s", data)
+    
+    // Get file info
+    info, err := os.Stat("example.txt")
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Printf("Size: %d bytes\n", info.Size())
+    
+    // Create directory
+    err = os.Mkdir("testdir", 0755)
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    // List directory
+    entries, err := os.ReadDir(".")
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    fmt.Println("Directory contents:")
+    for _, entry := range entries {
+        fmt.Printf("  %s (dir: %v)\n", entry.Name(), entry.IsDir())
+    }
+    
+    // Clean up
+    os.Remove("example.txt")
+    os.Remove("testdir")
+}
+```

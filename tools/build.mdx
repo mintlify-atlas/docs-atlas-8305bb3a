@@ -1,0 +1,541 @@
+---
+title: 'Building Go Programs'
+description: 'Compile packages and dependencies with go build'
+---
+
+The `go build` command compiles packages and their dependencies, creating executable binaries or verifying that packages can be built.
+
+## Overview
+
+Building is one of the most common operations in Go development. The `go build` command handles dependency resolution, compilation, and linking automatically.
+
+## Basic Usage
+
+```bash
+go build [-o output] [build flags] [packages]
+```
+
+<CodeGroup>
+```bash Current Package
+# Build current package
+go build
+
+# Build with custom output name
+go build -o myapp
+
+# Build for current directory
+go build .
+```
+
+```bash Specific Packages
+# Build specific package
+go build example.com/myapp
+
+# Build from .go files
+go build main.go helper.go
+
+# Build multiple packages
+go build ./cmd/... 
+```
+</CodeGroup>
+
+## Output Behavior
+
+<AccordionGroup>
+  <Accordion title="Main Packages (Executables)">
+    When building a main package, `go build` creates an executable file:
+    
+    ```bash
+    # Builds executable named after last path component
+    go build example.com/myapp     # Creates: myapp
+    go build example.com/foo/v2    # Creates: foo
+    ```
+    
+    On Windows, adds `.exe` extension automatically.
+  </Accordion>
+  
+  <Accordion title="Non-Main Packages (Libraries)">
+    When building library packages, `go build` compiles them but discards the result:
+    
+    ```bash
+    # Compiles but doesn't create output file
+    go build example.com/mylib
+    ```
+    
+    This is useful for verifying packages compile successfully.
+  </Accordion>
+  
+  <Accordion title="Custom Output with -o">
+    The `-o` flag controls output location:
+    
+    ```bash
+    # Specific filename
+    go build -o bin/myapp
+    
+    # Directory (must end with / or \\)
+    go build -o bin/ example.com/myapp
+    
+    # Multiple packages to directory
+    go build -o bin/ ./cmd/...
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Build Flags
+
+### Common Flags
+
+<ParamField path="-o" type="file/directory">
+  Specify output file or directory
+  
+  ```bash
+  go build -o myapp
+  go build -o bin/
+  ```
+</ParamField>
+
+<ParamField path="-v" type="flag">
+  Print names of packages as they are compiled
+  
+  ```bash
+  go build -v
+  ```
+</ParamField>
+
+<ParamField path="-a" type="flag">
+  Force rebuilding of packages that are already up-to-date
+  
+  ```bash
+  go build -a
+  ```
+</ParamField>
+
+<ParamField path="-n" type="flag">
+  Print commands but do not run them
+  
+  ```bash
+  go build -n
+  ```
+</ParamField>
+
+<ParamField path="-x" type="flag">
+  Print commands as they are executed
+  
+  ```bash
+  go build -x
+  ```
+</ParamField>
+
+### Compilation Control
+
+<ParamField path="-p" type="n">
+  Number of programs to run in parallel (default: GOMAXPROCS)
+  
+  ```bash
+  go build -p 4
+  ```
+</ParamField>
+
+<ParamField path="-race" type="flag">
+  Enable data race detection
+  
+  ```bash
+  go build -race
+  ```
+  
+  Supported on: darwin/amd64, darwin/arm64, linux/amd64, linux/arm64, windows/amd64
+</ParamField>
+
+<ParamField path="-msan" type="flag">
+  Enable memory sanitizer (requires Clang/LLVM)
+  
+  ```bash
+  go build -msan
+  ```
+</ParamField>
+
+<ParamField path="-asan" type="flag">
+  Enable address sanitizer
+  
+  ```bash
+  go build -asan
+  ```
+</ParamField>
+
+<ParamField path="-cover" type="flag">
+  Enable code coverage instrumentation
+  
+  ```bash
+  go build -cover
+  ```
+</ParamField>
+
+### Build Tags
+
+<ParamField path="-tags" type="tag,list">
+  Comma-separated list of build tags
+  
+  ```bash
+  go build -tags=integration,postgres
+  go build -tags "debug trace"
+  ```
+</ParamField>
+
+### Compiler and Linker Flags
+
+<ParamField path="-gcflags" type="'[pattern=]arg list'">
+  Arguments to pass to the Go compiler
+  
+  ```bash
+  # Disable optimizations and inlining
+  go build -gcflags='-N -l'
+  
+  # View optimization decisions
+  go build -gcflags='-m'
+  
+  # For specific package
+  go build -gcflags='example.com/myapp=-N -l'
+  ```
+</ParamField>
+
+<ParamField path="-ldflags" type="'[pattern=]arg list'">
+  Arguments to pass to the linker
+  
+  ```bash
+  # Set version information
+  go build -ldflags="-X main.version=1.0.0"
+  
+  # Strip debug info and reduce binary size
+  go build -ldflags="-s -w"
+  
+  # Multiple flags
+  go build -ldflags="-X main.version=1.0.0 -s -w"
+  ```
+</ParamField>
+
+<ParamField path="-asmflags" type="'[pattern=]arg list'">
+  Arguments to pass to the assembler
+  
+  ```bash
+  go build -asmflags="-S"
+  ```
+</ParamField>
+
+## Cross-Compilation
+
+<Steps>
+  <Step title="Set Target Platform">
+    Use GOOS and GOARCH environment variables:
+    
+    ```bash
+    # Linux AMD64
+    GOOS=linux GOARCH=amd64 go build
+    
+    # Windows
+    GOOS=windows GOARCH=amd64 go build -o app.exe
+    
+    # macOS ARM64 (Apple Silicon)
+    GOOS=darwin GOARCH=arm64 go build
+    ```
+  </Step>
+  
+  <Step title="List Supported Platforms">
+    View all supported OS/architecture combinations:
+    
+    ```bash
+    go tool dist list
+    ```
+  </Step>
+  
+  <Step title="Build for Multiple Platforms">
+    Common cross-compilation script:
+    
+    ```bash
+    #!/bin/bash
+    platforms=("linux/amd64" "darwin/amd64" "windows/amd64")
+    
+    for platform in "${platforms[@]}"; do
+        platform_split=(${platform//\// })
+        GOOS=${platform_split[0]}
+        GOARCH=${platform_split[1]}
+        output_name='myapp-'$GOOS'-'$GOARCH
+        
+        if [ $GOOS = "windows" ]; then
+            output_name+='.exe'
+        fi
+        
+        GOOS=$GOOS GOARCH=$GOARCH go build -o bin/$output_name
+    done
+    ```
+  </Step>
+</Steps>
+
+### Common Target Platforms
+
+<CardGroup cols={2}>
+  <Card title="Linux">
+    ```bash
+    GOOS=linux GOARCH=amd64 go build
+    GOOS=linux GOARCH=arm64 go build
+    ```
+  </Card>
+  <Card title="macOS">
+    ```bash
+    GOOS=darwin GOARCH=amd64 go build
+    GOOS=darwin GOARCH=arm64 go build
+    ```
+  </Card>
+  <Card title="Windows">
+    ```bash
+    GOOS=windows GOARCH=amd64 go build
+    GOOS=windows GOARCH=386 go build
+    ```
+  </Card>
+  <Card title="ARM">
+    ```bash
+    GOOS=linux GOARCH=arm go build
+    GOOS=linux GOARCH=arm64 go build
+    ```
+  </Card>
+</CardGroup>
+
+## Advanced Options
+
+### Build Modes
+
+<ParamField path="-buildmode" type="mode">
+  Specify build mode
+  
+  ```bash
+  # Default executable
+  go build -buildmode=exe
+  
+  # Shared library
+  go build -buildmode=shared
+  
+  # C shared library
+  go build -buildmode=c-shared -o mylib.so
+  
+  # C static library
+  go build -buildmode=c-archive
+  
+  # Plugin
+  go build -buildmode=plugin
+  ```
+</ParamField>
+
+### Module Flags
+
+<ParamField path="-mod" type="mode">
+  Module download mode: readonly, vendor, or mod
+  
+  ```bash
+  # Read-only mode (default in most cases)
+  go build -mod=readonly
+  
+  # Use vendor directory
+  go build -mod=vendor
+  
+  # Allow module updates
+  go build -mod=mod
+  ```
+</ParamField>
+
+<ParamField path="-modfile" type="file">
+  Use alternate go.mod file
+  
+  ```bash
+  go build -modfile=go.dev.mod
+  ```
+</ParamField>
+
+### Path Trimming
+
+<ParamField path="-trimpath" type="flag">
+  Remove file system paths from executable
+  
+  ```bash
+  go build -trimpath
+  ```
+  
+  Results in reproducible builds and smaller binaries.
+</ParamField>
+
+## Build Examples
+
+### Development Builds
+
+<CodeGroup>
+```bash Quick Development Build
+# Fast build for local testing
+go build -o bin/myapp
+
+# With race detector
+go build -race -o bin/myapp
+
+# Verbose output
+go build -v -o bin/myapp
+```
+
+```bash Debug Build
+# Disable optimizations for debugging
+go build -gcflags="-N -l" -o bin/myapp-debug
+
+# With all symbols
+go build -gcflags="-N -l" -ldflags="" -o bin/myapp-debug
+```
+</CodeGroup>
+
+### Production Builds
+
+<CodeGroup>
+```bash Optimized Production Build
+# Strip debug info, reduce size
+go build -ldflags="-s -w" -trimpath -o bin/myapp
+
+# With version info
+VERSION=$(git describe --tags)
+go build -ldflags="-s -w -X main.version=$VERSION" -trimpath -o bin/myapp
+```
+
+```bash Static Binary
+# Fully static binary (no CGO)
+CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o bin/myapp
+
+# Static with musl (Alpine Linux)
+CC=musl-gcc CGO_ENABLED=1 go build -ldflags="-linkmode external -extldflags '-static'" -o bin/myapp
+```
+</CodeGroup>
+
+### Multi-Platform Release
+
+```bash Makefile
+.PHONY: build-all
+build-all:
+	@echo "Building for multiple platforms..."
+	GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/myapp-linux-amd64
+	GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o dist/myapp-linux-arm64
+	GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o dist/myapp-darwin-amd64
+	GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o dist/myapp-darwin-arm64
+	GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o dist/myapp-windows-amd64.exe
+```
+
+## Build Performance
+
+### Caching
+
+Go automatically caches build artifacts:
+
+```bash
+# View cache location
+go env GOCACHE
+
+# Clear build cache
+go clean -cache
+
+# Clear module cache
+go clean -modcache
+```
+
+### Parallel Builds
+
+```bash
+# Increase parallelism
+go build -p 8
+
+# Set via environment
+export GOMAXPROCS=8
+go build
+```
+
+### Incremental Builds
+
+```bash
+# Only rebuild changed packages (default)
+go build
+
+# Force full rebuild
+go build -a
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Build is slow">
+    ```bash
+    # Check what's being compiled
+    go build -x
+    
+    # Increase parallelism
+    go build -p 8
+    
+    # Check cache
+    go env GOCACHE
+    ```
+  </Accordion>
+  
+  <Accordion title="Binary is too large">
+    ```bash
+    # Strip debug symbols
+    go build -ldflags="-s -w"
+    
+    # Use UPX compression
+    go build -ldflags="-s -w" && upx myapp
+    ```
+  </Accordion>
+  
+  <Accordion title="Module version conflicts">
+    ```bash
+    # Update dependencies
+    go get -u
+    go mod tidy
+    
+    # Use specific version
+    go get example.com/pkg@v1.2.3
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## CI/CD Integration
+
+### GitHub Actions
+
+```yaml .github/workflows/build.yml
+name: Build
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          
+      - name: Build
+        run: go build -v ./...
+        
+      - name: Build release
+        run: |
+          go build -ldflags="-s -w" -trimpath -o bin/myapp
+```
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="go Command" href="/tools/go-command">
+    Overview of go command
+  </Card>
+  <Card title="Testing" href="/tools/test">
+    Testing Go packages
+  </Card>
+  <Card title="Modules" href="/tools/modules">
+    Managing dependencies
+  </Card>
+  <Card title="Compiler" href="/tools/compile">
+    Go compiler reference
+  </Card>
+</CardGroup>

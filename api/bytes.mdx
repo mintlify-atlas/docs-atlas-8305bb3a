@@ -1,0 +1,544 @@
+---
+title: 'bytes'
+description: 'Functions for manipulating byte slices'
+---
+
+## Overview
+
+Package bytes implements functions for the manipulation of byte slices. It is analogous to the facilities of the strings package.
+
+## Comparison Functions
+
+### Equal
+
+Reports whether two byte slices are the same length and contain the same bytes.
+
+```go
+func Equal(a, b []byte) bool
+```
+
+<ParamField path="a" type="[]byte" required>
+  First byte slice
+</ParamField>
+
+<ParamField path="b" type="[]byte" required>
+  Second byte slice
+</ParamField>
+
+<ResponseField name="equal" type="bool">
+  True if slices are equal
+</ResponseField>
+
+**Example:**
+```go
+a := []byte("hello")
+b := []byte("hello")
+if bytes.Equal(a, b) {
+    fmt.Println("Equal")
+}
+```
+
+### Compare
+
+Returns an integer comparing two byte slices lexicographically.
+
+```go
+func Compare(a, b []byte) int
+```
+
+<ResponseField name="result" type="int">
+  0 if a == b, -1 if a < b, +1 if a > b
+</ResponseField>
+
+**Example:**
+```go
+result := bytes.Compare([]byte("a"), []byte("b"))
+// result = -1
+```
+
+## Search Functions
+
+### Contains
+
+Reports whether subslice is within b.
+
+```go
+func Contains(b, subslice []byte) bool
+```
+
+**Example:**
+```go
+if bytes.Contains([]byte("seafood"), []byte("foo")) {
+    fmt.Println("Contains foo")
+}
+```
+
+### Index
+
+Returns the index of the first instance of sep in s, or -1 if sep is not present.
+
+```go
+func Index(s, sep []byte) int
+```
+
+**Example:**
+```go
+idx := bytes.Index([]byte("chicken"), []byte("ken"))
+// idx = 4
+```
+
+### IndexByte
+
+Returns the index of the first instance of c in b, or -1 if c is not present.
+
+```go
+func IndexByte(b []byte, c byte) int
+```
+
+**Example:**
+```go
+idx := bytes.IndexByte([]byte("hello"), 'e')
+// idx = 1
+```
+
+### LastIndex
+
+Returns the index of the last instance of sep in s, or -1 if sep is not present.
+
+```go
+func LastIndex(s, sep []byte) int
+```
+
+### Count
+
+Counts the number of non-overlapping instances of sep in s.
+
+```go
+func Count(s, sep []byte) int
+```
+
+**Example:**
+```go
+count := bytes.Count([]byte("cheese"), []byte("e"))
+// count = 3
+```
+
+## Transformation Functions
+
+### ToUpper
+
+Returns a copy of the byte slice with all Unicode letters mapped to their upper case.
+
+```go
+func ToUpper(s []byte) []byte
+```
+
+**Example:**
+```go
+upper := bytes.ToUpper([]byte("hello"))
+// upper = []byte("HELLO")
+```
+
+### ToLower
+
+Returns a copy of the byte slice with all Unicode letters mapped to their lower case.
+
+```go
+func ToLower(s []byte) []byte
+```
+
+**Example:**
+```go
+lower := bytes.ToLower([]byte("HELLO"))
+// lower = []byte("hello")
+```
+
+### Trim
+
+Returns a subslice of s by slicing off all leading and trailing UTF-8-encoded code points contained in cutset.
+
+```go
+func Trim(s []byte, cutset string) []byte
+```
+
+**Example:**
+```go
+trimmed := bytes.Trim([]byte("!!!Hello!!!"), "!")
+// trimmed = []byte("Hello")
+```
+
+### TrimSpace
+
+Returns a subslice of s by slicing off all leading and trailing white space.
+
+```go
+func TrimSpace(s []byte) []byte
+```
+
+**Example:**
+```go
+trimmed := bytes.TrimSpace([]byte("  \t\n Hello \n\t  "))
+// trimmed = []byte("Hello")
+```
+
+### TrimPrefix
+
+Returns s without the provided leading prefix string.
+
+```go
+func TrimPrefix(s, prefix []byte) []byte
+```
+
+**Example:**
+```go
+result := bytes.TrimPrefix([]byte("Goodbye!"), []byte("Good"))
+// result = []byte("bye!")
+```
+
+### TrimSuffix
+
+Returns s without the provided trailing suffix string.
+
+```go
+func TrimSuffix(s, suffix []byte) []byte
+```
+
+### Replace
+
+Returns a copy of the slice s with the first n non-overlapping instances of old replaced by new.
+
+```go
+func Replace(s, old, new []byte, n int) []byte
+```
+
+<ParamField path="s" type="[]byte" required>
+  Source byte slice
+</ParamField>
+
+<ParamField path="old" type="[]byte" required>
+  Bytes to replace
+</ParamField>
+
+<ParamField path="new" type="[]byte" required>
+  Replacement bytes
+</ParamField>
+
+<ParamField path="n" type="int" required>
+  Number of replacements (-1 means all)
+</ParamField>
+
+**Example:**
+```go
+result := bytes.Replace([]byte("oink oink oink"), []byte("oink"), []byte("moo"), -1)
+// result = []byte("moo moo moo")
+```
+
+### ReplaceAll
+
+Returns a copy of s with all non-overlapping instances of old replaced by new.
+
+```go
+func ReplaceAll(s, old, new []byte) []byte
+```
+
+## Split Functions
+
+### Split
+
+Slices s into all subslices separated by sep.
+
+```go
+func Split(s, sep []byte) [][]byte
+```
+
+**Example:**
+```go
+parts := bytes.Split([]byte("a,b,c"), []byte(","))
+// parts = [][]byte{[]byte("a"), []byte("b"), []byte("c")}
+```
+
+### SplitN
+
+Slices s into subslices separated by sep and returns a slice of the subslices between those separators.
+
+```go
+func SplitN(s, sep []byte, n int) [][]byte
+```
+
+<ParamField path="n" type="int" required>
+  Maximum number of subslices to return
+</ParamField>
+
+### SplitAfter
+
+Slices s into all subslices after each instance of sep.
+
+```go
+func SplitAfter(s, sep []byte) [][]byte
+```
+
+**Example:**
+```go
+parts := bytes.SplitAfter([]byte("a,b,c"), []byte(","))
+// parts = [][]byte{[]byte("a,"), []byte("b,"), []byte("c")}
+```
+
+### Fields
+
+Splits the slice s around each instance of one or more consecutive white space characters.
+
+```go
+func Fields(s []byte) [][]byte
+```
+
+**Example:**
+```go
+fields := bytes.Fields([]byte("  foo bar  baz   "))
+// fields = [][]byte{[]byte("foo"), []byte("bar"), []byte("baz")}
+```
+
+## Join Function
+
+### Join
+
+Concatenates the elements of s to create a new byte slice.
+
+```go
+func Join(s [][]byte, sep []byte) []byte
+```
+
+<ParamField path="s" type="[][]byte" required>
+  Slices to join
+</ParamField>
+
+<ParamField path="sep" type="[]byte" required>
+  Separator to insert between elements
+</ParamField>
+
+**Example:**
+```go
+parts := [][]byte{[]byte("foo"), []byte("bar"), []byte("baz")}
+result := bytes.Join(parts, []byte(","))
+// result = []byte("foo,bar,baz")
+```
+
+## Buffer Type
+
+### Buffer
+
+A variable-sized buffer of bytes with Read and Write methods.
+
+```go
+type Buffer struct {
+    // contains filtered or unexported fields
+}
+```
+
+### NewBuffer
+
+Creates and initializes a new Buffer using buf as its initial contents.
+
+```go
+func NewBuffer(buf []byte) *Buffer
+```
+
+**Example:**
+```go
+buf := bytes.NewBuffer([]byte("initial data"))
+```
+
+### NewBufferString
+
+Creates and initializes a new Buffer using string s as its initial contents.
+
+```go
+func NewBufferString(s string) *Buffer
+```
+
+**Example:**
+```go
+buf := bytes.NewBufferString("Hello")
+```
+
+### Buffer.Write
+
+Appends the contents of p to the buffer.
+
+```go
+func (b *Buffer) Write(p []byte) (n int, err error)
+```
+
+**Example:**
+```go
+var buf bytes.Buffer
+buf.Write([]byte("Hello, "))
+buf.Write([]byte("World!"))
+fmt.Println(buf.String()) // Output: Hello, World!
+```
+
+### Buffer.WriteString
+
+Appends the contents of s to the buffer.
+
+```go
+func (b *Buffer) WriteString(s string) (n int, err error)
+```
+
+**Example:**
+```go
+var buf bytes.Buffer
+buf.WriteString("Hello, ")
+buf.WriteString("World!")
+```
+
+### Buffer.WriteByte
+
+Appends the byte c to the buffer.
+
+```go
+func (b *Buffer) WriteByte(c byte) error
+```
+
+### Buffer.WriteRune
+
+Appends the UTF-8 encoding of Unicode code point r to the buffer.
+
+```go
+func (b *Buffer) WriteRune(r rune) (n int, err error)
+```
+
+### Buffer.Read
+
+Reads the next len(p) bytes from the buffer or until the buffer is drained.
+
+```go
+func (b *Buffer) Read(p []byte) (n int, err error)
+```
+
+**Example:**
+```go
+buf := bytes.NewBufferString("Hello")
+data := make([]byte, 5)
+n, _ := buf.Read(data)
+fmt.Printf("Read %d bytes: %s\n", n, data)
+```
+
+### Buffer.ReadByte
+
+Reads and returns the next byte from the buffer.
+
+```go
+func (b *Buffer) ReadByte() (byte, error)
+```
+
+### Buffer.ReadString
+
+Reads until the first occurrence of delim in the input.
+
+```go
+func (b *Buffer) ReadString(delim byte) (line string, err error)
+```
+
+### Buffer.String
+
+Returns the contents of the unread portion of the buffer as a string.
+
+```go
+func (b *Buffer) String() string
+```
+
+**Example:**
+```go
+var buf bytes.Buffer
+buf.WriteString("Hello")
+fmt.Println(buf.String()) // Output: Hello
+```
+
+### Buffer.Bytes
+
+Returns a slice of length b.Len() holding the unread portion of the buffer.
+
+```go
+func (b *Buffer) Bytes() []byte
+```
+
+### Buffer.Len
+
+Returns the number of bytes of the unread portion of the buffer.
+
+```go
+func (b *Buffer) Len() int
+```
+
+### Buffer.Reset
+
+Resets the buffer to be empty.
+
+```go
+func (b *Buffer) Reset()
+```
+
+**Example:**
+```go
+var buf bytes.Buffer
+buf.WriteString("Hello")
+buf.Reset()
+fmt.Println(buf.Len()) // Output: 0
+```
+
+### Buffer.Grow
+
+Grows the buffer's capacity to guarantee space for another n bytes.
+
+```go
+func (b *Buffer) Grow(n int)
+```
+
+## Complete Example
+
+```go
+package main
+
+import (
+    "bytes"
+    "fmt"
+)
+
+func main() {
+    // Comparison
+    a := []byte("hello")
+    b := []byte("hello")
+    fmt.Println(bytes.Equal(a, b)) // true
+    
+    // Searching
+    data := []byte("Hello, World!")
+    if bytes.Contains(data, []byte("World")) {
+        fmt.Println("Found World")
+    }
+    
+    // Transformation
+    upper := bytes.ToUpper([]byte("hello"))
+    fmt.Printf("Uppercase: %s\n", upper)
+    
+    // Replacement
+    result := bytes.ReplaceAll([]byte("foo foo foo"), []byte("foo"), []byte("bar"))
+    fmt.Printf("Replaced: %s\n", result)
+    
+    // Splitting
+    parts := bytes.Split([]byte("a,b,c"), []byte(","))
+    for _, part := range parts {
+        fmt.Printf("Part: %s\n", part)
+    }
+    
+    // Buffer usage
+    var buf bytes.Buffer
+    buf.WriteString("Hello, ")
+    buf.WriteString("World!")
+    fmt.Println(buf.String())
+    
+    // Reading from buffer
+    buf = *bytes.NewBufferString("test data")
+    line, _ := buf.ReadString(' ')
+    fmt.Printf("Read: %s\n", line)
+}
+```
