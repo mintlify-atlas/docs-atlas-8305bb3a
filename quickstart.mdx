@@ -1,0 +1,280 @@
+---
+title: Quickstart
+description: Get up and running with Go in 5 minutes
+---
+
+## Prerequisites
+
+Before you begin, make sure you have:
+
+- Go installed on your system ([installation guide](/installation))
+- A text editor or IDE
+- Basic familiarity with command-line interfaces
+
+## Your first Go program
+
+<Steps>
+  <Step title="Create a new directory">
+    Create a directory for your Go project:
+    
+    ```bash
+    mkdir hello-go
+    cd hello-go
+    ```
+  </Step>
+
+  <Step title="Initialize a Go module">
+    Initialize a new Go module:
+    
+    ```bash
+    go mod init example.com/hello
+    ```
+    
+    This creates a `go.mod` file that tracks your project's dependencies.
+  </Step>
+
+  <Step title="Create your program">
+    Create a file named `main.go` with the following content:
+    
+    ```go
+    package main
+
+    import "fmt"
+
+    func main() {
+        fmt.Println("Hello, Go!")
+    }
+    ```
+  </Step>
+
+  <Step title="Run your program">
+    Execute your program:
+    
+    ```bash
+    go run main.go
+    ```
+    
+    You should see:
+    ```
+    Hello, Go!
+    ```
+  </Step>
+
+  <Step title="Build an executable">
+    Compile your program into an executable:
+    
+    ```bash
+    go build
+    ```
+    
+    This creates an executable file you can run directly:
+    
+    ```bash
+    ./hello  # On Unix/Linux/macOS
+    hello.exe  # On Windows
+    ```
+  </Step>
+</Steps>
+
+## Working with packages
+
+Let's enhance your program by using Go's standard library:
+
+```go
+package main
+
+import (
+    "fmt"
+    "time"
+)
+
+func main() {
+    fmt.Println("Hello, Go!")
+    fmt.Println("The current time is:", time.Now().Format("15:04:05"))
+}
+```
+
+Run it again:
+
+```bash
+go run main.go
+```
+
+## Using external packages
+
+Add an external package to fetch data from the web:
+
+<Steps>
+  <Step title="Add a dependency">
+    Go automatically downloads dependencies when you import them:
+    
+    ```go
+    package main
+
+    import (
+        "encoding/json"
+        "fmt"
+        "io"
+        "net/http"
+    )
+
+    type Response struct {
+        Message string `json:"message"`
+    }
+
+    func main() {
+        resp, err := http.Get("https://httpbin.org/json")
+        if err != nil {
+            fmt.Println("Error:", err)
+            return
+        }
+        defer resp.Body.Close()
+
+        body, err := io.ReadAll(resp.Body)
+        if err != nil {
+            fmt.Println("Error reading body:", err)
+            return
+        }
+
+        fmt.Println("Response:", string(body))
+    }
+    ```
+  </Step>
+
+  <Step title="Run with automatic dependency management">
+    Go will automatically download and manage dependencies:
+    
+    ```bash
+    go run main.go
+    ```
+    
+    Go downloads the required packages and runs your program.
+  </Step>
+
+  <Step title="View dependencies">
+    Check your `go.mod` file to see tracked dependencies:
+    
+    ```bash
+    cat go.mod
+    ```
+  </Step>
+</Steps>
+
+## Essential Go commands
+
+Here are the most common Go commands you'll use:
+
+| Command | Description |
+|---------|-------------|
+| `go run main.go` | Compile and run your program |
+| `go build` | Compile into an executable |
+| `go mod init <module>` | Initialize a new module |
+| `go mod tidy` | Add missing and remove unused dependencies |
+| `go get <package>` | Add a dependency |
+| `go test` | Run tests |
+| `go fmt` | Format your code |
+| `go vet` | Examine code for common mistakes |
+
+## Common patterns
+
+### Variables and types
+
+```go
+// Short variable declaration (inside functions)
+name := "Alice"
+age := 30
+
+// Explicit type declaration
+var count int = 10
+var price float64 = 99.99
+
+// Multiple variables
+x, y := 1, 2
+```
+
+### Functions
+
+```go
+func add(a, b int) int {
+    return a + b
+}
+
+func divide(a, b float64) (float64, error) {
+    if b == 0 {
+        return 0, fmt.Errorf("division by zero")
+    }
+    return a / b, nil
+}
+```
+
+### Error handling
+
+```go
+result, err := divide(10, 0)
+if err != nil {
+    fmt.Println("Error:", err)
+    return
+}
+fmt.Println("Result:", result)
+```
+
+### Structs
+
+```go
+type Person struct {
+    Name string
+    Age  int
+}
+
+person := Person{
+    Name: "Bob",
+    Age:  25,
+}
+fmt.Println(person.Name)
+```
+
+### Slices and maps
+
+```go
+// Slice (dynamic array)
+numbers := []int{1, 2, 3, 4, 5}
+numbers = append(numbers, 6)
+
+// Map (hash table)
+ages := map[string]int{
+    "Alice": 30,
+    "Bob":   25,
+}
+ages["Charlie"] = 35
+```
+
+## Code formatting
+
+Go has built-in code formatting. Always format your code:
+
+```bash
+go fmt ./...
+```
+
+This ensures your code follows Go's standard formatting conventions.
+
+<Tip>
+Most Go editors and IDEs automatically run `go fmt` when you save a file.
+</Tip>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Complete tutorial" icon="book" href="/tutorial">
+    Follow a comprehensive tutorial covering all Go fundamentals
+  </Card>
+  <Card title="Language specification" icon="file-lines" href="/language/specification">
+    Read the official Go language specification
+  </Card>
+  <Card title="Standard library" icon="books" href="/stdlib/overview">
+    Explore Go's rich standard library
+  </Card>
+  <Card title="Effective Go" icon="lightbulb" href="/language/effective-go">
+    Learn Go best practices and idioms
+  </Card>
+</CardGroup>
